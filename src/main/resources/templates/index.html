@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>King Yurina</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body>
+<div class="page-shell">
+    <header class="site-header" aria-label="Primary navigation">
+        <a class="brand-mark" href="/" aria-label="King Yurina home">KY</a>
+        <nav class="nav-links" aria-label="Main menu">
+            <a href="#studio">Studio</a>
+            <a href="#systems">Systems</a>
+            <a th:href="@{/stocks}" href="/stocks">Markets</a>
+        </nav>
+        <a class="header-action" href="mailto:hello@kingyurina.com">Contact</a>
+    </header>
+
+    <main class="hero">
+        <section class="hero-stage" aria-labelledby="hero-title">
+            <div class="hero-editorial">
+                <p class="eyebrow">Luxury interface studio</p>
+                <h1 id="hero-title">king yurina</h1>
+                <p class="hero-copy">
+                    Editorial presence for a technology-led brand, refined into a clean market intelligence surface.
+                </p>
+                <div class="hero-actions" aria-label="Featured actions">
+                    <a class="primary-action" th:href="@{/stocks}" href="/stocks">Stock Analysis</a>
+                    <a class="secondary-action" href="#systems">View System</a>
+                </div>
+            </div>
+            <div class="hero-card" aria-label="Market preview">
+                <span>Market Signal</span>
+                <strong>US Equity Research</strong>
+                <p>Minimal stock analysis workspace with cached quotes, profile data, and valuation snapshots.</p>
+                <dl>
+                    <div>
+                        <dt>Stack</dt>
+                        <dd>Spring Boot 4</dd>
+                    </div>
+                    <div>
+                        <dt>Data</dt>
+                        <dd>MariaDB ready</dd>
+                    </div>
+                    <div>
+                        <dt>View</dt>
+                        <dd>Thymeleaf</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <section class="detail-strip" aria-label="Brand details">
+            <article id="studio">
+                <span>01</span>
+                <strong>Studio</strong>
+                <p>White-space first composition, sharp typography, and a quiet luxury rhythm.</p>
+            </article>
+            <article id="systems">
+                <span>02</span>
+                <strong>Systems</strong>
+                <p>Built on Spring Boot 4, Java 21, Spring Security 7, MyBatis, and MariaDB readiness.</p>
+            </article>
+            <article id="signal">
+                <span>03</span>
+                <strong>Signal</strong>
+                <p>A calm entry point that leads directly into the stock analysis workflow.</p>
+            </article>
+        </section>
+    </main>
+</div>
+</body>
+</html>

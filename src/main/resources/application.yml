@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: codex-demo
+  config:
+    import: optional:file:./config/application-secret.yml
+  profiles:
+    default: local
+
+server:
+  port: ${PORT:8080}
+
+finnhub:
+  api-key: ${FINNHUB_API_KEY:}
+  base-url: https://finnhub.io/api/v1
+  quote-cache-seconds: 60
+  profile-cache-hours: 24
+  metrics-cache-hours: 24
+  news-cache-minutes: 30
+  recommendation-enabled: true
+  recommendation-cache-hours: 24
+  eps-surprises-enabled: true
+  eps-surprises-cache-hours: 24
+  candle-enabled: false
+  candle-cache-hours: 24
+
+app:
+  batch:
+    finnhub:
+      index-codes: ""
+    index:
+      stale-hours: 24
+      sp500-sync-enabled: false
+      nasdaq100-sync-enabled: false
+      dow30-sync-enabled: false
+  signal:
+    refresh:
+      enabled: true
+      run-on-startup: true
+      index-code: SP500
+      initial-delay-millis: 3600000
+      fixed-delay-millis: 3600000

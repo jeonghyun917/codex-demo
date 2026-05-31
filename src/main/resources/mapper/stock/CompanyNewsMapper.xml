@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.CompanyNewsMapper">
+    <select id="countRecentBySymbol" resultType="int">
+        SELECT COUNT(*)
+        FROM company_news
+        WHERE symbol = #{symbol}
+          AND published_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    </select>
+
+    <select id="findLatestFetchedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(fetched_at)
+        FROM company_news
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findRecentBySymbol" resultType="com.kingyurina.demo.stock.CompanyNews">
+        SELECT
+            symbol,
+            news_id AS newsId,
+            headline,
+            summary,
+            url,
+            source,
+            published_at AS publishedAt,
+            raw_json AS rawJson,
+            fetched_at AS fetchedAt
+        FROM company_news
+        WHERE symbol = #{symbol}
+        ORDER BY published_at DESC, news_id DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertBatch">
+        INSERT INTO company_news (
+            symbol, news_id, headline, summary, url, source, published_at, raw_json, fetched_at
+        )
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.symbol}, #{item.newsId}, #{item.headline}, #{item.summary}, #{item.url}, #{item.source},
+                #{item.publishedAt}, #{item.rawJson}, #{item.fetchedAt}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            headline = VALUES(headline),
+            summary = VALUES(summary),
+            url = VALUES(url),
+            source = VALUES(source),
+            published_at = VALUES(published_at),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

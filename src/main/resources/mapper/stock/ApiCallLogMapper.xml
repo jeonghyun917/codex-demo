@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.ApiCallLogMapper">
+    <select id="findLatestSuccessfulCallAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(requested_at)
+        FROM api_call_log
+        WHERE endpoint = #{endpoint}
+          AND symbol = #{symbol}
+          AND status_code BETWEEN 200 AND 299
+    </select>
+
+    <insert id="insert">
+        INSERT INTO api_call_log (provider, endpoint, symbol, status_code, error_message)
+        VALUES (#{provider}, #{endpoint}, #{symbol}, #{statusCode}, #{errorMessage})
+    </insert>
+</mapper>

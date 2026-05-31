@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockSignalLatestMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.StockSignalLatest">
+        SELECT
+            symbol,
+            calculated_at,
+            signal_version,
+            integrated_score,
+            integrated_label,
+            tone,
+            confidence,
+            summary,
+            valuation_score,
+            valuation_label,
+            quality_score,
+            quality_label,
+            earnings_score,
+            earnings_label,
+            analyst_score,
+            analyst_label,
+            news_score,
+            news_label,
+            momentum_score,
+            momentum_label,
+            reasons_json,
+            cards_json,
+            source_freshness_json,
+            raw_json
+        FROM stock_signal_latest
+        WHERE symbol = #{symbol}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_signal_latest (
+            symbol, calculated_at, signal_version, integrated_score, integrated_label, tone, confidence, summary,
+            valuation_score, valuation_label, quality_score, quality_label, earnings_score, earnings_label,
+            analyst_score, analyst_label, news_score, news_label, momentum_score, momentum_label,
+            reasons_json, cards_json, source_freshness_json, raw_json
+        )
+        VALUES (
+            #{symbol}, #{calculatedAt}, #{signalVersion}, #{integratedScore}, #{integratedLabel}, #{tone},
+            #{confidence}, #{summary}, #{valuationScore}, #{valuationLabel}, #{qualityScore}, #{qualityLabel},
+            #{earningsScore}, #{earningsLabel}, #{analystScore}, #{analystLabel}, #{newsScore}, #{newsLabel},
+            #{momentumScore}, #{momentumLabel}, #{reasonsJson}, #{cardsJson}, #{sourceFreshnessJson}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            calculated_at = VALUES(calculated_at),
+            signal_version = VALUES(signal_version),
+            integrated_score = VALUES(integrated_score),
+            integrated_label = VALUES(integrated_label),
+            tone = VALUES(tone),
+            confidence = VALUES(confidence),
+            summary = VALUES(summary),
+            valuation_score = VALUES(valuation_score),
+            valuation_label = VALUES(valuation_label),
+            quality_score = VALUES(quality_score),
+            quality_label = VALUES(quality_label),
+            earnings_score = VALUES(earnings_score),
+            earnings_label = VALUES(earnings_label),
+            analyst_score = VALUES(analyst_score),
+            analyst_label = VALUES(analyst_label),
+            news_score = VALUES(news_score),
+            news_label = VALUES(news_label),
+            momentum_score = VALUES(momentum_score),
+            momentum_label = VALUES(momentum_label),
+            reasons_json = VALUES(reasons_json),
+            cards_json = VALUES(cards_json),
+            source_freshness_json = VALUES(source_freshness_json),
+            raw_json = VALUES(raw_json)
+    </insert>
+</mapper>

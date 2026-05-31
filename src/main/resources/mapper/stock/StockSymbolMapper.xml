@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockSymbolMapper">
+    <select id="findActiveSymbols" resultType="string">
+        SELECT symbol
+        FROM stock_symbol
+        WHERE active = TRUE
+        ORDER BY last_collected_at IS NULL DESC, last_collected_at, symbol
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertSymbol">
+        INSERT INTO stock_symbol (symbol, name, exchange, currency, active, collect_tier, first_seen_at, last_seen_at)
+        VALUES (#{symbol}, #{name}, #{exchange}, #{currency}, TRUE, #{collectTier}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            exchange = VALUES(exchange),
+            currency = VALUES(currency),
+            active = TRUE,
+            collect_tier = VALUES(collect_tier),
+            last_seen_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="markCollected">
+        UPDATE stock_symbol
+        SET last_collected_at = CURRENT_TIMESTAMP
+        WHERE symbol = #{symbol}
+    </update>
+</mapper>

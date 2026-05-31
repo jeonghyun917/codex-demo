@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockCandleMapper">
+    <select id="countBySymbol" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_candle_daily
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findLatestUpdatedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(updated_at)
+        FROM stock_candle_daily
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findRecentBySymbol" resultType="com.kingyurina.demo.stock.StockCandleDaily">
+        SELECT
+            symbol,
+            trade_date AS tradeDate,
+            open_price AS openPrice,
+            high_price AS highPrice,
+            low_price AS lowPrice,
+            close_price AS closePrice,
+            volume,
+            source,
+            updated_at AS updatedAt
+        FROM stock_candle_daily
+        WHERE symbol = #{symbol}
+        ORDER BY trade_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_candle_daily (
+            symbol, trade_date, open_price, high_price, low_price, close_price, volume, source
+        )
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.symbol}, #{item.tradeDate}, #{item.openPrice}, #{item.highPrice}, #{item.lowPrice},
+                #{item.closePrice}, #{item.volume}, #{item.source}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open_price = VALUES(open_price),
+            high_price = VALUES(high_price),
+            low_price = VALUES(low_price),
+            close_price = VALUES(close_price),
+            volume = VALUES(volume),
+            source = VALUES(source),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

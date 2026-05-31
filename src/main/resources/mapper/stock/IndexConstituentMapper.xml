@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.IndexConstituentMapper">
+    <select id="findLatestSeenAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(last_seen_at)
+        FROM index_constituent
+        WHERE index_code = #{indexCode}
+    </select>
+
+    <update id="markAllNotCurrent">
+        UPDATE index_constituent
+        SET current_member = FALSE
+        WHERE index_code = #{indexCode}
+    </update>
+
+    <insert id="upsertCurrent" parameterType="com.kingyurina.demo.stock.IndexConstituent">
+        INSERT INTO index_constituent (
+            index_code, symbol, name, exchange, sector, current_member,
+            first_seen_at, last_seen_at, removed_at, source
+        )
+        VALUES (
+            #{indexCode}, #{symbol}, #{name}, #{exchange}, #{sector}, TRUE,
+            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            exchange = VALUES(exchange),
+            sector = VALUES(sector),
+            current_member = TRUE,
+            last_seen_at = CURRENT_TIMESTAMP,
+            removed_at = NULL,
+            source = VALUES(source)
+    </insert>
+
+    <update id="markRemoved">
+        UPDATE index_constituent
+        SET removed_at = COALESCE(removed_at, CURRENT_TIMESTAMP)
+        WHERE index_code = #{indexCode}
+          AND current_member = FALSE
+          AND removed_at IS NULL
+    </update>
+
+    <select id="countCurrent" resultType="int">
+        SELECT COUNT(*)
+        FROM index_constituent
+        WHERE index_code = #{indexCode}
+          AND current_member = TRUE
+    </select>
+
+    <select id="countTotal" resultType="int">
+        SELECT COUNT(*)
+        FROM index_constituent
+        WHERE index_code = #{indexCode}
+    </select>
+
+    <select id="findCurrentSymbols" resultType="string">
+        SELECT symbol
+        FROM index_constituent
+        WHERE index_code = #{indexCode}
+          AND current_member = TRUE
+          AND symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(sector, '')) &lt;&gt; 'TICKER'
+        ORDER BY symbol
+    </select>
+
+    <select id="findCurrentSymbolsByIndexCodes" resultType="string">
+        SELECT i.symbol
+        FROM index_constituent i
+        LEFT JOIN stock_symbol s
+            ON s.symbol = i.symbol
+        WHERE i.current_member = TRUE
+          AND i.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+          AND i.index_code IN
+        <foreach collection="indexCodes" item="indexCode" open="(" separator="," close=")">
+            #{indexCode}
+        </foreach>
+        GROUP BY i.symbol
+        ORDER BY
+            MAX(CASE WHEN s.last_collected_at IS NULL THEN 1 ELSE 0 END) DESC,
+            MIN(s.last_collected_at),
+            i.symbol
+        LIMIT #{limit}
+    </select>
+
+    <select id="findMarketRows" resultType="com.kingyurina.demo.stock.StockMarketRow">
+        SELECT
+            i.symbol,
+            COALESCE(p.name, i.name) AS name,
+            p.logo,
+            i.sector,
+            p.finnhub_industry AS industry,
+            p.market_cap,
+            q.current_price,
+            q.previous_close,
+            q.open_price,
+            q.high_price,
+            q.low_price,
+            m.pe_normalized_annual,
+            m.pb_annual,
+            m.roe_ttm,
+            sl.integrated_score AS signalScore,
+            sl.confidence AS signalConfidence,
+            sl.tone AS signalTone,
+            sl.calculated_at AS signalCalculatedAt
+        FROM index_constituent i
+        LEFT JOIN company_profile p
+            ON p.symbol = i.symbol
+        LEFT JOIN stock_quote_cache q
+            ON q.symbol = i.symbol
+        LEFT JOIN stock_metric_snapshot m
+            ON m.symbol = i.symbol
+            AND m.metric_date = (
+                SELECT MAX(metric_date)
+                FROM stock_metric_snapshot
+                WHERE symbol = i.symbol
+            )
+        LEFT JOIN stock_signal_latest sl
+            ON sl.symbol = i.symbol
+        WHERE i.index_code = #{indexCode}
+          AND i.current_member = TRUE
+          AND i.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        ORDER BY p.market_cap DESC, i.symbol
+    </select>
+
+    <select id="findMarketRowsBySymbols" resultType="com.kingyurina.demo.stock.StockMarketRow">
+        SELECT
+            p.symbol,
+            p.name,
+            p.logo,
+            ic.sector,
+            p.finnhub_industry AS industry,
+            p.market_cap,
+            q.current_price,
+            q.previous_close,
+            q.open_price,
+            q.high_price,
+            q.low_price,
+            m.pe_normalized_annual,
+            m.pb_annual,
+            m.roe_ttm,
+            sl.integrated_score AS signalScore,
+            sl.confidence AS signalConfidence,
+            sl.tone AS signalTone,
+            sl.calculated_at AS signalCalculatedAt
+        FROM company_profile p
+        LEFT JOIN (
+            SELECT symbol, MIN(sector) AS sector
+            FROM index_constituent
+            WHERE current_member = TRUE
+            GROUP BY symbol
+        ) ic
+            ON ic.symbol = p.symbol
+        LEFT JOIN stock_quote_cache q
+            ON q.symbol = p.symbol
+        LEFT JOIN stock_metric_snapshot m
+            ON m.symbol = p.symbol
+            AND m.metric_date = (
+                SELECT MAX(metric_date)
+                FROM stock_metric_snapshot
+                WHERE symbol = p.symbol
+            )
+        LEFT JOIN stock_signal_latest sl
+            ON sl.symbol = p.symbol
+        WHERE p.symbol IN
+        <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
+            #{symbol}
+        </foreach>
+        ORDER BY p.market_cap DESC, p.symbol
+    </select>
+</mapper>

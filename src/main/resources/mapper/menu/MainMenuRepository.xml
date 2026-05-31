@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.menu.MainMenuRepository">
+    <select id="findEnabledMenus" resultType="com.kingyurina.demo.menu.MainMenu">
+        SELECT
+            id,
+            code,
+            label,
+            href,
+            sort_order,
+            enabled
+        FROM main_menu
+        WHERE enabled = TRUE
+        ORDER BY sort_order ASC, id ASC
+    </select>
+</mapper>

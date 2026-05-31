@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockMetricMapper">
+    <select id="findLatestBySymbol" resultType="com.kingyurina.demo.stock.StockMetricSnapshot">
+        SELECT
+            symbol,
+            metric_date,
+            pe_normalized_annual,
+            pb_annual,
+            roe_ttm,
+            eps_ttm,
+            week_52_high,
+            week_52_low,
+            raw_json,
+            fetched_at
+        FROM stock_metric_snapshot
+        WHERE symbol = #{symbol}
+        ORDER BY metric_date DESC
+        LIMIT 1
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_metric_snapshot (
+            symbol, metric_date, pe_normalized_annual, pb_annual, roe_ttm,
+            eps_ttm, week_52_high, week_52_low, raw_json, fetched_at
+        )
+        VALUES (
+            #{symbol}, #{metricDate}, #{peNormalizedAnnual}, #{pbAnnual}, #{roeTtm},
+            #{epsTtm}, #{week52High}, #{week52Low}, #{rawJson}, #{fetchedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            pe_normalized_annual = VALUES(pe_normalized_annual),
+            pb_annual = VALUES(pb_annual),
+            roe_ttm = VALUES(roe_ttm),
+            eps_ttm = VALUES(eps_ttm),
+            week_52_high = VALUES(week_52_high),
+            week_52_low = VALUES(week_52_low),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

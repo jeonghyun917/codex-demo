@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockQuoteMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.StockQuoteCache">
+        SELECT
+            symbol,
+            current_price,
+            open_price,
+            high_price,
+            low_price,
+            previous_close,
+            quote_time,
+            raw_json,
+            fetched_at
+        FROM stock_quote_cache
+        WHERE symbol = #{symbol}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_quote_cache (
+            symbol, current_price, open_price, high_price, low_price,
+            previous_close, quote_time, raw_json, fetched_at
+        )
+        VALUES (
+            #{symbol}, #{currentPrice}, #{openPrice}, #{highPrice}, #{lowPrice},
+            #{previousClose}, #{quoteTime}, #{rawJson}, #{fetchedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            current_price = VALUES(current_price),
+            open_price = VALUES(open_price),
+            high_price = VALUES(high_price),
+            low_price = VALUES(low_price),
+            previous_close = VALUES(previous_close),
+            quote_time = VALUES(quote_time),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

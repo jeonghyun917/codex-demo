@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockEpsSurpriseMapper">
+    <select id="findLatestFetchedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(fetched_at)
+        FROM stock_eps_surprise
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findRecentBySymbol" resultType="com.kingyurina.demo.stock.StockEpsSurprise">
+        SELECT
+            symbol,
+            period_date AS periodDate,
+            fiscal_year AS fiscalYear,
+            fiscal_quarter AS fiscalQuarter,
+            actual,
+            estimate,
+            surprise,
+            surprise_percent AS surprisePercent,
+            raw_json AS rawJson,
+            fetched_at AS fetchedAt
+        FROM stock_eps_surprise
+        WHERE symbol = #{symbol}
+        ORDER BY period_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_eps_surprise (
+            symbol, period_date, fiscal_year, fiscal_quarter, actual, estimate,
+            surprise, surprise_percent, raw_json, fetched_at
+        )
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.symbol}, #{item.periodDate}, #{item.fiscalYear}, #{item.fiscalQuarter}, #{item.actual},
+                #{item.estimate}, #{item.surprise}, #{item.surprisePercent}, #{item.rawJson}, #{item.fetchedAt}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            fiscal_year = VALUES(fiscal_year),
+            fiscal_quarter = VALUES(fiscal_quarter),
+            actual = VALUES(actual),
+            estimate = VALUES(estimate),
+            surprise = VALUES(surprise),
+            surprise_percent = VALUES(surprise_percent),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

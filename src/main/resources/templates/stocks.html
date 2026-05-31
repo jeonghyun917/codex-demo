@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>US Stock Analysis</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" th:value="${dashboard.symbol}" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <section class="ticker-strip">
+        <div>
+            <strong th:text="${dashboard.profile != null && dashboard.profile.name != null ? dashboard.profile.name : dashboard.symbol}">Apple Inc</strong>
+            <span th:text="${dashboard.symbol}">AAPL</span>
+        </div>
+        <div>
+            <strong th:text="${dashboard.quote != null && dashboard.quote.currentPrice != null ? dashboard.quote.currentPrice + ' USD' : '-'}">0 USD</strong>
+            <span th:classappend="${dashboard.quote != null && dashboard.quote.currentPrice != null && dashboard.quote.previousClose != null && dashboard.quote.currentPrice.compareTo(dashboard.quote.previousClose) >= 0 ? ' up' : ' down'}"
+                  th:text="${dashboard.quote != null && dashboard.quote.currentPrice != null && dashboard.quote.previousClose != null ? dashboard.quote.currentPrice.subtract(dashboard.quote.previousClose) + ' vs prev' : 'quote unavailable'}">change</span>
+        </div>
+        <div class="ticker-meta">
+            <span th:text="${info.marketCapLabel}">market cap</span>
+            <span th:text="${info.shareOutstandingLabel}">shares</span>
+            <span th:text="${dashboard.databaseEnabled ? 'MariaDB cache' : 'Live only'}">cache</span>
+        </div>
+    </section>
+
+    <nav class="section-tabs" aria-label="Stock sections">
+        <a href="#major">주요 정보</a>
+        <a href="#finance">재무</a>
+        <a href="#earnings">실적</a>
+        <a href="#dividend">배당</a>
+        <a href="#peers">동종 업계 비교</a>
+        <a href="#news">뉴스</a>
+    </nav>
+
+    <main class="stock-info-layout">
+        <aside class="stock-info-menu" aria-label="Stock info menu">
+            <a class="active" href="#major">주요 정보</a>
+            <a href="#finance">재무</a>
+            <a href="#earnings">실적</a>
+            <a href="#dividend">배당</a>
+            <a href="#peers">동종 업계 비교</a>
+            <a href="#news">뉴스</a>
+        </aside>
+
+        <div class="stock-info-content">
+            <section id="major" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p th:text="${info.fiscalSourceLabel}">Finnhub basic financials</p>
+                        <h1 th:text="${dashboard.profile != null && dashboard.profile.name != null ? dashboard.profile.name : dashboard.symbol}">Apple Inc</h1>
+                    </div>
+                    <a th:if="${dashboard.profile != null && dashboard.profile.weburl != null}" th:href="${dashboard.profile.weburl}" target="_blank" rel="noopener noreferrer">홈페이지</a>
+                </div>
+                <p class="company-summary">
+                    <span th:text="${dashboard.profile != null && dashboard.profile.country != null ? dashboard.profile.country : 'US'}">US</span>
+                    시장의
+                    <span th:text="${info.industryName}">Technology</span>
+                    업종 기업입니다. 현재 보유한 Finnhub profile, quote, metric 데이터를 기준으로 표출합니다.
+                </p>
+                <section class="signal-panel" th:if="${signal != null}" aria-label="Stock signal">
+                    <div class="signal-overview" th:classappend="${signal.tone}">
+                        <span>Integrated Signal</span>
+                        <strong th:text="${signal.integratedLabel}">중립</strong>
+                        <p th:text="${signal.summary}">현재 보유한 캐시 데이터 기준의 투자 판단 보조 신호입니다.</p>
+                        <div>
+                            <b th:text="${signal.score}">50 / 100</b>
+                            <small th:text="${signal.confidence}">신뢰도 보통</small>
+                        </div>
+                    </div>
+                    <div class="signal-card-grid">
+                        <article th:each="card : ${signal.cards}" th:classappend="${card.tone}">
+                            <span th:text="${card.title}">Valuation</span>
+                            <strong th:text="${card.label}">적정</strong>
+                            <b th:text="${card.score}">50점</b>
+                            <p th:text="${card.detail}">detail</p>
+                        </article>
+                    </div>
+                    <ul class="signal-reasons" th:if="${!signal.reasons.isEmpty()}">
+                        <li th:each="reason : ${signal.reasons}" th:text="${reason}">근거</li>
+                    </ul>
+                </section>
+                <div class="info-table">
+                    <div th:each="row : ${info.majorRows}">
+                        <span th:text="${row.label}">시가총액</span>
+                        <strong th:text="${row.value}">-</strong>
+                    </div>
+                </div>
+
+                <div class="business-card">
+                    <div class="donut" aria-hidden="true"></div>
+                    <div>
+                        <h2>매출/산업 구성</h2>
+                        <p>세그먼트별 매출 데이터는 아직 없어서 현재는 Finnhub 산업 분류를 대표 구성으로 표시합니다.</p>
+                        <strong th:text="${info.industryName}">Technology</strong>
+                    </div>
+                </div>
+
+                <h2>투자 지표</h2>
+                <div class="metric-card-grid">
+                    <article th:each="card : ${info.investmentCards}">
+                        <span th:text="${card.label}">PER</span>
+                        <strong th:text="${card.value}">-</strong>
+                        <p th:text="${card.note}">source</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="finance" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p>비율 지표와 주당 지표 기반</p>
+                        <h2>재무</h2>
+                    </div>
+                </div>
+                <div class="metric-card-grid">
+                    <article th:each="card : ${info.financeCards}">
+                        <span th:text="${card.label}">부채비율</span>
+                        <strong th:text="${card.value}">-</strong>
+                        <p th:text="${card.note}">source</p>
+                    </article>
+                </div>
+
+                <div class="chart-block">
+                    <div>
+                        <h3>수익성</h3>
+                        <p>주당 매출과 순이익률을 조합한 추정 흐름입니다.</p>
+                    </div>
+                    <div class="barline-chart">
+                        <div th:each="point : ${info.profitability}" class="barline-point"
+                             th:style="'--primary:' + ${point.primaryHeight} + '%; --secondary:' + ${point.secondaryHeight} + '%'">
+                            <span class="bar"></span>
+                            <span class="line"></span>
+                            <small th:text="${point.label}">25.03</small>
+                        </div>
+                    </div>
+                    <div class="series-table">
+                        <div>
+                            <span>기간</span>
+                            <b th:each="point : ${info.profitability}" th:text="${point.label}">25.03</b>
+                        </div>
+                        <div>
+                            <span>추정 매출</span>
+                            <b th:each="point : ${info.profitability}" th:text="${point.primary}">-</b>
+                        </div>
+                        <div>
+                            <span>순이익률</span>
+                            <b th:each="point : ${info.profitability}" th:text="${point.secondary}">-</b>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-block">
+                    <div>
+                        <h3>안정성</h3>
+                        <p>부채/자본 비율과 유동비율의 최근 흐름입니다.</p>
+                    </div>
+                    <div class="barline-chart teal">
+                        <div th:each="point : ${info.stability}" class="barline-point"
+                             th:style="'--primary:' + ${point.primaryHeight} + '%; --secondary:' + ${point.secondaryHeight} + '%'">
+                            <span class="bar"></span>
+                            <span class="line"></span>
+                            <small th:text="${point.label}">25.03</small>
+                        </div>
+                    </div>
+                    <div class="series-table">
+                        <div>
+                            <span>기간</span>
+                            <b th:each="point : ${info.stability}" th:text="${point.label}">25.03</b>
+                        </div>
+                        <div>
+                            <span>부채/자본</span>
+                            <b th:each="point : ${info.stability}" th:text="${point.primary}">-</b>
+                        </div>
+                        <div>
+                            <span>유동비율</span>
+                            <b th:each="point : ${info.stability}" th:text="${point.secondary}">-</b>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="statement-table">
+                    <div th:each="row : ${info.incomeStatementRows}">
+                        <span th:text="${row.label}">항목</span>
+                        <b th:each="value : ${row.values}" th:text="${value}">-</b>
+                    </div>
+                </div>
+            </section>
+
+            <section id="earnings" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p>최근 분기 기준</p>
+                        <h2>실적</h2>
+                    </div>
+                </div>
+                <div class="chart-block">
+                    <div>
+                        <h3>예상 매출</h3>
+                        <p>예상치 원본은 없어서 발표치 기반 추정 매출 흐름을 표시합니다.</p>
+                    </div>
+                    <div class="barline-chart blue">
+                        <div th:each="point : ${info.earningsRevenue}" class="barline-point"
+                             th:style="'--primary:' + ${point.primaryHeight} + '%; --secondary:' + ${point.secondaryHeight} + '%'">
+                            <span class="bar"></span>
+                            <span class="line"></span>
+                            <small th:text="${point.label}">25.03</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-block">
+                    <div>
+                        <h3>예상 주당순이익</h3>
+                        <p>EPS와 ROE 기반의 최근 흐름입니다.</p>
+                    </div>
+                    <div class="barline-chart">
+                        <div th:each="point : ${info.earningsEps}" class="barline-point"
+                             th:style="'--primary:' + ${point.primaryHeight} + '%; --secondary:' + ${point.secondaryHeight} + '%'">
+                            <span class="bar"></span>
+                            <span class="line"></span>
+                            <small th:text="${point.label}">25.03</small>
+                        </div>
+                    </div>
+                    <div class="series-table">
+                        <div>
+                            <span>기간</span>
+                            <b th:each="point : ${info.earningsEps}" th:text="${point.label}">25.03</b>
+                        </div>
+                        <div>
+                            <span>EPS</span>
+                            <b th:each="point : ${info.earningsEps}" th:text="${point.primary}">-</b>
+                        </div>
+                        <div>
+                            <span>ROE</span>
+                            <b th:each="point : ${info.earningsEps}" th:text="${point.secondary}">-</b>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="dividend" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p>배당 관련 Finnhub metric</p>
+                        <h2>배당</h2>
+                    </div>
+                </div>
+                <div class="metric-card-grid">
+                    <article th:each="card : ${info.dividendCards}">
+                        <span th:text="${card.label}">배당</span>
+                        <strong th:text="${card.value}">-</strong>
+                        <p th:text="${card.note}">source</p>
+                    </article>
+                </div>
+                <div class="chart-block">
+                    <div>
+                        <h3>배당성향 지급 내역</h3>
+                        <p>개별 배당락/지급일 데이터는 아직 없어서 연간 배당성향과 예상 배당을 표시합니다.</p>
+                    </div>
+                    <div class="barline-chart violet">
+                        <div th:each="point : ${info.dividendHistory}" class="barline-point"
+                             th:style="'--primary:' + ${point.primaryHeight} + '%; --secondary:' + ${point.secondaryHeight} + '%'">
+                            <span class="bar"></span>
+                            <span class="line"></span>
+                            <small th:text="${point.label}">25.03</small>
+                        </div>
+                    </div>
+                    <div class="series-table">
+                        <div>
+                            <span>기간</span>
+                            <b th:each="point : ${info.dividendHistory}" th:text="${point.label}">25.03</b>
+                        </div>
+                        <div>
+                            <span>배당성향</span>
+                            <b th:each="point : ${info.dividendHistory}" th:text="${point.primary}">-</b>
+                        </div>
+                        <div>
+                            <span>주당배당</span>
+                            <b th:each="point : ${info.dividendHistory}" th:text="${point.secondary}">-</b>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="peers" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p th:text="${info.industryName + ' 업종'}">Technology 업종</p>
+                        <h2>다른 종목과 비교하기</h2>
+                    </div>
+                </div>
+                <div class="peer-table">
+                    <div class="peer-head">
+                        <span>순위</span>
+                        <span>주식</span>
+                        <span>PER</span>
+                        <span>시가총액</span>
+                        <span>주가</span>
+                        <span>PBR</span>
+                        <span>ROE</span>
+                    </div>
+                    <div th:each="peer : ${info.peers}" th:class="${peer.selected ? 'selected' : ''}">
+                        <span th:text="${peer.rank}">1</span>
+                        <strong><b th:text="${peer.symbol}">AAPL</b><small th:text="${peer.name}">Apple</small></strong>
+                        <span th:text="${peer.per}">-</span>
+                        <span th:text="${peer.marketCap}">-</span>
+                        <span th:text="${peer.price}">-</span>
+                        <span th:text="${peer.pbr}">-</span>
+                        <span th:text="${peer.roe}">-</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="news" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p>company_news cache</p>
+                        <h2>뉴스</h2>
+                    </div>
+                </div>
+                <div class="market-news" th:if="${!dashboard.news.isEmpty()}">
+                    <article th:each="item : ${dashboard.news}">
+                        <span th:text="${item.source != null ? item.source : 'Finnhub'}">Source</span>
+                        <a th:href="${item.url}" th:text="${item.headline}" target="_blank" rel="noopener noreferrer">Headline</a>
+                        <p th:text="${item.summary != null ? item.summary : 'No summary provided.'}">Summary</p>
+                    </article>
+                </div>
+                <p class="empty-state" th:if="${dashboard.news.isEmpty()}">표시할 뉴스 데이터가 없습니다.</p>
+            </section>
+        </div>
+    </main>
+
+    <footer class="market-footer">
+        <span>US stock analysis</span>
+        <span th:text="${dashboard.apiConfigured ? 'Finnhub connected' : 'Finnhub key missing'}">Finnhub connected</span>
+        <span th:text="${dashboard.databaseEnabled ? 'MariaDB cache active' : 'DB disabled'}">MariaDB cache active</span>
+    </footer>
+</div>
+<script>
+    (() => {
+        const menuLinks = Array.from(document.querySelectorAll(".stock-info-menu a"));
+        const tabLinks = Array.from(document.querySelectorAll(".section-tabs a"));
+        const sections = menuLinks
+            .map((link) => document.querySelector(link.getAttribute("href")))
+            .filter(Boolean);
+
+        const setActive = (id) => {
+            [...menuLinks, ...tabLinks].forEach((link) => {
+                link.classList.toggle("active", link.getAttribute("href") === `#${id}`);
+            });
+        };
+
+        const updateActive = () => {
+            const marker = window.scrollY + 150;
+            const current = sections.reduce((active, section) => {
+                return section.offsetTop <= marker ? section : active;
+            }, sections[0]);
+            if (current) {
+                setActive(current.id);
+            }
+        };
+
+        [...menuLinks, ...tabLinks].forEach((link) => {
+            link.addEventListener("click", () => {
+                const id = link.getAttribute("href").slice(1);
+                setActive(id);
+            });
+        });
+
+        window.addEventListener("scroll", updateActive, { passive: true });
+        window.addEventListener("resize", updateActive);
+        updateActive();
+    })();
+</script>
+</body>
+</html>

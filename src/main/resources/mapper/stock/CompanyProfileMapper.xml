@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.CompanyProfileMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.CompanyProfile">
+        SELECT
+            symbol,
+            name,
+            country,
+            currency,
+            exchange,
+            finnhub_industry,
+            market_cap,
+            share_outstanding,
+            logo,
+            weburl,
+            raw_json,
+            fetched_at
+        FROM company_profile
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findPeersByIndustry" resultType="com.kingyurina.demo.stock.StockPeerComparison">
+        SELECT
+            p.symbol,
+            p.name,
+            p.finnhub_industry,
+            p.market_cap,
+            q.current_price,
+            m.pe_normalized_annual,
+            m.pb_annual,
+            m.roe_ttm
+        FROM company_profile p
+        LEFT JOIN stock_quote_cache q
+            ON q.symbol = p.symbol
+        LEFT JOIN stock_metric_snapshot m
+            ON m.symbol = p.symbol
+            AND m.metric_date = (
+                SELECT MAX(metric_date)
+                FROM stock_metric_snapshot
+                WHERE symbol = p.symbol
+            )
+        WHERE p.finnhub_industry = #{industry}
+        ORDER BY p.market_cap DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO company_profile (
+            symbol, name, country, currency, exchange, finnhub_industry,
+            market_cap, share_outstanding, logo, weburl, raw_json, fetched_at
+        )
+        VALUES (
+            #{symbol}, #{name}, #{country}, #{currency}, #{exchange}, #{finnhubIndustry},
+            #{marketCap}, #{shareOutstanding}, #{logo}, #{weburl}, #{rawJson}, #{fetchedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            country = VALUES(country),
+            currency = VALUES(currency),
+            exchange = VALUES(exchange),
+            finnhub_industry = VALUES(finnhub_industry),
+            market_cap = VALUES(market_cap),
+            share_outstanding = VALUES(share_outstanding),
+            logo = VALUES(logo),
+            weburl = VALUES(weburl),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

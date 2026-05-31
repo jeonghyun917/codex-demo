@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>S&amp;P 500 Market</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" placeholder="티커 검색" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="market-home">
+        <section class="market-landing">
+            <div>
+                <p>S&P 500 구성종목</p>
+                <h1>
+                    <strong th:text="${market.title}">S&amp;P 500</strong>
+                    <span th:text="${market.subtitle}">미국 대형주 요약</span>
+                </h1>
+            </div>
+            <a class="market-link" href="#sp500-list">종목 보기</a>
+        </section>
+
+        <section class="index-card-row" aria-label="S&P 500 summary">
+            <article th:each="card : ${market.indexCards}" th:classappend="${card.positive ? ' positive' : ' negative'}">
+                <span th:text="${card.label}">구성종목</span>
+                <strong th:text="${card.value}">504</strong>
+                <p th:text="${card.change}">cached</p>
+                <i aria-hidden="true"></i>
+            </article>
+        </section>
+
+        <section class="market-board" id="sp500-list">
+            <div class="market-board-main">
+                <div class="board-toolbar">
+                    <div>
+                        <h2>S&P 500 실시간 캐시</h2>
+                        <p>
+                            구성종목 <b th:text="${market.totalMembers}">504</b>개,
+                            quote 캐시 <b th:text="${market.cachedQuotes}">504</b>개,
+                            상승 <b class="up" th:text="${market.advancers}">0</b>개,
+                            하락 <b class="down" th:text="${market.decliners}">0</b>개
+                        </p>
+                    </div>
+            <div class="toolbar-pills">
+                        <a th:href="@{/stocks/heatmap}" href="/stocks/heatmap">히트맵</a>
+                        <span>시총순</span>
+                        <span>전일 대비</span>
+                        <span>PER/PBR/ROE</span>
+                    </div>
+                </div>
+
+                <div class="sp-table" data-market-list data-visible-step="100">
+                    <div class="sp-row sp-head">
+                        <span>순위</span>
+                        <span>종목</span>
+                        <span>섹터</span>
+                        <span><button class="sp-sort" type="button" data-sort="price">현재가</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="change">등락률</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="marketCap">시가총액</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="per">PER</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="pbr">PBR</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="roe">ROE</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="signal">Signal 점수</button></span>
+                    </div>
+                    <a class="sp-row" th:each="row, rowStat : ${market.rows}" th:classappend="${rowStat.index >= 100} ? ' is-collapsed' : ''" th:href="@{/stocks/{symbol}(symbol=${row.symbol})}">
+                        <span th:text="${row.rank}">1</span>
+                        <strong class="stock-identity">
+                            <span class="stock-logo">
+                                <img th:if="${row.logoUrl != null}" th:src="${row.logoUrl}" th:alt="${row.symbol + ' logo'}" loading="lazy" onerror="this.remove()">
+                                <span th:text="${row.logoInitial}">A</span>
+                            </span>
+                            <span class="stock-copy">
+                                <b th:text="${row.symbol}">AAPL</b>
+                                <small th:text="${row.name}">Apple Inc</small>
+                            </span>
+                        </strong>
+                        <span th:text="${row.sector}">Information Technology</span>
+                        <span th:text="${row.price}">0 USD</span>
+                        <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">0%</span>
+                        <span th:text="${row.marketCap}">0</span>
+                        <span th:text="${row.per}">-</span>
+                        <span th:text="${row.pbr}">-</span>
+                        <span th:text="${row.roe}">-</span>
+                        <span class="market-signal-score" th:classappend="${row.signalTone}" th:text="${row.signalScore}">-</span>
+                    </a>
+                </div>
+                <div class="sp-load-more" th:if="${#lists.size(market.rows) > 100}">
+                    <button type="button" data-market-load-more>더보기</button>
+                </div>
+            </div>
+
+            <aside class="market-board-side">
+                <section>
+                    <h2>급등락 종목</h2>
+                    <a class="mover-row" th:each="row : ${market.topMovers}" th:href="@{/stocks/{symbol}(symbol=${row.symbol})}">
+                        <strong class="stock-identity">
+                            <span class="stock-logo small">
+                                <img th:if="${row.logoUrl != null}" th:src="${row.logoUrl}" th:alt="${row.symbol + ' logo'}" loading="lazy" onerror="this.remove()">
+                                <span th:text="${row.logoInitial}">A</span>
+                            </span>
+                            <span class="stock-copy">
+                                <b th:text="${row.symbol}">AAPL</b>
+                                <small th:text="${row.name}">Apple Inc</small>
+                            </span>
+                        </strong>
+                        <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">0%</span>
+                    </a>
+                </section>
+
+                <section>
+                    <h2>섹터 요약</h2>
+                    <div class="sector-row" th:each="sector : ${market.sectors}">
+                        <strong th:text="${sector.sector}">Technology</strong>
+                        <span th:text="${sector.count + '개'}">0개</span>
+                        <small th:text="${sector.marketCap}">0</small>
+                        <small th:text="${sector.averageChange}">0%</small>
+                    </div>
+                </section>
+            </aside>
+        </section>
+    </main>
+
+    <footer class="market-footer">
+        <span>S&P 500 dashboard</span>
+        <span th:text="${market.aggregateMarketCap}">market cap</span>
+        <span th:text="${market.averageChange}">change</span>
+    </footer>
+</div>
+<script>
+(() => {
+    const table = document.querySelector("[data-market-list]");
+    if (!table) {
+        return;
+    }
+
+    const button = document.querySelector("[data-market-load-more]");
+    const sortButtons = Array.from(table.querySelectorAll("[data-sort]"));
+    const step = Number(table.dataset.visibleStep || 100);
+    const columnIndex = {
+        price: 3,
+        change: 4,
+        marketCap: 5,
+        per: 6,
+        pbr: 7,
+        roe: 8,
+        signal: 9
+    };
+    let rows = Array.from(table.querySelectorAll(".sp-row:not(.sp-head)"));
+    let visibleCount = rows.filter((row) => !row.classList.contains("is-collapsed")).length;
+    const sortState = {
+        key: "",
+        direction: "desc"
+    };
+
+    const updateButton = () => {
+        if (button) {
+            button.hidden = visibleCount >= rows.length;
+        }
+    };
+
+    const applyVisibility = () => {
+        rows.forEach((row, index) => {
+            row.classList.toggle("is-collapsed", index >= visibleCount);
+        });
+        updateButton();
+    };
+
+    const parseNumber = (value) => {
+        const match = String(value || "").match(/[+-]?\d[\d,]*(?:\.\d+)?/);
+        return match ? Number(match[0].replace(/,/g, "")) : null;
+    };
+
+    const sortValue = (row, key) => {
+        const index = columnIndex[key];
+        if (index == null) {
+            return null;
+        }
+        return parseNumber(row.children[index]?.textContent);
+    };
+
+    button?.addEventListener("click", () => {
+        visibleCount = Math.min(visibleCount + step, rows.length);
+        applyVisibility();
+    });
+
+    sortButtons.forEach((sortButton) => {
+        sortButton.addEventListener("click", () => {
+            const key = sortButton.dataset.sort;
+            const direction = sortState.key === key && sortState.direction === "desc" ? "asc" : "desc";
+            sortState.key = key;
+            sortState.direction = direction;
+
+            rows = [...rows].sort((left, right) => {
+                const leftValue = sortValue(left, key);
+                const rightValue = sortValue(right, key);
+                if (leftValue == null && rightValue == null) {
+                    return 0;
+                }
+                if (leftValue == null) {
+                    return 1;
+                }
+                if (rightValue == null) {
+                    return -1;
+                }
+                return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
+            });
+
+            rows.forEach((row) => table.append(row));
+            visibleCount = Math.min(step, rows.length);
+            sortButtons.forEach((buttonItem) => {
+                buttonItem.removeAttribute("data-direction");
+                buttonItem.removeAttribute("aria-sort");
+            });
+            sortButton.dataset.direction = direction;
+            sortButton.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+            applyVisibility();
+        });
+    });
+
+    updateButton();
+})();
+</script>
+</body>
+</html>

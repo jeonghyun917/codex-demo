@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${heatmap.title}">Stock Heatmap</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+    <script defer th:src="@{/js/heatmap.js}" src="../static/js/heatmap.js"></script>
+</head>
+<body class="heatmap-body">
+<div class="heatmap-page">
+    <header class="market-topbar heatmap-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:classappend="${menu.href == '/stocks/heatmap' ? ' active' : ''}"
+               th:text="${menu.label}"
+               href="/">Dashboard</a>
+        </nav>
+    </header>
+
+<div class="heatmap-shell">
+    <aside class="heatmap-sidebar">
+        <h2>MAP FILTER</h2>
+        <nav aria-label="Heatmap index filter">
+            <a th:each="menu : ${heatmap.menus}"
+               th:classappend="${menu.active ? ' active' : ''}"
+               th:href="@{/stocks/heatmap(index=${menu.code})}"
+               th:text="${menu.label}">S&amp;P 500</a>
+        </nav>
+        <div class="heatmap-filter-card">
+            <strong>1-Day Performance</strong>
+            <span>Sector, industry, and stock size represent market cap.</span>
+        </div>
+    </aside>
+
+    <main class="heatmap-main">
+        <header class="heatmap-header">
+            <nav>
+                <a th:href="@{/stocks}" href="/stocks">S&amp;P 500 목록</a>
+                <a class="active" th:href="@{/stocks/heatmap}" href="/stocks/heatmap">Heatmap</a>
+            </nav>
+            <p th:text="${heatmap.description}">Size represents market cap.</p>
+            <a th:href="@{/stocks}" href="/stocks">목록으로</a>
+        </header>
+
+        <section class="heatmap-board" aria-label="Stock heatmap">
+            <article class="heatmap-sector" th:each="sector : ${heatmap.sectors}"
+                     th:style="${sector.layoutStyle}">
+                <h2 th:text="${sector.name}">TECHNOLOGY</h2>
+                <div class="heatmap-industries">
+                    <section class="heatmap-industry"
+                             th:each="industry : ${sector.industries}"
+                             th:classappend="${industry.colorClass}"
+                             th:style="${industry.layoutStyle}">
+                        <h3><span data-industry-label th:text="${industry.name}">SEMICONDUCTORS</span></h3>
+                        <div class="heatmap-tiles">
+                            <a class="heatmap-tile"
+                               th:each="tile : ${industry.tiles}"
+                               th:classappend="${tile.colorClass}"
+                               th:href="${tile.href}"
+                               th:aria-label="${tile.symbol + ' ' + tile.name + ' ' + tile.change}"
+                               th:attr="data-symbol=${tile.symbol},
+                                        data-name=${tile.name},
+                                        data-sector=${tile.sector},
+                                        data-industry=${tile.industry},
+                                        data-change=${tile.change},
+                                        data-price=${tile.currentPrice},
+                                        data-previous-close=${tile.previousClose},
+                                        data-open=${tile.openPrice},
+                                        data-day-range=${tile.dayRange},
+                                        data-market-cap=${tile.marketCap},
+                                        data-per=${tile.per},
+                                        data-pbr=${tile.pbr},
+                                        data-roe=${tile.roe}"
+                               th:style="${tile.layoutStyle}">
+                                <strong data-tile-symbol th:text="${tile.symbol}">AAPL</strong>
+                                <span data-tile-change th:text="${tile.change}">0%</span>
+                            </a>
+                        </div>
+                    </section>
+                </div>
+            </article>
+        </section>
+
+        <footer class="heatmap-legend">
+            <span class="down-3">-3%</span>
+            <span class="down-2">-2%</span>
+            <span class="down-1">-1%</span>
+            <span class="flat">0%</span>
+            <span class="up-1">+1%</span>
+            <span class="up-2">+2%</span>
+            <span class="up-3">+3%</span>
+        </footer>
+    </main>
+</div>
+</div>
+<div class="heatmap-tooltip" data-heatmap-tooltip aria-hidden="true"></div>
+</body>
+</html>
