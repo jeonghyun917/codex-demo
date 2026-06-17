@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.Institution13fBatchRunMapper">
+    <insert id="insert" parameterType="com.kingyurina.demo.stock.Institution13fBatchRun"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO institution_13f_batch_run (job_name, status)
+        VALUES (#{jobName}, #{status})
+    </insert>
+
+    <update id="finish" parameterType="com.kingyurina.demo.stock.Institution13fBatchRun">
+        UPDATE institution_13f_batch_run
+        SET finished_at = #{finishedAt},
+            status = #{status},
+            requested_count = #{requestedCount},
+            success_count = #{successCount},
+            fail_count = #{failCount},
+            holding_count = #{holdingCount},
+            aggregate_rows = #{aggregateRows},
+            message = #{message}
+        WHERE id = #{id}
+    </update>
+</mapper>

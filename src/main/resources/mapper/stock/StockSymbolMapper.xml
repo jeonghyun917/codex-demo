@@ -11,6 +11,59 @@
         LIMIT #{limit}
     </select>
 
+    <select id="findSymbolByQuery" resultType="string">
+        SELECT symbol
+        FROM (
+            SELECT s.symbol, 1 AS priority
+            FROM stock_symbol s
+            WHERE UPPER(s.symbol) = UPPER(#{query})
+              AND s.active = TRUE
+
+            UNION ALL
+
+            SELECT p.symbol, 2 AS priority
+            FROM company_profile p
+            JOIN stock_symbol s
+                ON s.symbol = p.symbol
+               AND s.active = TRUE
+            WHERE UPPER(p.symbol) = UPPER(#{query})
+
+            UNION ALL
+
+            SELECT s.symbol, 3 AS priority
+            FROM stock_symbol s
+            WHERE LOWER(s.name) = LOWER(#{query})
+              AND s.active = TRUE
+
+            UNION ALL
+
+            SELECT p.symbol, 4 AS priority
+            FROM company_profile p
+            JOIN stock_symbol s
+                ON s.symbol = p.symbol
+               AND s.active = TRUE
+            WHERE LOWER(p.name) = LOWER(#{query})
+
+            UNION ALL
+
+            SELECT s.symbol, 5 AS priority
+            FROM stock_symbol s
+            WHERE LOWER(s.name) LIKE CONCAT('%', LOWER(#{query}), '%')
+              AND s.active = TRUE
+
+            UNION ALL
+
+            SELECT p.symbol, 6 AS priority
+            FROM company_profile p
+            JOIN stock_symbol s
+                ON s.symbol = p.symbol
+               AND s.active = TRUE
+            WHERE LOWER(p.name) LIKE CONCAT('%', LOWER(#{query}), '%')
+        ) matched
+        ORDER BY priority, symbol
+        LIMIT 1
+    </select>
+
     <insert id="upsertSymbol">
         INSERT INTO stock_symbol (symbol, name, exchange, currency, active, collect_tier, first_seen_at, last_seen_at)
         VALUES (#{symbol}, #{name}, #{exchange}, #{currency}, TRUE, #{collectTier}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

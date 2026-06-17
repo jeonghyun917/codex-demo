@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.Institution13fMapper">
+    <select id="findActiveManagers" resultType="com.kingyurina.demo.stock.Institution13fManager">
+        SELECT cik, manager_name, short_name, active, priority
+        FROM institution_13f_manager
+        WHERE active = TRUE
+        ORDER BY priority, manager_name
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertFiling" parameterType="com.kingyurina.demo.stock.Institution13fFiling">
+        INSERT INTO institution_13f_filing (
+            accession_number, manager_cik, manager_name, form_type, report_quarter,
+            report_date, filing_date, information_table_url, status, raw_json, fetched_at
+        )
+        VALUES (
+            #{accessionNumber}, #{managerCik}, #{managerName}, #{formType}, #{reportQuarter},
+            #{reportDate}, #{filingDate}, #{informationTableUrl}, #{status}, #{rawJson}, #{fetchedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            manager_cik = VALUES(manager_cik),
+            manager_name = VALUES(manager_name),
+            form_type = VALUES(form_type),
+            report_quarter = VALUES(report_quarter),
+            report_date = VALUES(report_date),
+            filing_date = VALUES(filing_date),
+            information_table_url = COALESCE(VALUES(information_table_url), information_table_url),
+            status = VALUES(status),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <update id="updateFilingStatus">
+        UPDATE institution_13f_filing
+        SET status = #{status},
+            information_table_url = COALESCE(#{informationTableUrl}, information_table_url),
+            fetched_at = CURRENT_TIMESTAMP
+        WHERE accession_number = #{accessionNumber}
+    </update>
+
+    <delete id="deleteHoldings">
+        DELETE FROM institution_13f_holding
+        WHERE accession_number = #{accessionNumber}
+    </delete>
+
+    <insert id="upsertHoldings">
+        INSERT INTO institution_13f_holding (
+            accession_number, manager_cik, manager_name, report_quarter, issuer_name,
+            title_of_class, cusip, value_usd_thousands, shares, share_type, put_call,
+            investment_discretion, other_manager, voting_sole, voting_shared, voting_none,
+            symbol, mapped_by, raw_xml, fetched_at
+        )
+        VALUES
+        <foreach collection="holdings" item="holding" separator=",">
+            (
+                #{holding.accessionNumber}, #{holding.managerCik}, #{holding.managerName},
+                #{holding.reportQuarter}, #{holding.issuerName}, #{holding.titleOfClass}, #{holding.cusip},
+                #{holding.valueUsdThousands}, #{holding.shares}, #{holding.shareType}, #{holding.putCall},
+                #{holding.investmentDiscretion}, #{holding.otherManager}, #{holding.votingSole},
+                #{holding.votingShared}, #{holding.votingNone}, #{holding.symbol}, #{holding.mappedBy},
+                #{holding.rawXml}, #{holding.fetchedAt}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            manager_cik = VALUES(manager_cik),
+            manager_name = VALUES(manager_name),
+            report_quarter = VALUES(report_quarter),
+            value_usd_thousands = VALUES(value_usd_thousands),
+            shares = VALUES(shares),
+            symbol = VALUES(symbol),
+            mapped_by = VALUES(mapped_by),
+            raw_xml = VALUES(raw_xml),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <select id="findNameMappings" resultType="com.kingyurina.demo.stock.Institution13fMapper$InstitutionNameMapping">
+        SELECT
+            p.symbol,
+            p.name AS companyName,
+            UPPER(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    COALESCE(p.name, p.symbol),
+                    '.', ''), ',', ''), '-', ' '), '&amp;', ' AND '), ' INCORPORATED', ''),
+                    ' INC', ''), ' CORP', ''), ' CORPORATION', ''), ' CLASS A', '')
+            ) AS normalizedName
+        FROM company_profile p
+        JOIN stock_symbol s
+            ON s.symbol = p.symbol
+            AND s.active = TRUE
+        JOIN (
+            SELECT DISTINCT symbol
+            FROM index_constituent
+            WHERE current_member = TRUE
+              AND index_code IN ('SP500', 'NASDAQ100', 'DOW30')
+        ) universe
+            ON universe.symbol = p.symbol
+        WHERE p.symbol IS NOT NULL
+    </select>
+
+    <delete id="deleteQuarterFlows">
+        DELETE FROM stock_institution_flow_quarterly
+        WHERE report_quarter = #{reportQuarter}
+    </delete>
+
+    <insert id="rebuildQuarter">
+        INSERT INTO stock_institution_flow_quarterly (
+            symbol, report_quarter, holder_count, total_value_usd_thousands, total_shares,
+            previous_total_value_usd_thousands, previous_total_shares, value_change_pct,
+            shares_change_pct, net_shares_change, top_manager_name, top_manager_value_usd_thousands,
+            source_filing_count, mapped_holding_count, fetched_at
+        )
+        SELECT
+            current_flow.symbol,
+            current_flow.report_quarter,
+            current_flow.holder_count,
+            current_flow.total_value_usd_thousands,
+            current_flow.total_shares,
+            previous_flow.total_value_usd_thousands,
+            previous_flow.total_shares,
+            CASE
+                WHEN previous_flow.total_value_usd_thousands IS NULL
+                  OR previous_flow.total_value_usd_thousands = 0 THEN NULL
+                ELSE ((current_flow.total_value_usd_thousands - previous_flow.total_value_usd_thousands)
+                    / previous_flow.total_value_usd_thousands) * 100
+            END,
+            CASE
+                WHEN previous_flow.total_shares IS NULL OR previous_flow.total_shares = 0 THEN NULL
+                ELSE ((current_flow.total_shares - previous_flow.total_shares) / previous_flow.total_shares) * 100
+            END,
+            CASE
+                WHEN previous_flow.total_shares IS NULL THEN NULL
+                ELSE current_flow.total_shares - previous_flow.total_shares
+            END,
+            top_flow.manager_name,
+            top_flow.manager_value_usd_thousands,
+            current_flow.source_filing_count,
+            current_flow.mapped_holding_count,
+            CURRENT_TIMESTAMP
+        FROM (
+            SELECT
+                symbol,
+                report_quarter,
+                COUNT(DISTINCT manager_cik) AS holder_count,
+                SUM(value_usd_thousands) AS total_value_usd_thousands,
+                SUM(shares) AS total_shares,
+                COUNT(DISTINCT accession_number) AS source_filing_count,
+                COUNT(*) AS mapped_holding_count
+            FROM institution_13f_holding
+            WHERE report_quarter = #{reportQuarter}
+              AND symbol IS NOT NULL
+              AND (put_call IS NULL OR UPPER(put_call) NOT IN ('PUT', 'CALL'))
+            GROUP BY symbol, report_quarter
+        ) current_flow
+        LEFT JOIN stock_institution_flow_quarterly previous_flow
+            ON previous_flow.symbol = current_flow.symbol
+           AND previous_flow.report_quarter = (
+                SELECT MAX(prev.report_quarter)
+                FROM stock_institution_flow_quarterly prev
+                WHERE prev.symbol = current_flow.symbol
+                  AND prev.report_quarter &lt; current_flow.report_quarter
+           )
+        LEFT JOIN (
+            SELECT ranked.symbol, ranked.report_quarter, ranked.manager_name,
+                   ranked.manager_value_usd_thousands
+            FROM (
+                SELECT
+                    h.symbol,
+                    h.report_quarter,
+                    h.manager_name,
+                    SUM(h.value_usd_thousands) AS manager_value_usd_thousands,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY h.symbol, h.report_quarter
+                        ORDER BY SUM(h.value_usd_thousands) DESC, h.manager_name
+                    ) AS row_num
+                FROM institution_13f_holding h
+                WHERE h.report_quarter = #{reportQuarter}
+                  AND h.symbol IS NOT NULL
+                  AND (h.put_call IS NULL OR UPPER(h.put_call) NOT IN ('PUT', 'CALL'))
+                GROUP BY h.symbol, h.report_quarter, h.manager_name
+            ) ranked
+            WHERE ranked.row_num = 1
+        ) top_flow
+            ON top_flow.symbol = current_flow.symbol
+           AND top_flow.report_quarter = current_flow.report_quarter
+        ON DUPLICATE KEY UPDATE
+            holder_count = VALUES(holder_count),
+            total_value_usd_thousands = VALUES(total_value_usd_thousands),
+            total_shares = VALUES(total_shares),
+            previous_total_value_usd_thousands = VALUES(previous_total_value_usd_thousands),
+            previous_total_shares = VALUES(previous_total_shares),
+            value_change_pct = VALUES(value_change_pct),
+            shares_change_pct = VALUES(shares_change_pct),
+            net_shares_change = VALUES(net_shares_change),
+            top_manager_name = VALUES(top_manager_name),
+            top_manager_value_usd_thousands = VALUES(top_manager_value_usd_thousands),
+            source_filing_count = VALUES(source_filing_count),
+            mapped_holding_count = VALUES(mapped_holding_count),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <select id="findLatestFlow" resultType="com.kingyurina.demo.stock.StockInstitutionFlow">
+        SELECT *
+        FROM stock_institution_flow_quarterly
+        WHERE symbol = #{symbol}
+        ORDER BY report_quarter DESC
+        LIMIT 1
+    </select>
+
+    <select id="findRecentFlows" resultType="com.kingyurina.demo.stock.StockInstitutionFlow">
+        SELECT *
+        FROM stock_institution_flow_quarterly
+        WHERE symbol = #{symbol}
+        ORDER BY report_quarter DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

@@ -12,6 +12,8 @@ public interface StockSymbolMapper {
 
     List<String> findActiveSymbols(@Param("limit") int limit);
 
+    String findSymbolByQuery(@Param("query") String query);
+
     void upsertSymbol(@Param("symbol") String symbol, @Param("name") String name,
             @Param("exchange") String exchange, @Param("currency") String currency,
             @Param("collectTier") String collectTier);

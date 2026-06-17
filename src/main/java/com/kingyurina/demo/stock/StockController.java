@@ -16,32 +16,65 @@ public class StockController {
     private final StockMarketViewService stockMarketViewService;
     private final StockHeatmapViewService stockHeatmapViewService;
     private final StockSignalService stockSignalService;
+    private final StockBacktestService stockBacktestService;
+    private final StockPortfolioBacktestService stockPortfolioBacktestService;
+    private final StockSearchService stockSearchService;
     private final MenuService menuService;
 
     public StockController(StockAnalysisService stockAnalysisService, StockInfoViewService stockInfoViewService,
             StockMarketViewService stockMarketViewService, StockHeatmapViewService stockHeatmapViewService,
-            StockSignalService stockSignalService, MenuService menuService) {
+            StockSignalService stockSignalService, StockBacktestService stockBacktestService,
+            StockPortfolioBacktestService stockPortfolioBacktestService, StockSearchService stockSearchService,
+            MenuService menuService) {
         this.stockAnalysisService = stockAnalysisService;
         this.stockInfoViewService = stockInfoViewService;
         this.stockMarketViewService = stockMarketViewService;
         this.stockHeatmapViewService = stockHeatmapViewService;
         this.stockSignalService = stockSignalService;
+        this.stockBacktestService = stockBacktestService;
+        this.stockPortfolioBacktestService = stockPortfolioBacktestService;
+        this.stockSearchService = stockSearchService;
         this.menuService = menuService;
     }
 
     @GetMapping("/stocks")
     public String stocks(@RequestParam(required = false) String symbol, Model model) {
         if (symbol != null && !symbol.isBlank()) {
-            return "redirect:/stocks/" + symbol.trim().toUpperCase();
+            return "redirect:/stocks/" + stockSearchService.resolveSymbol(symbol);
         }
         model.addAttribute("mainMenus", menuService.mainMenus());
         model.addAttribute("market", stockMarketViewService.sp500());
         return "stocks-index";
     }
 
+    @GetMapping("/atelier")
+    public String atelier(Model model) {
+        model.addAttribute("mainMenus", menuService.mainMenus());
+        model.addAttribute("market", stockMarketViewService.sp500());
+        return "atelier";
+    }
+
+    @GetMapping("/signals/backtest")
+    public String signalBacktest(Model model) {
+        model.addAttribute("mainMenus", menuService.mainMenus());
+        model.addAttribute("backtest", stockBacktestService.build("SP500"));
+        return "stock-backtest";
+    }
+
+    @GetMapping("/signals/portfolio")
+    public String portfolioBacktest(Model model) {
+        model.addAttribute("mainMenus", menuService.mainMenus());
+        model.addAttribute("portfolio", stockPortfolioBacktestService.build("SP500"));
+        return "portfolio-backtest";
+    }
+
     @GetMapping("/stocks/{symbol}")
     public String stockDetail(@PathVariable String symbol, Model model) {
-        StockDashboard dashboard = stockAnalysisService.dashboard(symbol);
+        String resolvedSymbol = stockSearchService.resolveSymbol(symbol);
+        if (stockSearchService.isDifferentSymbol(symbol, resolvedSymbol)) {
+            return "redirect:/stocks/" + resolvedSymbol;
+        }
+        StockDashboard dashboard = stockAnalysisService.dashboard(resolvedSymbol);
         model.addAttribute("mainMenus", menuService.mainMenus());
         model.addAttribute("sideMenus", menuService.sideMenus());
         model.addAttribute("dashboard", dashboard);

@@ -20,8 +20,11 @@ public record StockMarketView(
     }
 
     public record Row(String rank, String symbol, String name, String logoUrl, String logoInitial, String sector,
-            String price, String change, String marketCap, String per, String pbr, String roe, String signalScore,
-            String signalConfidence, String signalTone, boolean positive) {
+            String price, String change, String marketCap, String institutionFlow, String per, String pbr, String roe,
+            String signalScore, String signalConfidence, String signalTone, boolean positive, Integer signalValue,
+            String dataQualityScore, String dataQualityTone, Integer dataQualityValue,
+            Integer valuationScore, Integer qualityScore, Integer growthScore, Integer stabilityScore,
+            Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore) {
     }
 
     public record SectorRow(String sector, String count, String marketCap, String averageChange) {

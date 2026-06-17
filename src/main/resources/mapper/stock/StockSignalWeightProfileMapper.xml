@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockSignalWeightProfileMapper">
+    <select id="findProfiles" resultType="com.kingyurina.demo.stock.StockSignalWeightProfile">
+        SELECT
+            code,
+            name,
+            description,
+            active,
+            source,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM stock_signal_weight_profile
+        WHERE code IN ('DEFAULT', 'BACKTEST_V1', 'BACKTEST_V2')
+        ORDER BY CASE code
+            WHEN 'DEFAULT' THEN 1
+            WHEN 'BACKTEST_V1' THEN 2
+            WHEN 'BACKTEST_V2' THEN 3
+            ELSE 99
+        END
+    </select>
+
+    <select id="findItemsByProfile" resultType="com.kingyurina.demo.stock.StockSignalWeightProfileItem">
+        SELECT
+            profile_code AS profileCode,
+            factor,
+            weight,
+            enabled,
+            reason,
+            sort_order AS sortOrder,
+            updated_at AS updatedAt
+        FROM stock_signal_weight_profile_item
+        WHERE profile_code = #{profileCode}
+        ORDER BY sort_order, factor
+    </select>
+
+    <insert id="upsertProfile">
+        INSERT INTO stock_signal_weight_profile (
+            code, name, description, active, source
+        )
+        VALUES (
+            #{code}, #{name}, #{description}, #{active}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            description = VALUES(description),
+            source = VALUES(source),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertItem">
+        INSERT INTO stock_signal_weight_profile_item (
+            profile_code, factor, weight, enabled, reason, sort_order
+        )
+        VALUES (
+            #{profileCode}, #{factor}, #{weight}, #{enabled}, #{reason}, #{sortOrder}
+        )
+        ON DUPLICATE KEY UPDATE
+            weight = VALUES(weight),
+            enabled = VALUES(enabled),
+            reason = VALUES(reason),
+            sort_order = VALUES(sort_order),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.HistoricalBacktestSeedMapper">
+    <select id="findLatestCandleDate" resultType="java.time.LocalDate">
+        SELECT MAX(trade_date)
+        FROM stock_candle_daily
+    </select>
+
+    <select id="findTradeDateOnOrBefore" resultType="java.time.LocalDate">
+        SELECT MAX(trade_date)
+        FROM stock_candle_daily
+        WHERE trade_date &lt;= #{targetDate}
+    </select>
+
+    <select id="findCandlesOnOrBefore" resultType="com.kingyurina.demo.stock.StockCandleDaily">
+        SELECT
+            symbol,
+            trade_date AS tradeDate,
+            open_price AS openPrice,
+            high_price AS highPrice,
+            low_price AS lowPrice,
+            close_price AS closePrice,
+            volume,
+            source,
+            updated_at AS updatedAt
+        FROM stock_candle_daily
+        WHERE symbol = #{symbol}
+          AND trade_date &lt;= #{signalDate}
+        ORDER BY trade_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findLatestAnnualAsOf" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period = 'FY'
+          AND filed_at IS NOT NULL
+          AND filed_at &lt;= #{asOfDate}
+        ORDER BY
+            end_date DESC,
+            CASE
+                WHEN form IN ('10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A') THEN 0
+                ELSE 1
+            END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findPreviousAnnualAsOf" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period = 'FY'
+          AND filed_at IS NOT NULL
+          AND filed_at &lt;= #{asOfDate}
+          AND end_date &lt; #{endDate}
+        ORDER BY
+            end_date DESC,
+            CASE
+                WHEN form IN ('10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A') THEN 0
+                ELSE 1
+            END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findLatestQuarterAsOf" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+          AND filed_at IS NOT NULL
+          AND filed_at &lt;= #{asOfDate}
+        ORDER BY
+            end_date DESC,
+            CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findPreviousQuarterAsOf" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+          AND filed_at IS NOT NULL
+          AND filed_at &lt;= #{asOfDate}
+          AND end_date &lt; #{endDate}
+        ORDER BY
+            end_date DESC,
+            CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findRecommendationAsOf" resultType="com.kingyurina.demo.stock.StockRecommendationTrend">
+        SELECT *
+        FROM stock_recommendation_trend
+        WHERE symbol = #{symbol}
+          AND period_date &lt;= #{asOfDate}
+        ORDER BY period_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="findInstitutionFlowAsOf" resultType="com.kingyurina.demo.stock.StockInstitutionFlow">
+        SELECT
+            symbol,
+            report_quarter AS reportQuarter,
+            holder_count AS holderCount,
+            total_value_usd_thousands AS totalValueUsdThousands,
+            total_shares AS totalShares,
+            previous_total_value_usd_thousands AS previousTotalValueUsdThousands,
+            previous_total_shares AS previousTotalShares,
+            value_change_pct AS valueChangePct,
+            shares_change_pct AS sharesChangePct,
+            net_shares_change AS netSharesChange,
+            top_manager_name AS topManagerName,
+            top_manager_value_usd_thousands AS topManagerValueUsdThousands,
+            source_filing_count AS sourceFilingCount,
+            mapped_holding_count AS mappedHoldingCount,
+            fetched_at AS fetchedAt
+        FROM stock_institution_flow_quarterly
+        WHERE symbol = #{symbol}
+          AND report_quarter &lt;= #{availableQuarterCutoff}
+        ORDER BY report_quarter DESC
+        LIMIT 1
+    </select>
+
+    <select id="findNewsStatsAsOf" resultType="com.kingyurina.demo.stock.HistoricalNewsStats">
+        SELECT
+            COUNT(*) AS totalCount,
+            SUM(CASE
+                WHEN LOWER(CONCAT(COALESCE(headline, ''), ' ', COALESCE(summary, ''))) REGEXP
+                    'beat|surge|growth|upgrade|record|profit|strong|positive|approval|contract|partnership'
+                THEN 1 ELSE 0
+            END) AS positiveCount,
+            SUM(CASE
+                WHEN LOWER(CONCAT(COALESCE(headline, ''), ' ', COALESCE(summary, ''))) REGEXP
+                    'miss|risk|lawsuit|probe|recall|downgrade|weak|decline|loss|cut|warning|delay|concern'
+                THEN 1 ELSE 0
+            END) AS riskCount
+        FROM company_news
+        WHERE symbol = #{symbol}
+          AND published_at &gt;= #{fromDateTime}
+          AND published_at &lt; #{toDateTime}
+    </select>
+</mapper>

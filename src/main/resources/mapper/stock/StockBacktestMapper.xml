@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockBacktestMapper">
+    <select id="findCoverage" resultType="com.kingyurina.demo.stock.StockBacktestCoverage">
+        SELECT
+            i.symbol,
+            COALESCE(p.name, i.name) AS name,
+            COALESCE(i.sector, '-') AS sector,
+            COUNT(c.trade_date) AS candleCount,
+            MIN(c.trade_date) AS firstTradeDate,
+            MAX(c.trade_date) AS lastTradeDate
+        FROM index_constituent i
+        LEFT JOIN company_profile p
+            ON p.symbol = i.symbol
+        LEFT JOIN stock_candle_daily c
+            ON c.symbol = i.symbol
+        WHERE i.index_code = #{indexCode}
+          AND i.current_member = TRUE
+          AND i.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        GROUP BY i.symbol, COALESCE(p.name, i.name), COALESCE(i.sector, '-')
+        ORDER BY COUNT(c.trade_date), i.symbol
+    </select>
+
+    <select id="countSnapshots" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_signal_snapshot s
+        INNER JOIN index_constituent i
+            ON i.symbol = s.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+    </select>
+
+    <select id="countResults" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_signal_backtest_result r
+        INNER JOIN index_constituent i
+            ON i.symbol = r.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+    </select>
+
+    <select id="countResultsByHorizon" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_signal_backtest_result r
+        INNER JOIN index_constituent i
+            ON i.symbol = r.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        WHERE r.horizon_days = #{horizonDays}
+    </select>
+
+    <select id="findSnapshotsNeedingResults" resultType="com.kingyurina.demo.stock.StockSignalSnapshot">
+        SELECT
+            s.id,
+            s.symbol,
+            s.signal_date,
+            s.snapshot_mode,
+            s.calculated_at,
+            s.signal_version,
+            s.integrated_score,
+            s.integrated_label,
+            s.tone,
+            s.confidence,
+            s.summary,
+            s.valuation_score,
+            s.valuation_label,
+            s.quality_score,
+            s.quality_label,
+            s.growth_score,
+            s.growth_label,
+            s.stability_score,
+            s.stability_label,
+            s.earnings_score,
+            s.earnings_label,
+            s.analyst_score,
+            s.analyst_label,
+            s.news_score,
+            s.news_label,
+            s.momentum_score,
+            s.momentum_label,
+            s.risk_score,
+            s.risk_label,
+            s.institution_score,
+            s.institution_label,
+            s.data_quality_score,
+            s.data_quality_excluded_metric_count,
+            s.data_quality_issue_count,
+            s.reasons_json,
+            s.cards_json,
+            s.source_freshness_json,
+            s.raw_json
+        FROM stock_signal_snapshot s
+        LEFT JOIN (
+            SELECT
+                snapshot_id,
+                COUNT(*) AS completed_count,
+                MAX(calculated_at) AS latest_result_calculated_at,
+                SUM(CASE WHEN institution_score IS NULL THEN 1 ELSE 0 END) AS missing_institution_count
+            FROM stock_signal_backtest_result
+            GROUP BY snapshot_id
+        ) r
+            ON r.snapshot_id = s.id
+        WHERE COALESCE(r.completed_count, 0) &lt; 3
+           OR r.latest_result_calculated_at &lt; s.calculated_at
+           OR (s.institution_score IS NOT NULL AND COALESCE(r.missing_institution_count, 0) &gt; 0)
+        ORDER BY s.signal_date DESC, s.symbol
+        LIMIT #{limit}
+    </select>
+
+    <select id="findFutureCandles" resultType="com.kingyurina.demo.stock.StockCandleDaily">
+        SELECT
+            symbol,
+            trade_date AS tradeDate,
+            open_price AS openPrice,
+            high_price AS highPrice,
+            low_price AS lowPrice,
+            close_price AS closePrice,
+            volume,
+            source,
+            updated_at AS updatedAt
+        FROM stock_candle_daily
+        WHERE symbol = #{symbol}
+          AND trade_date &gt; #{signalDate}
+        ORDER BY trade_date
+        LIMIT #{limit}
+    </select>
+
+    <select id="findRiskCandles" resultType="com.kingyurina.demo.stock.StockCandleDaily">
+        SELECT
+            c.symbol,
+            c.trade_date AS tradeDate,
+            c.open_price AS openPrice,
+            c.high_price AS highPrice,
+            c.low_price AS lowPrice,
+            c.close_price AS closePrice,
+            c.volume,
+            c.source,
+            c.updated_at AS updatedAt
+        FROM stock_candle_daily c
+        INNER JOIN index_constituent i
+            ON i.symbol = c.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        WHERE c.trade_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY c.symbol, c.trade_date
+    </select>
+
+    <select id="findSectorForSymbol" resultType="string">
+        SELECT COALESCE(MIN(sector), '-')
+        FROM index_constituent
+        WHERE symbol = #{symbol}
+          AND current_member = TRUE
+          AND UPPER(COALESCE(sector, '')) &lt;&gt; 'TICKER'
+    </select>
+
+    <insert id="upsertResult">
+        INSERT INTO stock_signal_backtest_result (
+            snapshot_id, symbol, signal_date, horizon_days, entry_trade_date, entry_close,
+            exit_trade_date, exit_close, forward_return_pct, integrated_score, valuation_score,
+            quality_score, growth_score, stability_score, earnings_score, analyst_score, news_score,
+            momentum_score, risk_score, institution_score, data_quality_score, sector
+        )
+        VALUES (
+            #{snapshotId}, #{symbol}, #{signalDate}, #{horizonDays}, #{entryTradeDate}, #{entryClose},
+            #{exitTradeDate}, #{exitClose}, #{forwardReturnPct}, #{integratedScore}, #{valuationScore},
+            #{qualityScore}, #{growthScore}, #{stabilityScore}, #{earningsScore}, #{analystScore}, #{newsScore},
+            #{momentumScore}, #{riskScore}, #{institutionScore}, #{dataQualityScore}, #{sector}
+        )
+        ON DUPLICATE KEY UPDATE
+            entry_trade_date = VALUES(entry_trade_date),
+            entry_close = VALUES(entry_close),
+            exit_trade_date = VALUES(exit_trade_date),
+            exit_close = VALUES(exit_close),
+            forward_return_pct = VALUES(forward_return_pct),
+            integrated_score = VALUES(integrated_score),
+            valuation_score = VALUES(valuation_score),
+            quality_score = VALUES(quality_score),
+            growth_score = VALUES(growth_score),
+            stability_score = VALUES(stability_score),
+            earnings_score = VALUES(earnings_score),
+            analyst_score = VALUES(analyst_score),
+            news_score = VALUES(news_score),
+            momentum_score = VALUES(momentum_score),
+            risk_score = VALUES(risk_score),
+            institution_score = VALUES(institution_score),
+            data_quality_score = VALUES(data_quality_score),
+            sector = VALUES(sector),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="findResults" resultType="com.kingyurina.demo.stock.StockBacktestResult">
+        SELECT
+            r.snapshot_id AS snapshotId,
+            r.symbol,
+            COALESCE(p.name, i.name, r.symbol) AS name,
+            r.signal_date AS signalDate,
+            r.horizon_days AS horizonDays,
+            r.entry_trade_date AS entryTradeDate,
+            r.entry_close AS entryClose,
+            r.exit_trade_date AS exitTradeDate,
+            r.exit_close AS exitClose,
+            r.forward_return_pct AS forwardReturnPct,
+            r.integrated_score AS integratedScore,
+            r.valuation_score AS valuationScore,
+            r.quality_score AS qualityScore,
+            r.growth_score AS growthScore,
+            r.stability_score AS stabilityScore,
+            r.earnings_score AS earningsScore,
+            r.analyst_score AS analystScore,
+            r.news_score AS newsScore,
+            r.momentum_score AS momentumScore,
+            r.risk_score AS riskScore,
+            r.institution_score AS institutionScore,
+            r.data_quality_score AS dataQualityScore,
+            p.market_cap AS marketCap,
+            r.sector,
+            r.calculated_at AS calculatedAt
+        FROM stock_signal_backtest_result r
+        INNER JOIN index_constituent i
+            ON i.symbol = r.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        LEFT JOIN company_profile p
+            ON p.symbol = r.symbol
+        ORDER BY r.signal_date DESC, r.symbol, r.horizon_days
+        LIMIT #{limit}
+    </select>
+</mapper>

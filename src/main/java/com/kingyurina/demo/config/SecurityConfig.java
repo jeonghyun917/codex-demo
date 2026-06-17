@@ -6,6 +6,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
+import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
+
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfig {
@@ -14,7 +16,19 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/stocks", "/stocks/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        .requestMatchers(
+                                pathPattern("/"),
+                                pathPattern("/dashboard"),
+                                pathPattern("/atelier"),
+                                pathPattern("/stocks"),
+                                pathPattern("/stocks/**"),
+                                pathPattern("/signals/**"),
+                                pathPattern("/etfs"),
+                                pathPattern("/etfs/**"),
+                                pathPattern("/error"),
+                                pathPattern("/css/**"),
+                                pathPattern("/js/**"),
+                                pathPattern("/favicon.ico")).permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form.disable())

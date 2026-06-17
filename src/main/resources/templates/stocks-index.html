@@ -23,7 +23,7 @@
     <main class="market-home">
         <section class="market-landing">
             <div>
-                <p>S&P 500 구성종목</p>
+                <p>S&amp;P 500 구성종목</p>
                 <h1>
                     <strong th:text="${market.title}">S&amp;P 500</strong>
                     <span th:text="${market.subtitle}">미국 대형주 요약</span>
@@ -35,7 +35,7 @@
         <section class="index-card-row" aria-label="S&P 500 summary">
             <article th:each="card : ${market.indexCards}" th:classappend="${card.positive ? ' positive' : ' negative'}">
                 <span th:text="${card.label}">구성종목</span>
-                <strong th:text="${card.value}">504</strong>
+                <strong th:text="${card.value}">503</strong>
                 <p th:text="${card.change}">cached</p>
                 <i aria-hidden="true"></i>
             </article>
@@ -45,19 +45,19 @@
             <div class="market-board-main">
                 <div class="board-toolbar">
                     <div>
-                        <h2>S&P 500 실시간 캐시</h2>
+                        <h2>S&amp;P 500 실시간 캐시</h2>
                         <p>
-                            구성종목 <b th:text="${market.totalMembers}">504</b>개,
-                            quote 캐시 <b th:text="${market.cachedQuotes}">504</b>개,
+                            구성종목 <b th:text="${market.totalMembers}">503</b>개,
+                            quote 캐시 <b th:text="${market.cachedQuotes}">503</b>개,
                             상승 <b class="up" th:text="${market.advancers}">0</b>개,
                             하락 <b class="down" th:text="${market.decliners}">0</b>개
                         </p>
                     </div>
-            <div class="toolbar-pills">
+                    <div class="toolbar-pills">
                         <a th:href="@{/stocks/heatmap}" href="/stocks/heatmap">히트맵</a>
                         <span>시총순</span>
                         <span>전일 대비</span>
-                        <span>PER/PBR/ROE</span>
+                        <span>Quant Signal</span>
                     </div>
                 </div>
 
@@ -69,12 +69,16 @@
                         <span><button class="sp-sort" type="button" data-sort="price">현재가</button></span>
                         <span><button class="sp-sort" type="button" data-sort="change">등락률</button></span>
                         <span><button class="sp-sort" type="button" data-sort="marketCap">시가총액</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="institution">기관증감</button></span>
                         <span><button class="sp-sort" type="button" data-sort="per">PER</button></span>
                         <span><button class="sp-sort" type="button" data-sort="pbr">PBR</button></span>
                         <span><button class="sp-sort" type="button" data-sort="roe">ROE</button></span>
-                        <span><button class="sp-sort" type="button" data-sort="signal">Signal 점수</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="signal">Signal</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="quality">품질</button></span>
                     </div>
-                    <a class="sp-row" th:each="row, rowStat : ${market.rows}" th:classappend="${rowStat.index >= 100} ? ' is-collapsed' : ''" th:href="@{/stocks/{symbol}(symbol=${row.symbol})}">
+                    <a class="sp-row" th:each="row, rowStat : ${market.rows}"
+                       th:classappend="${rowStat.index >= 100} ? ' is-collapsed' : ''"
+                       th:href="@{/stocks/{symbol}(symbol=${row.symbol})}">
                         <span th:text="${row.rank}">1</span>
                         <strong class="stock-identity">
                             <span class="stock-logo">
@@ -87,13 +91,15 @@
                             </span>
                         </strong>
                         <span th:text="${row.sector}">Information Technology</span>
-                        <span th:text="${row.price}">0 USD</span>
+                        <span th:text="${row.price}">0원</span>
                         <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">0%</span>
-                        <span th:text="${row.marketCap}">0</span>
+                        <span th:text="${row.marketCap}">0 조원</span>
+                        <span th:text="${row.institutionFlow}">-</span>
                         <span th:text="${row.per}">-</span>
                         <span th:text="${row.pbr}">-</span>
                         <span th:text="${row.roe}">-</span>
                         <span class="market-signal-score" th:classappend="${row.signalTone}" th:text="${row.signalScore}">-</span>
+                        <span class="market-signal-score compact" th:classappend="${row.dataQualityTone}" th:text="${row.dataQualityScore}">-</span>
                     </a>
                 </div>
                 <div class="sp-load-more" th:if="${#lists.size(market.rows) > 100}">
@@ -124,7 +130,7 @@
                     <div class="sector-row" th:each="sector : ${market.sectors}">
                         <strong th:text="${sector.sector}">Technology</strong>
                         <span th:text="${sector.count + '개'}">0개</span>
-                        <small th:text="${sector.marketCap}">0</small>
+                        <small th:text="${sector.marketCap}">0 조원</small>
                         <small th:text="${sector.averageChange}">0%</small>
                     </div>
                 </section>
@@ -133,7 +139,7 @@
     </main>
 
     <footer class="market-footer">
-        <span>S&P 500 dashboard</span>
+        <span>S&amp;P 500 dashboard</span>
         <span th:text="${market.aggregateMarketCap}">market cap</span>
         <span th:text="${market.averageChange}">change</span>
     </footer>
@@ -152,10 +158,12 @@
         price: 3,
         change: 4,
         marketCap: 5,
-        per: 6,
-        pbr: 7,
-        roe: 8,
-        signal: 9
+        institution: 6,
+        per: 7,
+        pbr: 8,
+        roe: 9,
+        signal: 10,
+        quality: 11
     };
     let rows = Array.from(table.querySelectorAll(".sp-row:not(.sp-head)"));
     let visibleCount = rows.filter((row) => !row.classList.contains("is-collapsed")).length;
@@ -218,13 +226,13 @@
             });
 
             rows.forEach((row) => table.append(row));
-            visibleCount = Math.min(step, rows.length);
             sortButtons.forEach((buttonItem) => {
                 buttonItem.removeAttribute("data-direction");
                 buttonItem.removeAttribute("aria-sort");
             });
             sortButton.dataset.direction = direction;
             sortButton.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+            visibleCount = Math.min(step, rows.length);
             applyVisibility();
         });
     });

@@ -17,6 +17,9 @@ public class StockCacheService {
     private final ObjectProvider<StockEpsSurpriseMapper> epsSurpriseMapper;
     private final ObjectProvider<StockCandleMapper> candleMapper;
     private final ObjectProvider<StockSignalLatestMapper> signalLatestMapper;
+    private final ObjectProvider<StockDataQualityMapper> dataQualityMapper;
+    private final ObjectProvider<SecFinancialStandardMapper> secFinancialStandardMapper;
+    private final ObjectProvider<Institution13fMapper> institution13fMapper;
     private final ObjectProvider<StockSymbolMapper> symbolMapper;
     private final ObjectProvider<ApiCallLogMapper> apiCallLogMapper;
 
@@ -28,6 +31,9 @@ public class StockCacheService {
             ObjectProvider<StockEpsSurpriseMapper> epsSurpriseMapper,
             ObjectProvider<StockCandleMapper> candleMapper,
             ObjectProvider<StockSignalLatestMapper> signalLatestMapper,
+            ObjectProvider<StockDataQualityMapper> dataQualityMapper,
+            ObjectProvider<SecFinancialStandardMapper> secFinancialStandardMapper,
+            ObjectProvider<Institution13fMapper> institution13fMapper,
             ObjectProvider<StockSymbolMapper> symbolMapper,
             ObjectProvider<ApiCallLogMapper> apiCallLogMapper) {
         this.profileMapper = profileMapper;
@@ -38,6 +44,9 @@ public class StockCacheService {
         this.epsSurpriseMapper = epsSurpriseMapper;
         this.candleMapper = candleMapper;
         this.signalLatestMapper = signalLatestMapper;
+        this.dataQualityMapper = dataQualityMapper;
+        this.secFinancialStandardMapper = secFinancialStandardMapper;
+        this.institution13fMapper = institution13fMapper;
         this.symbolMapper = symbolMapper;
         this.apiCallLogMapper = apiCallLogMapper;
     }
@@ -165,10 +174,52 @@ public class StockCacheService {
         return mapper == null ? null : mapper.findBySymbol(symbol);
     }
 
+    public StockDataQualityLatest findLatestDataQuality(String symbol) {
+        StockDataQualityMapper mapper = dataQualityMapper.getIfAvailable();
+        return mapper == null ? null : mapper.findBySymbol(symbol);
+    }
+
+    public SecFinancialStandard findLatestSecAnnualFinancial(String symbol) {
+        SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
+        return mapper == null ? null : mapper.findLatestAnnual(symbol);
+    }
+
+    public SecFinancialStandard findPreviousSecAnnualFinancial(String symbol, java.time.LocalDate endDate) {
+        SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
+        return mapper == null || endDate == null ? null : mapper.findPreviousAnnual(symbol, endDate);
+    }
+
+    public SecFinancialStandard findLatestSecQuarterFinancial(String symbol) {
+        SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
+        return mapper == null ? null : mapper.findLatestQuarter(symbol);
+    }
+
+    public SecFinancialStandard findPreviousSecQuarterFinancial(String symbol, java.time.LocalDate endDate) {
+        SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
+        return mapper == null || endDate == null ? null : mapper.findPreviousQuarter(symbol, endDate);
+    }
+
+    public StockInstitutionFlow findLatestInstitutionFlow(String symbol) {
+        Institution13fMapper mapper = institution13fMapper.getIfAvailable();
+        return mapper == null ? null : mapper.findLatestFlow(symbol);
+    }
+
+    public List<StockInstitutionFlow> findRecentInstitutionFlows(String symbol, int limit) {
+        Institution13fMapper mapper = institution13fMapper.getIfAvailable();
+        return mapper == null ? List.of() : mapper.findRecentFlows(symbol, limit);
+    }
+
     public void saveLatestSignal(StockSignalLatest signal) {
         StockSignalLatestMapper mapper = signalLatestMapper.getIfAvailable();
         if (mapper != null) {
             mapper.upsert(signal);
+        }
+    }
+
+    public void saveLatestDataQuality(StockDataQualityLatest quality) {
+        StockDataQualityMapper mapper = dataQualityMapper.getIfAvailable();
+        if (mapper != null) {
+            mapper.upsert(quality);
         }
     }
 

@@ -14,30 +14,31 @@
     <header class="site-header" aria-label="Primary navigation">
         <a class="brand-mark" href="/" aria-label="King Yurina home">KY</a>
         <nav class="nav-links" aria-label="Main menu">
-            <a href="#studio">Studio</a>
-            <a href="#systems">Systems</a>
-            <a th:href="@{/stocks}" href="/stocks">Markets</a>
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:text="${menu.label}"
+               href="/dashboard">Dashboard</a>
         </nav>
-        <a class="header-action" href="mailto:hello@kingyurina.com">Contact</a>
+        <a class="header-action" th:href="@{/stocks}" href="/stocks">Stock Analysis</a>
     </header>
 
     <main class="hero">
         <section class="hero-stage" aria-labelledby="hero-title">
             <div class="hero-editorial">
-                <p class="eyebrow">Luxury interface studio</p>
+                <p class="eyebrow">Luxury market intelligence</p>
                 <h1 id="hero-title">king yurina</h1>
                 <p class="hero-copy">
                     Editorial presence for a technology-led brand, refined into a clean market intelligence surface.
                 </p>
                 <div class="hero-actions" aria-label="Featured actions">
                     <a class="primary-action" th:href="@{/stocks}" href="/stocks">Stock Analysis</a>
-                    <a class="secondary-action" href="#systems">View System</a>
+                    <a class="secondary-action" th:href="@{/dashboard}" href="/dashboard">Quant AI Dashboard</a>
                 </div>
             </div>
             <div class="hero-card" aria-label="Market preview">
                 <span>Market Signal</span>
                 <strong>US Equity Research</strong>
-                <p>Minimal stock analysis workspace with cached quotes, profile data, and valuation snapshots.</p>
+                <p>Minimal stock analysis workspace with cached quotes, profile data, valuation snapshots, and Quant Signal validation.</p>
                 <dl>
                     <div>
                         <dt>Stack</dt>
@@ -45,7 +46,7 @@
                     </div>
                     <div>
                         <dt>Data</dt>
-                        <dd>MariaDB ready</dd>
+                        <dd>MariaDB</dd>
                     </div>
                     <div>
                         <dt>View</dt>
@@ -64,12 +65,12 @@
             <article id="systems">
                 <span>02</span>
                 <strong>Systems</strong>
-                <p>Built on Spring Boot 4, Java 21, Spring Security 7, MyBatis, and MariaDB readiness.</p>
+                <p>Built on Spring Boot 4, Java 21, Spring Security 7, MyBatis, and MariaDB.</p>
             </article>
             <article id="signal">
                 <span>03</span>
                 <strong>Signal</strong>
-                <p>A calm entry point that leads directly into the stock analysis workflow.</p>
+                <p>A calm entry point that leads into stocks, ETF, heatmap, and Quant AI validation workflows.</p>
             </article>
         </section>
     </main>

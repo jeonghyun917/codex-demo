@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.etf.EtfMapper">
+    <sql id="marketColumns">
+        p.symbol,
+        p.name,
+        p.issuer,
+        p.category,
+        p.strategy,
+        p.region,
+        p.asset_class AS assetClass,
+        p.currency,
+        p.benchmark,
+        p.expense_ratio AS expenseRatio,
+        p.dividend_yield AS dividendYield,
+        p.aum_million AS aumMillion,
+        p.holdings_count AS holdingsCount,
+        p.inception_date AS inceptionDate,
+        p.description,
+        p.website,
+        p.logo_url AS logoUrl,
+        p.source,
+        q.current_price AS currentPrice,
+        q.previous_close AS previousClose,
+        q.open_price AS openPrice,
+        q.high_price AS highPrice,
+        q.low_price AS lowPrice,
+        q.volume,
+        q.quote_time AS quoteTime,
+        c.latest_trade_date AS latestTradeDate,
+        COALESCE(c.candle_count, 0) AS candleCount
+    </sql>
+
+    <select id="findMarketRows" resultType="com.kingyurina.demo.etf.EtfMarketRow">
+        SELECT
+            <include refid="marketColumns"/>
+        FROM etf_profile p
+        LEFT JOIN etf_quote_cache q
+            ON q.symbol = p.symbol
+        LEFT JOIN (
+            SELECT symbol, MAX(trade_date) AS latest_trade_date, COUNT(*) AS candle_count
+            FROM etf_candle_daily
+            GROUP BY symbol
+        ) c
+            ON c.symbol = p.symbol
+        WHERE p.active = TRUE
+        ORDER BY p.sort_order ASC, p.symbol ASC
+    </select>
+
+    <select id="findMarketRowBySymbol" resultType="com.kingyurina.demo.etf.EtfMarketRow">
+        SELECT
+            <include refid="marketColumns"/>
+        FROM etf_profile p
+        LEFT JOIN etf_quote_cache q
+            ON q.symbol = p.symbol
+        LEFT JOIN (
+            SELECT symbol, MAX(trade_date) AS latest_trade_date, COUNT(*) AS candle_count
+            FROM etf_candle_daily
+            GROUP BY symbol
+        ) c
+            ON c.symbol = p.symbol
+        WHERE p.symbol = #{symbol}
+          AND p.active = TRUE
+    </select>
+
+    <select id="findActiveSymbols" resultType="string">
+        SELECT symbol
+        FROM etf_profile
+        WHERE active = TRUE
+        ORDER BY sort_order ASC, symbol ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findRecentCandles" resultType="com.kingyurina.demo.etf.EtfCandleDaily">
+        SELECT
+            symbol,
+            trade_date AS tradeDate,
+            open_price AS openPrice,
+            high_price AS highPrice,
+            low_price AS lowPrice,
+            close_price AS closePrice,
+            volume,
+            source,
+            updated_at AS updatedAt
+        FROM etf_candle_daily
+        WHERE symbol = #{symbol}
+        ORDER BY trade_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsertQuote" parameterType="com.kingyurina.demo.etf.EtfQuoteCache">
+        INSERT INTO etf_quote_cache (
+            symbol, current_price, open_price, high_price, low_price, previous_close,
+            volume, quote_time, source
+        )
+        VALUES (
+            #{symbol}, #{currentPrice}, #{openPrice}, #{highPrice}, #{lowPrice}, #{previousClose},
+            #{volume}, #{quoteTime}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            current_price = VALUES(current_price),
+            open_price = VALUES(open_price),
+            high_price = VALUES(high_price),
+            low_price = VALUES(low_price),
+            previous_close = VALUES(previous_close),
+            volume = VALUES(volume),
+            quote_time = VALUES(quote_time),
+            source = VALUES(source),
+            fetched_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertCandles">
+        INSERT INTO etf_candle_daily (
+            symbol, trade_date, open_price, high_price, low_price, close_price, volume, source
+        )
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.symbol}, #{item.tradeDate}, #{item.openPrice}, #{item.highPrice}, #{item.lowPrice},
+                #{item.closePrice}, #{item.volume}, #{item.source}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open_price = VALUES(open_price),
+            high_price = VALUES(high_price),
+            low_price = VALUES(low_price),
+            close_price = VALUES(close_price),
+            volume = VALUES(volume),
+            source = VALUES(source),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

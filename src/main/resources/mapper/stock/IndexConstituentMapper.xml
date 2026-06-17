@@ -93,6 +93,9 @@
             i.sector,
             p.finnhub_industry AS industry,
             p.market_cap,
+            inst.shares_change_pct AS institutionSharesChangePct,
+            inst.holder_count AS institutionHolderCount,
+            inst.report_quarter AS institutionReportQuarter,
             q.current_price,
             q.previous_close,
             q.open_price,
@@ -104,12 +107,32 @@
             sl.integrated_score AS signalScore,
             sl.confidence AS signalConfidence,
             sl.tone AS signalTone,
-            sl.calculated_at AS signalCalculatedAt
+            sl.calculated_at AS signalCalculatedAt,
+            dq.quality_score AS dataQualityScore,
+            dq.quality_label AS dataQualityLabel,
+            dq.tone AS dataQualityTone,
+            dq.excluded_fields_json AS dataQualityExcludedFieldsJson,
+            sl.valuation_score AS valuationScore,
+            sl.quality_score AS qualityScore,
+            sl.growth_score AS growthScore,
+            sl.stability_score AS stabilityScore,
+            sl.earnings_score AS earningsScore,
+            sl.analyst_score AS analystScore,
+            sl.news_score AS newsScore,
+            sl.momentum_score AS momentumScore,
+            sl.risk_score AS riskScore
         FROM index_constituent i
         LEFT JOIN company_profile p
             ON p.symbol = i.symbol
         LEFT JOIN stock_quote_cache q
             ON q.symbol = i.symbol
+        LEFT JOIN stock_institution_flow_quarterly inst
+            ON inst.symbol = i.symbol
+            AND inst.report_quarter = (
+                SELECT MAX(report_quarter)
+                FROM stock_institution_flow_quarterly
+                WHERE symbol = i.symbol
+            )
         LEFT JOIN stock_metric_snapshot m
             ON m.symbol = i.symbol
             AND m.metric_date = (
@@ -119,6 +142,8 @@
             )
         LEFT JOIN stock_signal_latest sl
             ON sl.symbol = i.symbol
+        LEFT JOIN stock_data_quality_latest dq
+            ON dq.symbol = i.symbol
         WHERE i.index_code = #{indexCode}
           AND i.current_member = TRUE
           AND i.symbol NOT IN ('TICKER', 'SECURITY')
@@ -134,6 +159,9 @@
             ic.sector,
             p.finnhub_industry AS industry,
             p.market_cap,
+            inst.shares_change_pct AS institutionSharesChangePct,
+            inst.holder_count AS institutionHolderCount,
+            inst.report_quarter AS institutionReportQuarter,
             q.current_price,
             q.previous_close,
             q.open_price,
@@ -145,7 +173,20 @@
             sl.integrated_score AS signalScore,
             sl.confidence AS signalConfidence,
             sl.tone AS signalTone,
-            sl.calculated_at AS signalCalculatedAt
+            sl.calculated_at AS signalCalculatedAt,
+            dq.quality_score AS dataQualityScore,
+            dq.quality_label AS dataQualityLabel,
+            dq.tone AS dataQualityTone,
+            dq.excluded_fields_json AS dataQualityExcludedFieldsJson,
+            sl.valuation_score AS valuationScore,
+            sl.quality_score AS qualityScore,
+            sl.growth_score AS growthScore,
+            sl.stability_score AS stabilityScore,
+            sl.earnings_score AS earningsScore,
+            sl.analyst_score AS analystScore,
+            sl.news_score AS newsScore,
+            sl.momentum_score AS momentumScore,
+            sl.risk_score AS riskScore
         FROM company_profile p
         LEFT JOIN (
             SELECT symbol, MIN(sector) AS sector
@@ -156,6 +197,13 @@
             ON ic.symbol = p.symbol
         LEFT JOIN stock_quote_cache q
             ON q.symbol = p.symbol
+        LEFT JOIN stock_institution_flow_quarterly inst
+            ON inst.symbol = p.symbol
+            AND inst.report_quarter = (
+                SELECT MAX(report_quarter)
+                FROM stock_institution_flow_quarterly
+                WHERE symbol = p.symbol
+            )
         LEFT JOIN stock_metric_snapshot m
             ON m.symbol = p.symbol
             AND m.metric_date = (
@@ -165,6 +213,8 @@
             )
         LEFT JOIN stock_signal_latest sl
             ON sl.symbol = p.symbol
+        LEFT JOIN stock_data_quality_latest dq
+            ON dq.symbol = p.symbol
         WHERE p.symbol IN
         <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
             #{symbol}

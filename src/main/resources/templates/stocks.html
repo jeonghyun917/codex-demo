@@ -59,9 +59,19 @@
         <div class="stock-info-content">
             <section id="major" class="market-section">
                 <div class="section-heading">
-                    <div>
-                        <p th:text="${info.fiscalSourceLabel}">Finnhub basic financials</p>
-                        <h1 th:text="${dashboard.profile != null && dashboard.profile.name != null ? dashboard.profile.name : dashboard.symbol}">Apple Inc</h1>
+                    <div class="stock-title-row">
+                        <span class="stock-logo detail">
+                            <img th:if="${dashboard.profile != null && !#strings.isEmpty(dashboard.profile.logo)}"
+                                 th:src="${dashboard.profile.logo}"
+                                 th:alt="${dashboard.symbol + ' logo'}"
+                                 loading="lazy"
+                                 onerror="this.remove()">
+                            <span th:text="${#strings.substring(dashboard.symbol, 0, 1)}">A</span>
+                        </span>
+                        <div class="stock-title-copy">
+                            <p th:text="${info.fiscalSourceLabel}">Finnhub basic financials</p>
+                            <h1 th:text="${dashboard.profile != null && dashboard.profile.name != null ? dashboard.profile.name : dashboard.symbol}">Apple Inc</h1>
+                        </div>
                     </div>
                     <a th:if="${dashboard.profile != null && dashboard.profile.weburl != null}" th:href="${dashboard.profile.weburl}" target="_blank" rel="noopener noreferrer">홈페이지</a>
                 </div>
@@ -71,6 +81,24 @@
                     <span th:text="${info.industryName}">Technology</span>
                     업종 기업입니다. 현재 보유한 Finnhub profile, quote, metric 데이터를 기준으로 표출합니다.
                 </p>
+                <section class="data-quality-panel" th:if="${info.dataQualityCards != null && !info.dataQualityCards.isEmpty()}" aria-label="Data quality">
+                    <div class="section-heading compact">
+                        <div>
+                            <p>원천 데이터 검수</p>
+                            <h2>데이터 품질</h2>
+                        </div>
+                    </div>
+                    <div class="metric-card-grid data-quality-grid">
+                        <article th:each="card : ${info.dataQualityCards}">
+                            <span th:text="${card.label}">품질 점수</span>
+                            <strong th:text="${card.value}">-</strong>
+                            <p th:text="${card.note}">source</p>
+                        </article>
+                    </div>
+                    <ul class="signal-reasons data-quality-issues" th:if="${info.dataQualityIssues != null && !info.dataQualityIssues.isEmpty()}">
+                        <li th:each="issue : ${info.dataQualityIssues}" th:text="${issue}">품질 이슈</li>
+                    </ul>
+                </section>
                 <section class="signal-panel" th:if="${signal != null}" aria-label="Stock signal">
                     <div class="signal-overview" th:classappend="${signal.tone}">
                         <span>Integrated Signal</span>
@@ -78,7 +106,7 @@
                         <p th:text="${signal.summary}">현재 보유한 캐시 데이터 기준의 투자 판단 보조 신호입니다.</p>
                         <div>
                             <b th:text="${signal.score}">50 / 100</b>
-                            <small th:text="${signal.confidence}">신뢰도 보통</small>
+                            <small th:text="${signal.confidence}">데이터 신뢰도 보통</small>
                         </div>
                     </div>
                     <div class="signal-card-grid">
@@ -100,21 +128,20 @@
                     </div>
                 </div>
 
-                <div class="business-card">
-                    <div class="donut" aria-hidden="true"></div>
-                    <div>
-                        <h2>매출/산업 구성</h2>
-                        <p>세그먼트별 매출 데이터는 아직 없어서 현재는 Finnhub 산업 분류를 대표 구성으로 표시합니다.</p>
-                        <strong th:text="${info.industryName}">Technology</strong>
-                    </div>
-                </div>
-
                 <h2>투자 지표</h2>
                 <div class="metric-card-grid">
                     <article th:each="card : ${info.investmentCards}">
                         <span th:text="${card.label}">PER</span>
                         <strong th:text="${card.value}">-</strong>
                         <p th:text="${card.note}">source</p>
+                    </article>
+                </div>
+                <h2>기관 보유 증감</h2>
+                <div class="metric-card-grid">
+                    <article th:each="card : ${info.institutionCards}">
+                        <span th:text="${card.label}">기관 보유 증감</span>
+                        <strong th:text="${card.value}">-</strong>
+                        <p th:text="${card.note}">13F</p>
                     </article>
                 </div>
             </section>
@@ -383,6 +410,27 @@
         window.addEventListener("scroll", updateActive, { passive: true });
         window.addEventListener("resize", updateActive);
         updateActive();
+    })();
+</script>
+<script th:inline="javascript">
+    (() => {
+        const stock = {
+            symbol: /*[[${dashboard.symbol}]]*/ "AAPL",
+            name: /*[[${dashboard.profile != null && dashboard.profile.name != null ? dashboard.profile.name : dashboard.symbol}]]*/ "Apple Inc",
+            logoUrl: /*[[${dashboard.profile != null ? dashboard.profile.logo : ''}]]*/ "",
+            logoInitial: /*[[${#strings.substring(dashboard.symbol, 0, 1)}]]*/ "A",
+            sector: /*[[${dashboard.profile != null ? dashboard.profile.finnhubIndustry : ''}]]*/ "",
+            viewedAt: new Date().toISOString()
+        };
+        const key = "ky.atelier.recent";
+        try {
+            const items = JSON.parse(localStorage.getItem(key) || "[]")
+                .filter((item) => item && item.symbol !== stock.symbol);
+            items.unshift(stock);
+            localStorage.setItem(key, JSON.stringify(items.slice(0, 20)));
+        } catch {
+            localStorage.setItem(key, JSON.stringify([stock]));
+        }
     })();
 </script>
 </body>

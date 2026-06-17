@@ -5,6 +5,7 @@ import java.util.List;
 public record StockInfoView(
         List<InfoRow> majorRows,
         List<MetricCard> investmentCards,
+        List<MetricCard> institutionCards,
         List<MetricCard> financeCards,
         List<SeriesPoint> profitability,
         List<SeriesPoint> stability,
@@ -18,7 +19,9 @@ public record StockInfoView(
         String marketCapLabel,
         String enterpriseValueLabel,
         String shareOutstandingLabel,
-        String fiscalSourceLabel) {
+        String fiscalSourceLabel,
+        List<MetricCard> dataQualityCards,
+        List<String> dataQualityIssues) {
 
     public record InfoRow(String label, String value) {
     }

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockDataQualityMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.StockDataQualityLatest">
+        SELECT
+            symbol,
+            calculated_at,
+            quality_score,
+            quality_label,
+            tone,
+            coverage_score,
+            freshness_score,
+            outlier_score,
+            consistency_score,
+            issue_count,
+            excluded_metric_count,
+            stale_sources_json,
+            excluded_fields_json,
+            issues_json,
+            raw_json
+        FROM stock_data_quality_latest
+        WHERE symbol = #{symbol}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO stock_data_quality_latest (
+            symbol, calculated_at, quality_score, quality_label, tone,
+            coverage_score, freshness_score, outlier_score, consistency_score,
+            issue_count, excluded_metric_count,
+            stale_sources_json, excluded_fields_json, issues_json, raw_json
+        )
+        VALUES (
+            #{symbol}, #{calculatedAt}, #{qualityScore}, #{qualityLabel}, #{tone},
+            #{coverageScore}, #{freshnessScore}, #{outlierScore}, #{consistencyScore},
+            #{issueCount}, #{excludedMetricCount},
+            #{staleSourcesJson}, #{excludedFieldsJson}, #{issuesJson}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            calculated_at = VALUES(calculated_at),
+            quality_score = VALUES(quality_score),
+            quality_label = VALUES(quality_label),
+            tone = VALUES(tone),
+            coverage_score = VALUES(coverage_score),
+            freshness_score = VALUES(freshness_score),
+            outlier_score = VALUES(outlier_score),
+            consistency_score = VALUES(consistency_score),
+            issue_count = VALUES(issue_count),
+            excluded_metric_count = VALUES(excluded_metric_count),
+            stale_sources_json = VALUES(stale_sources_json),
+            excluded_fields_json = VALUES(excluded_fields_json),
+            issues_json = VALUES(issues_json),
+            raw_json = VALUES(raw_json)
+    </insert>
+</mapper>

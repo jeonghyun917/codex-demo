@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.SecEdgarBatchRunMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sec_edgar_batch_run (job_name, status, message)
+        VALUES (#{jobName}, #{status}, #{message})
+    </insert>
+
+    <update id="finish">
+        UPDATE sec_edgar_batch_run
+        SET
+            finished_at = #{finishedAt},
+            status = #{status},
+            requested_count = #{requestedCount},
+            success_count = #{successCount},
+            fail_count = #{failCount},
+            skipped_count = #{skippedCount},
+            message = #{message}
+        WHERE id = #{id}
+    </update>
+</mapper>

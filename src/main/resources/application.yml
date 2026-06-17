@@ -23,8 +23,66 @@ finnhub:
   candle-enabled: false
   candle-cache-hours: 24
 
+sec:
+  edgar:
+    base-url: https://data.sec.gov
+    files-base-url: https://www.sec.gov
+    user-agent: ${SEC_EDGAR_USER_AGENT:king-yurina-stock-research/0.1 contact@example.com}
+    company-facts-cache-hours: 168
+    max-facts-per-concept: 80
+    request-delay-millis: 300
+    full-concept-enabled: false
+
+stooq:
+  base-url: https://stooq.com/q/d/l/
+  default-years: 5
+  request-delay-millis: 300
+
+yahoo-chart:
+  base-url: https://query1.finance.yahoo.com/v8/finance/chart/
+  default-years: 5
+  request-delay-millis: 250
+
 app:
   batch:
+    yahoo-candle:
+      enabled: false
+      exit-on-complete: false
+      symbol-limit: 1000
+      years: 5
+      delay-millis: 250
+      index-codes: SP500,NASDAQ100,DOW30
+      symbols: ""
+    historical-backtest:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      years: 3
+      symbol-limit: 1000
+      date-limit: 40
+    etf-yahoo:
+      enabled: false
+      exit-on-complete: false
+      symbol-limit: 150
+      years: 3
+      delay-millis: 250
+      symbols: ""
+    stooq-candle:
+      enabled: false
+      exit-on-complete: false
+      symbol-limit: 1000
+      years: 5
+      delay-millis: 300
+      index-codes: SP500,NASDAQ100,DOW30
+      symbols: ""
+    sec-edgar:
+      enabled: false
+      sync-enabled: true
+      exit-on-complete: false
+      symbol-limit: 1000
+      index-codes: SP500,NASDAQ100,DOW30
+      symbols: ""
+      rebuild-standard: false
     finnhub:
       index-codes: ""
     index:

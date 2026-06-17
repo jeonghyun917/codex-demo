@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quant AI Dashboard | King Yurina</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body>
+<div class="page-shell">
+    <header class="site-header" aria-label="Primary navigation">
+        <a class="brand-mark" href="/" aria-label="King Yurina home">KY</a>
+        <nav class="nav-links" aria-label="Main menu">
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:text="${menu.label}"
+               href="/dashboard">Dashboard</a>
+        </nav>
+        <a class="header-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Portfolio Lab</a>
+    </header>
+
+    <main class="hero quant-home">
+        <section class="hero-stage" aria-labelledby="dashboard-title">
+            <div class="hero-editorial">
+                <p class="eyebrow">Quant AI operating dashboard</p>
+                <h1 id="dashboard-title">quant ai</h1>
+                <p class="hero-copy">
+                    This dashboard documents the Quant AI stack: collected market data, Signal composition,
+                    validation layers, weight profiles, and the portfolio backtest path.
+                </p>
+                <div class="hero-actions" aria-label="Quant dashboard actions">
+                    <a class="primary-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Portfolio Lab</a>
+                    <a class="secondary-action" th:href="@{/signals/backtest}" href="/signals/backtest">Backtest Lab</a>
+                    <a class="secondary-action" th:href="@{/stocks}" href="/stocks">Stock List</a>
+                </div>
+            </div>
+            <div class="hero-card" aria-label="Quant signal overview">
+                <span>Current engine</span>
+                <strong>Quant Signal v2</strong>
+                <p>9-factor scoring with data-quality guardrails, sector/size neutral diagnostics, and walk-forward validation.</p>
+                <dl>
+                    <div>
+                        <dt>Universe</dt>
+                        <dd>S&amp;P 500 / Nasdaq 100 / Dow 30</dd>
+                    </div>
+                    <div>
+                        <dt>Signal</dt>
+                        <dd>9-factor score</dd>
+                    </div>
+                    <div>
+                        <dt>Storage</dt>
+                        <dd>MariaDB snapshots</dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <section class="detail-strip quant-status-strip" aria-label="Quant AI summary">
+            <article>
+                <span>01</span>
+                <strong>Data Lake</strong>
+                <p>Finnhub, SEC EDGAR, Yahoo Chart, 13F, index constituents, and ETF seeds are stored in MariaDB.</p>
+            </article>
+            <article>
+                <span>02</span>
+                <strong>Signal Engine</strong>
+                <p>Valuation, Quality, Growth, Stability, Earnings, Analyst, News, Momentum/Risk, and Institution factors.</p>
+            </article>
+            <article>
+                <span>03</span>
+                <strong>Validation</strong>
+                <p>Forward returns, IC, hit rate, spread, walk-forward, and portfolio backtest checks.</p>
+            </article>
+        </section>
+
+        <section class="quant-section" aria-labelledby="quant-data-title">
+            <div class="quant-section-head">
+                <span>Data foundation</span>
+                <h2 id="quant-data-title">Collected data and storage</h2>
+                <p>
+                    Pages read from cached analytical tables instead of calling external APIs on every request.
+                    This keeps rendering fast and makes historical validation reproducible.
+                </p>
+            </div>
+            <div class="quant-data-grid">
+                <article>
+                    <span>Finnhub</span>
+                    <strong>Profile, quote, metric, recommendations, EPS, news</strong>
+                    <p>Company profile, current quote, basic financials, recommendation trend, EPS surprise, and company news.</p>
+                </article>
+                <article>
+                    <span>SEC EDGAR</span>
+                    <strong>CIK mapping and source financial facts</strong>
+                    <p>Revenue, operating income, net income, EPS, assets, liabilities, equity, and cash-flow facts are standardized.</p>
+                </article>
+                <article>
+                    <span>Yahoo Chart</span>
+                    <strong>Stock and ETF daily candles</strong>
+                    <p>OHLCV candles support moving averages, RSI, volatility, drawdown, and forward-return calculations.</p>
+                </article>
+                <article>
+                    <span>Institution 13F</span>
+                    <strong>Institutional ownership flow</strong>
+                    <p>13F-based ownership changes are used as a supporting factor with a conservative availability lag.</p>
+                </article>
+                <article>
+                    <span>Index Universe</span>
+                    <strong>S&amp;P 500, Nasdaq 100, Dow 30</strong>
+                    <p>Index membership is managed separately so collection can use the exact union of target indices.</p>
+                </article>
+                <article>
+                    <span>ETF Seed</span>
+                    <strong>Major ETF watchlist</strong>
+                    <p>Representative ETF symbols are managed locally; daily prices and ETF-specific Signal can be expanded from there.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="systems" class="quant-section quant-pipeline-section" aria-labelledby="quant-pipeline-title">
+            <div class="quant-section-head">
+                <span>Signal pipeline</span>
+                <h2 id="quant-pipeline-title">Signal calculation flow</h2>
+                <p>
+                    Live pages read stock_signal_latest. Historical validation uses stock_signal_snapshot and backtest result tables.
+                </p>
+            </div>
+            <div class="quant-flow">
+                <article>
+                    <span>01</span>
+                    <strong>Collect source data</strong>
+                    <p>Quote, metric, SEC financials, candles, news, analyst data, and 13F flow are refreshed by batch jobs.</p>
+                </article>
+                <article>
+                    <span>02</span>
+                    <strong>Validate data quality</strong>
+                    <p>Outliers, stale values, unit issues, missing coverage, and source conflicts are flagged before scoring.</p>
+                </article>
+                <article>
+                    <span>03</span>
+                    <strong>Calculate factor scores</strong>
+                    <p>Each factor is normalized to 0-100 and stored with reasons, freshness, and data-quality context.</p>
+                </article>
+                <article>
+                    <span>04</span>
+                    <strong>Build integrated Signal</strong>
+                    <p>Weighted scoring plus guardrails prevents weak quality, earnings, or momentum from receiving excessive scores.</p>
+                </article>
+                <article>
+                    <span>05</span>
+                    <strong>Save snapshots</strong>
+                    <p>List and detail pages read persisted values, so failed batch runs do not erase the last valid Signal.</p>
+                </article>
+                <article>
+                    <span>06</span>
+                    <strong>Validate outcomes</strong>
+                    <p>5D/20D/60D returns, factor diagnostics, walk-forward, and portfolio backtest test the usefulness of the score.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="quant-section" aria-labelledby="quant-factor-title">
+            <div class="quant-section-head">
+                <span>9-factor model</span>
+                <h2 id="quant-factor-title">Current Signal composition</h2>
+                <p>
+                    Signal is not a guaranteed forecast. It is a normalized, reviewable investment signal built from factor evidence.
+                </p>
+            </div>
+            <div class="quant-factor-grid">
+                <article><span>Valuation</span><strong>Relative valuation</strong><p>PER, PBR, PSR, market cap, and sector comparison.</p></article>
+                <article><span>Quality</span><strong>Business quality</strong><p>ROE, EPS, net margin, profitability, and earnings defense.</p></article>
+                <article><span>Growth</span><strong>Financial growth</strong><p>SEC-standardized revenue and income growth with recent trend context.</p></article>
+                <article><span>Stability</span><strong>Financial stability</strong><p>Assets, liabilities, equity, leverage, and structural risk.</p></article>
+                <article><span>Earnings</span><strong>Earnings momentum</strong><p>EPS surprise and filed-at-aware financial availability.</p></article>
+                <article><span>Analyst</span><strong>Analyst trend</strong><p>Buy/hold/sell mix and recommendation trend changes.</p></article>
+                <article><span>News</span><strong>News attention</strong><p>Recent article count and rule-based positive/risk keyword checks.</p></article>
+                <article><span>Momentum/Risk</span><strong>Price trend and risk</strong><p>Daily candles, SMA, RSI, 52-week position, volatility, and drawdown.</p></article>
+                <article><span>Institution</span><strong>Institutional flow</strong><p>13F ownership changes and institutional buy/sell support.</p></article>
+            </div>
+        </section>
+
+        <section class="quant-section quant-validation-section" aria-labelledby="quant-validation-title">
+            <div class="quant-section-head">
+                <span>Validation layer</span>
+                <h2 id="quant-validation-title">Validation and weight profiles</h2>
+                <p>
+                    Candidate weight profiles are not applied to live Signal until backtest and walk-forward evidence justifies promotion.
+                </p>
+            </div>
+            <div class="quant-validation-grid">
+                <article>
+                    <strong>DEFAULT</strong>
+                    <p>The current production reference profile used by list and detail pages through stored Signal values.</p>
+                </article>
+                <article>
+                    <strong>BACKTEST_V1</strong>
+                    <p>A factor-diagnostics candidate using 20D/60D spread, IC, hit rate, and year stability.</p>
+                </article>
+                <article>
+                    <strong>BACKTEST_V2</strong>
+                    <p>A candidate with factor-correlation penalties and sector/size neutral scoring. It remains validation-only.</p>
+                </article>
+                <article>
+                    <strong>PORTFOLIO_V1</strong>
+                    <p>Tests Signal-ranked portfolios by cumulative return, MDD, Sharpe, turnover, costs, and sector concentration.</p>
+                </article>
+            </div>
+            <div class="quant-actions">
+                <a class="primary-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Open Portfolio Lab</a>
+                <a class="secondary-action" th:href="@{/signals/backtest}" href="/signals/backtest">Open Signal Lab</a>
+                <a class="secondary-action" th:href="@{/stocks/heatmap}" href="/stocks/heatmap">Heatmap</a>
+                <a class="secondary-action" th:href="@{/etfs}" href="/etfs">ETF List</a>
+            </div>
+        </section>
+
+        <section id="contact" class="quant-section quant-roadmap-section" aria-labelledby="quant-roadmap-title">
+            <div class="quant-section-head">
+                <span>Roadmap</span>
+                <h2 id="quant-roadmap-title">Next Quant AI work</h2>
+                <p>
+                    The next quality jump is stricter point-in-time data and a risk model. Portfolio validation should not rely on
+                    future-known data, and it must track concentration, volatility, liquidity, and transaction costs.
+                </p>
+            </div>
+            <div class="quant-roadmap">
+                <span>01 Portfolio Backtest v1</span>
+                <span>02 Point-in-time market cap snapshots</span>
+                <span>03 Risk model beta / volatility / liquidity</span>
+                <span>04 Explainable Signal contribution</span>
+                <span>05 ETF holdings plus stock Signal linkage</span>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

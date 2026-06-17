@@ -11,6 +11,9 @@ public class StockMarketRow {
     private String sector;
     private String industry;
     private BigDecimal marketCap;
+    private BigDecimal institutionSharesChangePct;
+    private Integer institutionHolderCount;
+    private java.time.LocalDate institutionReportQuarter;
     private BigDecimal currentPrice;
     private BigDecimal previousClose;
     private BigDecimal openPrice;
@@ -28,6 +31,19 @@ public class StockMarketRow {
     private String signalConfidence;
     private String signalTone;
     private LocalDateTime signalCalculatedAt;
+    private Integer dataQualityScore;
+    private String dataQualityLabel;
+    private String dataQualityTone;
+    private String dataQualityExcludedFieldsJson;
+    private Integer valuationScore;
+    private Integer qualityScore;
+    private Integer growthScore;
+    private Integer stabilityScore;
+    private Integer earningsScore;
+    private Integer analystScore;
+    private Integer newsScore;
+    private Integer momentumScore;
+    private Integer riskScore;
 
     public String getSymbol() {
         return symbol;
@@ -75,6 +91,30 @@ public class StockMarketRow {
 
     public void setMarketCap(BigDecimal marketCap) {
         this.marketCap = marketCap;
+    }
+
+    public BigDecimal getInstitutionSharesChangePct() {
+        return institutionSharesChangePct;
+    }
+
+    public void setInstitutionSharesChangePct(BigDecimal institutionSharesChangePct) {
+        this.institutionSharesChangePct = institutionSharesChangePct;
+    }
+
+    public Integer getInstitutionHolderCount() {
+        return institutionHolderCount;
+    }
+
+    public void setInstitutionHolderCount(Integer institutionHolderCount) {
+        this.institutionHolderCount = institutionHolderCount;
+    }
+
+    public java.time.LocalDate getInstitutionReportQuarter() {
+        return institutionReportQuarter;
+    }
+
+    public void setInstitutionReportQuarter(java.time.LocalDate institutionReportQuarter) {
+        this.institutionReportQuarter = institutionReportQuarter;
     }
 
     public BigDecimal getCurrentPrice() {
@@ -211,5 +251,109 @@ public class StockMarketRow {
 
     public void setSignalCalculatedAt(LocalDateTime signalCalculatedAt) {
         this.signalCalculatedAt = signalCalculatedAt;
+    }
+
+    public Integer getDataQualityScore() {
+        return dataQualityScore;
+    }
+
+    public void setDataQualityScore(Integer dataQualityScore) {
+        this.dataQualityScore = dataQualityScore;
+    }
+
+    public String getDataQualityLabel() {
+        return dataQualityLabel;
+    }
+
+    public void setDataQualityLabel(String dataQualityLabel) {
+        this.dataQualityLabel = dataQualityLabel;
+    }
+
+    public String getDataQualityTone() {
+        return dataQualityTone;
+    }
+
+    public void setDataQualityTone(String dataQualityTone) {
+        this.dataQualityTone = dataQualityTone;
+    }
+
+    public String getDataQualityExcludedFieldsJson() {
+        return dataQualityExcludedFieldsJson;
+    }
+
+    public void setDataQualityExcludedFieldsJson(String dataQualityExcludedFieldsJson) {
+        this.dataQualityExcludedFieldsJson = dataQualityExcludedFieldsJson;
+    }
+
+    public Integer getValuationScore() {
+        return valuationScore;
+    }
+
+    public void setValuationScore(Integer valuationScore) {
+        this.valuationScore = valuationScore;
+    }
+
+    public Integer getQualityScore() {
+        return qualityScore;
+    }
+
+    public void setQualityScore(Integer qualityScore) {
+        this.qualityScore = qualityScore;
+    }
+
+    public Integer getGrowthScore() {
+        return growthScore;
+    }
+
+    public void setGrowthScore(Integer growthScore) {
+        this.growthScore = growthScore;
+    }
+
+    public Integer getStabilityScore() {
+        return stabilityScore;
+    }
+
+    public void setStabilityScore(Integer stabilityScore) {
+        this.stabilityScore = stabilityScore;
+    }
+
+    public Integer getEarningsScore() {
+        return earningsScore;
+    }
+
+    public void setEarningsScore(Integer earningsScore) {
+        this.earningsScore = earningsScore;
+    }
+
+    public Integer getAnalystScore() {
+        return analystScore;
+    }
+
+    public void setAnalystScore(Integer analystScore) {
+        this.analystScore = analystScore;
+    }
+
+    public Integer getNewsScore() {
+        return newsScore;
+    }
+
+    public void setNewsScore(Integer newsScore) {
+        this.newsScore = newsScore;
+    }
+
+    public Integer getMomentumScore() {
+        return momentumScore;
+    }
+
+    public void setMomentumScore(Integer momentumScore) {
+        this.momentumScore = momentumScore;
+    }
+
+    public Integer getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(Integer riskScore) {
+        this.riskScore = riskScore;
     }
 }

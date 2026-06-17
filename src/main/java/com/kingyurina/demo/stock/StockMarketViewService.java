@@ -33,6 +33,20 @@ public class StockMarketViewService {
                 && changePercent(row).compareTo(BigDecimal.ZERO) >= 0).count();
         int decliners = (int) rows.stream().filter(row -> changePercent(row) != null
                 && changePercent(row).compareTo(BigDecimal.ZERO) < 0).count();
+        int signalCount = (int) rows.stream().map(StockMarketRow::getSignalScore).filter(score -> score != null).count();
+        BigDecimal averageSignalProbability = rows.stream()
+                .map(StockMarketRow::getSignalScore)
+                .filter(score -> score != null)
+                .map(BigDecimal::valueOf)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (signalCount > 0) {
+            averageSignalProbability = averageSignalProbability.divide(BigDecimal.valueOf(signalCount), 2,
+                    RoundingMode.HALF_UP);
+        }
+        int strongBuySignals = (int) rows.stream()
+                .map(StockMarketRow::getSignalScore)
+                .filter(score -> score != null && score >= 70)
+                .count();
         BigDecimal aggregateMarketCap = rows.stream()
                 .map(StockMarketRow::getMarketCap)
                 .filter(value -> value != null)
@@ -68,18 +82,22 @@ public class StockMarketViewService {
                 String.valueOf(decliners),
                 formatMarketCapKrw(aggregateMarketCap),
                 formatPercent(averageChange),
-                indexCards(rows.size(), cachedQuotes, advancers, decliners, aggregateMarketCap, averageChange),
+                indexCards(rows.size(), cachedQuotes, advancers, decliners, averageSignalProbability, signalCount,
+                        strongBuySignals, averageChange),
                 viewRows,
                 topMovers,
                 sectorRows(rows));
     }
 
     private static List<StockMarketView.IndexCard> indexCards(int total, int cachedQuotes, int advancers, int decliners,
-            BigDecimal marketCap, BigDecimal averageChange) {
+            BigDecimal averageSignalProbability, int signalCount, int strongBuySignals, BigDecimal averageChange) {
         return List.of(
                 new StockMarketView.IndexCard("구성종목", String.valueOf(total), cachedQuotes + " quote cached", true),
                 new StockMarketView.IndexCard("상승", String.valueOf(advancers), "하락 " + decliners, advancers >= decliners),
-                new StockMarketView.IndexCard("합산 시가총액", formatMarketCapKrw(marketCap), "company_profile 기준", true),
+                new StockMarketView.IndexCard("Signal 평균", formatPercent(signalCount > 0 ? averageSignalProbability : null),
+                        signalCount + "개 Signal 기준", signalCount > 0
+                                && averageSignalProbability.compareTo(BigDecimal.valueOf(50)) >= 0),
+                new StockMarketView.IndexCard("강한 Signal", strongBuySignals + "개", "Signal 70%+", strongBuySignals > 0),
                 new StockMarketView.IndexCard("평균 등락률", formatPercent(averageChange), "전일종가 대비",
                         averageChange != null && averageChange.compareTo(BigDecimal.ZERO) >= 0));
     }
@@ -105,10 +123,12 @@ public class StockMarketViewService {
                     if (count > 0) {
                         change = change.divide(BigDecimal.valueOf(count), 4, RoundingMode.HALF_UP);
                     }
-                    return new StockMarketView.SectorRow(entry.getKey(), String.valueOf(entry.getValue().size()),
-                            formatMarketCapKrw(marketCap), formatPercent(change));
+                    return new SectorSummary(entry.getKey(), String.valueOf(entry.getValue().size()),
+                            marketCap, formatMarketCapKrw(marketCap), formatPercent(change));
                 })
-                .sorted(Comparator.comparing(StockMarketView.SectorRow::marketCap).reversed())
+                .sorted(Comparator.comparing(SectorSummary::marketCap).reversed())
+                .map(summary -> new StockMarketView.SectorRow(summary.sector(), summary.count(),
+                        summary.formattedMarketCap(), summary.averageChange()))
                 .toList();
     }
 
@@ -124,153 +144,27 @@ public class StockMarketViewService {
                 formatPriceKrw(row.getCurrentPrice()),
                 formatPercent(change),
                 formatMarketCapKrw(row.getMarketCap()),
-                formatRatio(row.getPeNormalizedAnnual(), "배"),
-                formatRatio(row.getPbAnnual(), "배"),
-                formatPercent(row.getRoeTtm()),
+                formatInstitutionFlow(row),
+                formatRatio(clean(row, "peNormalizedAnnual", row.getPeNormalizedAnnual()), "배"),
+                formatRatio(clean(row, "pbAnnual", row.getPbAnnual()), "배"),
+                formatPercent(clean(row, "roeTTM", row.getRoeTtm())),
                 includeSignal ? formatSignalScore(row.getSignalScore()) : "-",
                 includeSignal && row.getSignalConfidence() != null ? row.getSignalConfidence() : "-",
                 includeSignal && row.getSignalTone() != null ? row.getSignalTone() : "neutral",
-                change != null && change.compareTo(BigDecimal.ZERO) >= 0);
-    }
-
-    private static MarketSignal marketSignal(StockMarketRow row, BigDecimal change) {
-        List<Integer> scores = new ArrayList<>();
-        scores.add(valuationScore(row));
-        scores.add(qualityScore(row));
-        scores.add(earningsScore(row));
-        scores.add(analystScore(row));
-        scores.add(newsScore(row));
-        scores.add(momentumScore(change));
-
-        List<Integer> availableScores = scores.stream().filter(score -> score != null).toList();
-        if (availableScores.isEmpty()) {
-            return new MarketSignal("-", "매우 낮음", "neutral");
-        }
-        int score = Math.round((float) availableScores.stream().mapToInt(Integer::intValue).sum()
-                / availableScores.size());
-        String confidence = availableScores.size() >= 5 ? "보통"
-                : availableScores.size() >= 3 ? "낮음" : "매우 낮음";
-        return new MarketSignal(String.valueOf(score), confidence, signalTone(score));
-    }
-
-    private static Integer valuationScore(StockMarketRow row) {
-        if (row.getPeNormalizedAnnual() == null && row.getPbAnnual() == null) {
-            return null;
-        }
-        int score = 55;
-        BigDecimal pe = row.getPeNormalizedAnnual();
-        BigDecimal pb = row.getPbAnnual();
-        if (pe != null) {
-            if (lte(pe, "20")) {
-                score += 14;
-            } else if (gte(pe, "80")) {
-                score -= 24;
-            } else if (gte(pe, "50")) {
-                score -= 16;
-            } else if (gte(pe, "35")) {
-                score -= 8;
-            }
-        }
-        if (pb != null) {
-            if (lte(pb, "5")) {
-                score += 8;
-            } else if (gte(pb, "20")) {
-                score -= 16;
-            } else if (gte(pb, "10")) {
-                score -= 8;
-            }
-        }
-        return clamp(score);
-    }
-
-    private static Integer qualityScore(StockMarketRow row) {
-        if (row.getRoeTtm() == null) {
-            return null;
-        }
-        int score = 50;
-        BigDecimal roe = row.getRoeTtm();
-        if (gte(roe, "50")) {
-            score += 30;
-        } else if (gte(roe, "25")) {
-            score += 22;
-        } else if (gte(roe, "12")) {
-            score += 12;
-        } else if (lte(roe, "0")) {
-            score -= 25;
-        } else if (lte(roe, "8")) {
-            score -= 10;
-        }
-        return clamp(score);
-    }
-
-    private static Integer earningsScore(StockMarketRow row) {
-        BigDecimal surprise = row.getLatestSurprisePercent();
-        if (surprise == null) {
-            return null;
-        }
-        return clamp(50 + cappedInt(surprise, -25, 25));
-    }
-
-    private static Integer analystScore(StockMarketRow row) {
-        int bullish = count(row.getAnalystBullish());
-        int neutral = count(row.getAnalystNeutral());
-        int bearish = count(row.getAnalystBearish());
-        int total = bullish + neutral + bearish;
-        if (total == 0) {
-            return null;
-        }
-        return clamp(50 + ((bullish - bearish) * 50 / total));
-    }
-
-    private static Integer newsScore(StockMarketRow row) {
-        Integer count = row.getRecentNewsCount();
-        if (count == null) {
-            return null;
-        }
-        return clamp(50 + Math.min(count, 10));
-    }
-
-    private static Integer momentumScore(BigDecimal change) {
-        if (change == null) {
-            return null;
-        }
-        return clamp(50 + cappedInt(change.multiply(BigDecimal.valueOf(4)), -24, 24));
-    }
-
-    private static String signalTone(int score) {
-        if (score >= 67) {
-            return "positive";
-        }
-        if (score >= 52) {
-            return "neutral";
-        }
-        if (score >= 40) {
-            return "caution";
-        }
-        return "negative";
-    }
-
-    private static int count(Integer value) {
-        return value == null ? 0 : value;
-    }
-
-    private static boolean gte(BigDecimal value, String threshold) {
-        return value != null && value.compareTo(new BigDecimal(threshold)) >= 0;
-    }
-
-    private static boolean lte(BigDecimal value, String threshold) {
-        return value != null && value.compareTo(new BigDecimal(threshold)) <= 0;
-    }
-
-    private static int cappedInt(BigDecimal value, int min, int max) {
-        if (value == null) {
-            return 0;
-        }
-        return Math.max(min, Math.min(max, value.setScale(0, RoundingMode.HALF_UP).intValue()));
-    }
-
-    private static int clamp(int value) {
-        return Math.max(0, Math.min(100, value));
+                change != null && change.compareTo(BigDecimal.ZERO) >= 0,
+                row.getSignalScore(),
+                includeSignal ? formatSignalScore(row.getDataQualityScore()) : "-",
+                includeSignal && row.getDataQualityTone() != null ? row.getDataQualityTone() : "neutral",
+                row.getDataQualityScore(),
+                row.getValuationScore(),
+                row.getQualityScore(),
+                row.getGrowthScore(),
+                row.getStabilityScore(),
+                row.getEarningsScore(),
+                row.getAnalystScore(),
+                row.getNewsScore(),
+                row.getMomentumScore(),
+                row.getRiskScore());
     }
 
     private static String blankToNull(String value) {
@@ -290,13 +184,6 @@ public class StockMarketViewService {
                 .subtract(row.getPreviousClose())
                 .multiply(BigDecimal.valueOf(100))
                 .divide(row.getPreviousClose(), 4, RoundingMode.HALF_UP);
-    }
-
-    private static String formatMoney(BigDecimal value, String suffix) {
-        if (value == null) {
-            return "-";
-        }
-        return value.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + " " + suffix;
     }
 
     private static String formatMarketCapKrw(BigDecimal marketCapMillionUsd) {
@@ -335,6 +222,24 @@ public class StockMarketViewService {
         return score == null ? "-" : score + " / 100";
     }
 
-    private record MarketSignal(String scoreLabel, String confidence, String tone) {
+    private static String formatInstitutionFlow(StockMarketRow row) {
+        if (row.getInstitutionSharesChangePct() == null) {
+            return "-";
+        }
+        String holders = row.getInstitutionHolderCount() == null ? "" : " · " + row.getInstitutionHolderCount() + "곳";
+        return formatPercent(row.getInstitutionSharesChangePct()) + holders;
+    }
+
+    private static BigDecimal clean(StockMarketRow row, String field, BigDecimal value) {
+        return isExcluded(row, field) ? null : value;
+    }
+
+    private static boolean isExcluded(StockMarketRow row, String field) {
+        String json = row.getDataQualityExcludedFieldsJson();
+        return json != null && field != null && json.toLowerCase().contains(("\"" + field + "\"").toLowerCase());
+    }
+
+    private record SectorSummary(String sector, String count, BigDecimal marketCap, String formattedMarketCap,
+            String averageChange) {
     }
 }

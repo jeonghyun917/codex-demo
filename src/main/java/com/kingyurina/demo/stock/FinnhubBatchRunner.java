@@ -1,6 +1,7 @@
 package com.kingyurina.demo.stock;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -114,48 +115,64 @@ public class FinnhubBatchRunner implements ApplicationRunner {
         int skipped = 0;
         String syncMessage = syncSummary.message();
         String message = syncMessage == null ? null : "Index sync " + syncMessage + " ";
-
-        List<String> targetIndexCodes = targetIndexCodes();
-        List<String> symbols = targetSymbols(symbolMapper, targetIndexCodes, Math.max(1, symbolLimit));
-        message = appendMessage(message, targetIndexCodes.isEmpty()
-                ? "Target symbols=active stock_symbol."
-                : "Target indexes=" + String.join(",", targetIndexCodes) + ".");
-        for (String symbol : symbols) {
-            requested++;
-            try {
-                StockDashboard dashboard = stockAnalysisService.dashboard(symbol);
-                if (dashboard.quote() != null || dashboard.profile() != null || dashboard.metric() != null
-                        || !dashboard.recommendations().isEmpty() || !dashboard.epsSurprises().isEmpty()) {
-                    success++;
-                    symbolMapper.markCollected(symbol);
-                    stockSignalRefreshService.recalculateSymbol(symbol);
-                } else {
+        try {
+            List<String> targetIndexCodes = targetIndexCodes();
+            List<String> symbols = targetSymbols(symbolMapper, targetIndexCodes, Math.max(1, symbolLimit));
+            List<String> refreshedSymbols = new ArrayList<>();
+            message = appendMessage(message, targetIndexCodes.isEmpty()
+                    ? "Target symbols=active stock_symbol."
+                    : "Target indexes=" + String.join(",", targetIndexCodes) + ".");
+            for (String symbol : symbols) {
+                requested++;
+                try {
+                    StockDashboard dashboard = stockAnalysisService.dashboard(symbol);
+                    if (dashboard.quote() != null || dashboard.profile() != null || dashboard.metric() != null
+                            || !dashboard.recommendations().isEmpty() || !dashboard.epsSurprises().isEmpty()) {
+                        success++;
+                        symbolMapper.markCollected(symbol);
+                        refreshedSymbols.add(symbol);
+                    } else {
+                        fail++;
+                    }
+                } catch (PersistenceException ex) {
                     fail++;
+                    message = "DB error at " + symbol + ": " + ex.getMessage();
+                } catch (RuntimeException ex) {
+                    fail++;
+                    message = "Runtime error at " + symbol + ": " + ex.getMessage();
                 }
-            } catch (PersistenceException ex) {
-                fail++;
-                message = "DB error at " + symbol + ": " + ex.getMessage();
-            } catch (RuntimeException ex) {
-                fail++;
-                message = "Runtime error at " + symbol + ": " + ex.getMessage();
-            }
 
-            if (fail > 0 && message != null && message.contains("429")) {
-                skipped += symbols.size() - requested;
-                break;
+                if (fail > 0 && message != null && message.contains("429")) {
+                    skipped += symbols.size() - requested;
+                    break;
+                }
+                sleepBetweenSymbols();
             }
-            sleepBetweenSymbols();
+            StockSignalRefreshService.RefreshResult signalRefresh = refreshedSymbols.isEmpty()
+                    ? new StockSignalRefreshService.RefreshResult(0, 0, 0)
+                    : stockSignalRefreshService.recalculateSymbols(refreshedSymbols);
+
+            run.setFinishedAt(LocalDateTime.now());
+            run.setRequestedCount(requested);
+            run.setSuccessCount(success);
+            run.setFailCount(fail);
+            run.setSkippedCount(skipped);
+            run.setStatus(fail == 0 ? "COMPLETED" : "COMPLETED_WITH_ERRORS");
+            String processedMessage = "Processed " + requested + " symbols. Signal refreshed "
+                    + signalRefresh.success() + "/" + signalRefresh.requested() + ".";
+            run.setMessage(message == null ? processedMessage : message + processedMessage);
+            runMapper.finish(run);
+        } catch (RuntimeException ex) {
+            run.setFinishedAt(LocalDateTime.now());
+            run.setRequestedCount(requested);
+            run.setSuccessCount(success);
+            run.setFailCount(Math.max(1, fail));
+            run.setSkippedCount(skipped);
+            run.setStatus("FAILED");
+            run.setMessage(appendMessage(message, "Batch failed: " + ex.getMessage()));
+            runMapper.finish(run);
+            throw ex;
         }
-
-        run.setFinishedAt(LocalDateTime.now());
-        run.setRequestedCount(requested);
-        run.setSuccessCount(success);
-        run.setFailCount(fail);
-        run.setSkippedCount(skipped);
-        run.setStatus(fail == 0 ? "COMPLETED" : "COMPLETED_WITH_ERRORS");
-        String processedMessage = "Processed " + requested + " symbols.";
-        run.setMessage(message == null ? processedMessage : message + processedMessage);
-        runMapper.finish(run);
     }
 
     private List<String> targetSymbols(StockSymbolMapper symbolMapper, List<String> targetIndexCodes, int limit) {

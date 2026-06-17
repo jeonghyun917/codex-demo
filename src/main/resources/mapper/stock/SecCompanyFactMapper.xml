@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.SecCompanyFactMapper">
+    <select id="countBySymbol" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_sec_fact
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.SecCompanyFact">
+        SELECT
+            id,
+            symbol,
+            cik,
+            taxonomy,
+            concept,
+            unit,
+            fiscal_year,
+            fiscal_period,
+            form,
+            filed_at,
+            start_date,
+            end_date,
+            accession_number,
+            frame,
+            value,
+            raw_json,
+            fetched_at
+        FROM stock_sec_fact
+        WHERE symbol = #{symbol}
+        ORDER BY filed_at, end_date, concept
+    </select>
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_sec_fact (
+            symbol,
+            cik,
+            taxonomy,
+            concept,
+            unit,
+            fiscal_year,
+            fiscal_period,
+            form,
+            filed_at,
+            start_date,
+            end_date,
+            accession_number,
+            frame,
+            value,
+            raw_json,
+            fetched_at
+        )
+        VALUES
+        <foreach collection="facts" item="fact" separator=",">
+            (
+                #{fact.symbol},
+                #{fact.cik},
+                #{fact.taxonomy},
+                #{fact.concept},
+                #{fact.unit},
+                #{fact.fiscalYear},
+                #{fact.fiscalPeriod},
+                #{fact.form},
+                #{fact.filedAt},
+                #{fact.startDate},
+                #{fact.endDate},
+                #{fact.accessionNumber},
+                #{fact.frame},
+                #{fact.value},
+                #{fact.rawJson},
+                #{fact.fetchedAt}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            form = VALUES(form),
+            filed_at = VALUES(filed_at),
+            start_date = VALUES(start_date),
+            frame = VALUES(frame),
+            value = VALUES(value),
+            raw_json = VALUES(raw_json),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

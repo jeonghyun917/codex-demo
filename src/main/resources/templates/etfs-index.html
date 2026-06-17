@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ETF Market</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:text="${menu.label}"
+               th:classappend="${menu.href == '/etfs'} ? 'active' : ''"
+               href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/etfs}" method="get">
+            <label for="symbol">ETF</label>
+            <input id="symbol" name="symbol" placeholder="ETF 검색" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="market-home etf-page">
+        <section class="market-landing compact">
+            <div>
+                <p>ETF 리스트</p>
+                <h1>
+                    <strong th:text="${market.title}">ETF</strong>
+                    <span th:text="${market.subtitle}">ETF 요약</span>
+                </h1>
+            </div>
+            <a class="market-link" href="#etf-list">ETF 보기</a>
+        </section>
+
+        <section class="index-card-row" aria-label="ETF summary">
+            <article th:each="card : ${market.cards}" th:classappend="${card.positive ? ' positive' : ' negative'}">
+                <span th:text="${card.label}">ETF 수</span>
+                <strong th:text="${card.value}">0</strong>
+                <p th:text="${card.note}">cached</p>
+            </article>
+        </section>
+
+        <section class="market-board" id="etf-list">
+            <div class="market-board-main">
+                <div class="board-toolbar">
+                    <div>
+                        <h2>ETF 캐시</h2>
+                        <p>
+                            ETF <b th:text="${market.totalFunds}">0</b>개,
+                            quote 캐시 <b th:text="${market.cachedQuotes}">0</b>개,
+                            상승 <b class="up" th:text="${market.advancers}">0</b>개,
+                            하락 <b class="down" th:text="${market.decliners}">0</b>개
+                        </p>
+                    </div>
+                    <div class="toolbar-pills">
+                        <span>무료 v1</span>
+                        <span>Yahoo chart 가격</span>
+                        <span>ETF 전용 Signal</span>
+                    </div>
+                </div>
+
+                <div class="etf-table" data-etf-list>
+                    <div class="etf-row etf-head">
+                        <span>순위</span>
+                        <span>ETF</span>
+                        <span>운용사</span>
+                        <span>카테고리</span>
+                        <span>전략</span>
+                        <span><button class="sp-sort" type="button" data-sort="price">현재가</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="change">등락률</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="expense">비용</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="signal">Signal</button></span>
+                    </div>
+                    <a class="etf-row" th:each="row : ${market.rows}" th:href="@{/etfs/{symbol}(symbol=${row.symbol})}">
+                        <span th:text="${row.rank}">1</span>
+                        <strong class="stock-identity">
+                            <span class="stock-logo"><span th:text="${#strings.substring(row.symbol, 0, 1)}">E</span></span>
+                            <span class="stock-copy">
+                                <b th:text="${row.symbol}">SPY</b>
+                                <small th:text="${row.name}">SPDR S&amp;P 500 ETF Trust</small>
+                            </span>
+                        </strong>
+                        <span th:text="${row.issuer}">State Street</span>
+                        <span th:text="${row.category}">US Large Blend</span>
+                        <span th:text="${row.strategy}">S&amp;P 500</span>
+                        <span th:text="${row.price}">-</span>
+                        <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">-</span>
+                        <span th:text="${row.expenseRatio}">-</span>
+                        <span class="market-signal-score" th:classappend="${row.signalTone}" th:text="${row.signalScore}">-</span>
+                    </a>
+                </div>
+            </div>
+
+            <aside class="market-board-side">
+                <section>
+                    <h2>변동 ETF</h2>
+                    <a class="mover-row" th:each="row : ${market.topMovers}" th:href="@{/etfs/{symbol}(symbol=${row.symbol})}">
+                        <strong class="stock-identity">
+                            <span class="stock-logo small"><span th:text="${#strings.substring(row.symbol, 0, 1)}">E</span></span>
+                            <span class="stock-copy">
+                                <b th:text="${row.symbol}">SPY</b>
+                                <small th:text="${row.name}">ETF</small>
+                            </span>
+                        </strong>
+                        <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">-</span>
+                    </a>
+                    <p class="empty-state" th:if="${market.topMovers.isEmpty()}">가격 캐시가 쌓이면 변동 ETF가 표시됩니다.</p>
+                </section>
+
+                <section>
+                    <h2>카테고리 요약</h2>
+                    <div class="sector-row" th:each="category : ${market.categories}">
+                        <strong th:text="${category.category}">US Large Blend</strong>
+                        <span th:text="${category.count + '개'}">0개</span>
+                        <small th:text="${'평균 비용 ' + category.averageExpense}">평균 비용</small>
+                        <small th:text="${'평균 등락률 ' + category.averageChange}">평균 등락률</small>
+                    </div>
+                </section>
+            </aside>
+        </section>
+    </main>
+
+    <footer class="market-footer">
+        <span>ETF dashboard</span>
+        <span th:text="${market.averageExpense}">expense</span>
+        <span th:text="${market.averageChange}">change</span>
+    </footer>
+</div>
+<script>
+(() => {
+    const table = document.querySelector("[data-etf-list]");
+    if (!table) {
+        return;
+    }
+    const buttons = Array.from(table.querySelectorAll("[data-sort]"));
+    const columns = { price: 5, change: 6, expense: 7, signal: 8 };
+    let rows = Array.from(table.querySelectorAll(".etf-row:not(.etf-head)"));
+    const state = { key: "", direction: "desc" };
+    const parseNumber = (value) => {
+        const match = String(value || "").match(/[+-]?\d[\d,]*(?:\.\d+)?/);
+        return match ? Number(match[0].replace(/,/g, "")) : null;
+    };
+    buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const key = button.dataset.sort;
+            const direction = state.key === key && state.direction === "desc" ? "asc" : "desc";
+            state.key = key;
+            state.direction = direction;
+            rows = [...rows].sort((left, right) => {
+                const leftValue = parseNumber(left.children[columns[key]]?.textContent);
+                const rightValue = parseNumber(right.children[columns[key]]?.textContent);
+                if (leftValue == null && rightValue == null) {
+                    return 0;
+                }
+                if (leftValue == null) {
+                    return 1;
+                }
+                if (rightValue == null) {
+                    return -1;
+                }
+                return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
+            });
+            rows.forEach((row) => table.append(row));
+            buttons.forEach((item) => item.removeAttribute("data-direction"));
+            button.dataset.direction = direction;
+        });
+    });
+})();
+</script>
+</body>
+</html>

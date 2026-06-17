@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Portfolio Backtest</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" placeholder="Ticker search" autocomplete="off" spellcheck="false">
+            <button type="submit">Search</button>
+        </form>
+    </header>
+
+    <main class="market-home backtest-page">
+        <section class="market-landing backtest-hero">
+            <div>
+                <p>Portfolio Backtest v2</p>
+                <h1>
+                    <strong>Portfolio v2</strong>
+                    <span>
+                        <span th:text="${portfolio.indexCode}">SP500</span>
+                        Signal is tested as an investable portfolio with turnover, costs, drawdown, and benchmark excess return.
+                    </span>
+                </h1>
+            </div>
+            <div class="backtest-hero-actions">
+                <a class="market-link" th:href="@{/signals/backtest}" href="/signals/backtest">Signal Lab</a>
+                <a class="market-link" th:href="@{/stocks}" href="/stocks">Stock List</a>
+            </div>
+        </section>
+
+        <section class="index-card-row backtest-cards" aria-label="Portfolio backtest summary">
+            <article th:each="card : ${portfolio.cards}" th:classappend="${card.tone}">
+                <span th:text="${card.label}">Metric</span>
+                <strong th:text="${card.value}">0</strong>
+                <p th:text="${card.note}">note</p>
+            </article>
+        </section>
+
+        <section class="backtest-grid">
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Risk Model v1</p>
+                        <h2>Portfolio constraints and trailing risk inputs</h2>
+                    </div>
+                    <span>Sector cap, position cap, volatility, liquidity, beta</span>
+                </div>
+                <div class="backtest-table portfolio-risk-table"
+                     th:if="${!#lists.isEmpty(portfolio.riskModels)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Metric</span>
+                        <span>Value</span>
+                        <span>Rule</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.riskModels}">
+                        <span th:text="${row.metric}">Risk</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.value}">0</span>
+                        <span th:text="${row.rule}">rule</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Strategy Comparison</p>
+                        <h2>Top N, holding horizon, and weighting method</h2>
+                    </div>
+                    <span th:text="${portfolio.costAssumption}">Transaction cost 0.10%</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.strategies)}">
+                    No completed forward-return rows are available for portfolio backtest yet.
+                </p>
+                <div class="backtest-table portfolio-strategy-table"
+                     th:if="${!#lists.isEmpty(portfolio.strategies)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Rank</span>
+                        <span>Strategy</span>
+                        <span>Risk</span>
+                        <span>Horizon</span>
+                        <span>Top N</span>
+                        <span>Weighting</span>
+                        <span>Rebals</span>
+                        <span>Cum</span>
+                        <span>Benchmark</span>
+                        <span>Excess</span>
+                        <span>Annual</span>
+                        <span>Vol</span>
+                        <span>Sharpe</span>
+                        <span>MDD</span>
+                        <span>Beat</span>
+                        <span>Turnover</span>
+                        <span>Avg Cost</span>
+                        <span>Max Sector</span>
+                        <span>Max Position</span>
+                        <span>Avg Beta</span>
+                        <span>Trail Vol</span>
+                        <span>Liquidity</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.strategies}">
+                        <span th:text="${row.rank}">1</span>
+                        <span th:text="${row.strategy}">Top 20 Signal</span>
+                        <span th:text="${row.riskModel}">Base</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.topCount}">20</span>
+                        <span th:text="${row.weighting}">Signal weight</span>
+                        <span th:text="${row.rebalanceCount}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.cumulativeReturn}">+0.00%</span>
+                        <span th:text="${row.benchmarkReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessReturn}">+0.00%</span>
+                        <span th:text="${row.annualReturn}">+0.00%</span>
+                        <span th:text="${row.volatility}">0.00%</span>
+                        <span th:text="${row.sharpe}">0.00</span>
+                        <span class="backtest-return negative" th:text="${row.maxDrawdown}">-0.00%</span>
+                        <span th:text="${row.benchmarkBeatRate}">0.00%</span>
+                        <span th:text="${row.averageTurnover}">0.00%</span>
+                        <span th:text="${row.averageTransactionCost}">0.00%</span>
+                        <span th:text="${row.averageMaxSectorWeight}">0.00%</span>
+                        <span th:text="${row.averageMaxPositionWeight}">0.00%</span>
+                        <span th:text="${row.averageBeta}">1.00</span>
+                        <span th:text="${row.averageTrailingVolatility}">0.00%</span>
+                        <span th:text="${row.averageLiquidity}">$0.0M</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Risk Impact Review</p>
+                        <h2>Risk-controlled strategy versus matching Base strategy</h2>
+                    </div>
+                    <span>Positive MDD delta means drawdown improved</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.riskImpacts)}">
+                    No matching Base and Risk-controlled strategy pairs are available.
+                </p>
+                <div class="backtest-table portfolio-risk-impact-table"
+                     th:if="${!#lists.isEmpty(portfolio.riskImpacts)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Strategy</span>
+                        <span>Horizon</span>
+                        <span>Top N</span>
+                        <span>Weighting</span>
+                        <span>Sharpe Delta</span>
+                        <span>MDD Delta</span>
+                        <span>Beta Delta</span>
+                        <span>Sector Delta</span>
+                        <span>Cost Delta</span>
+                        <span>Excess Delta</span>
+                        <span>Verdict</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.riskImpacts}">
+                        <span th:text="${row.strategy}">Top 20 Signal</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.topCount}">20</span>
+                        <span th:text="${row.weighting}">Signal weight</span>
+                        <span th:text="${row.sharpeDelta}">+0.00</span>
+                        <span th:text="${row.drawdownDelta}">+0.00%</span>
+                        <span th:text="${row.betaDelta}">-0.00</span>
+                        <span th:text="${row.sectorDelta}">-0.00%</span>
+                        <span th:text="${row.costDelta}">+0.00%</span>
+                        <span th:text="${row.excessDelta}">+0.00%</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.verdict}">Mixed</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Selected Strategy Path</p>
+                        <h2>Recent rebalance periods</h2>
+                    </div>
+                    <span>Default detail: Top 20 Signal weight / Risk controlled, 20D</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.recentPeriods)}">
+                    No rebalance periods are available.
+                </p>
+                <div class="backtest-table portfolio-period-table"
+                     th:if="${!#lists.isEmpty(portfolio.recentPeriods)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Date</span>
+                        <span>Strategy</span>
+                        <span>Horizon</span>
+                        <span>Names</span>
+                        <span>Gross</span>
+                        <span>Net</span>
+                        <span>Benchmark</span>
+                    <span>Excess</span>
+                    <span>Turnover</span>
+                    <span>Cost</span>
+                    <span>Beta</span>
+                    <span>Trail Vol</span>
+                    <span>Liquidity</span>
+                    <span>Equity</span>
+                    <span>Bench Equity</span>
+                </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.recentPeriods}">
+                        <span th:text="${row.tradeDate}">2024-01-01</span>
+                        <span th:text="${row.strategy}">Top 20 Signal weight</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.positionCount}">20</span>
+                        <span th:text="${row.grossReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.netReturn}">+0.00%</span>
+                        <span th:text="${row.benchmarkReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessReturn}">+0.00%</span>
+                        <span th:text="${row.turnover}">0.00%</span>
+                        <span th:text="${row.transactionCost}">0.00%</span>
+                        <span th:text="${row.beta}">1.00</span>
+                        <span th:text="${row.trailingVolatility}">0.00%</span>
+                        <span th:text="${row.liquidity}">$0.0M</span>
+                        <span th:text="${row.equity}">1.00x</span>
+                        <span th:text="${row.benchmarkEquity}">1.00x</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Sector Exposure</p>
+                        <h2>Concentration check</h2>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.sectorExposures)}">
+                    No sector exposure rows are available.
+                </p>
+                <div class="backtest-table portfolio-sector-table"
+                     th:if="${!#lists.isEmpty(portfolio.sectorExposures)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Strategy</span>
+                        <span>Horizon</span>
+                        <span>Sector</span>
+                        <span>Avg</span>
+                        <span>Max</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.sectorExposures}">
+                        <span th:text="${row.strategy}">Top 20 Signal</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.sector}">Technology</span>
+                        <span th:text="${row.averageWeight}">0.00%</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.maxWeight}">0.00%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Latest Portfolio</p>
+                        <h2>Selected positions</h2>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.latestPositions)}">
+                    No latest portfolio positions are available.
+                </p>
+                <div class="backtest-table portfolio-position-table"
+                     th:if="${!#lists.isEmpty(portfolio.latestPositions)}">
+                    <div class="backtest-row backtest-head">
+                        <span>#</span>
+                        <span>Symbol</span>
+                        <span>Sector</span>
+                        <span>Signal</span>
+                        <span>Weight</span>
+                        <span>Forward</span>
+                        <span>Beta</span>
+                        <span>Trail Vol</span>
+                        <span>Liquidity</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.latestPositions}">
+                        <span th:text="${row.rank}">1</span>
+                        <span>
+                            <b th:text="${row.symbol}">AAPL</b>
+                            <small th:text="${row.name}">Apple Inc</small>
+                        </span>
+                        <span th:text="${row.sector}">Technology</span>
+                        <span th:text="${row.score}">70</span>
+                        <span th:text="${row.weight}">5.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.forwardReturn}">+0.00%</span>
+                        <span th:text="${row.beta}">1.00</span>
+                        <span th:text="${row.trailingVolatility}">0.00%</span>
+                        <span th:text="${row.liquidity}">$0.0M</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Validation Notes</p>
+                        <h2>Interpretation rules</h2>
+                    </div>
+                    <span th:text="${portfolio.benchmarkLabel}">benchmark</span>
+                </div>
+                <ul class="backtest-notes">
+                    <li th:each="note : ${portfolio.notes}" th:text="${note}">note</li>
+                </ul>
+            </article>
+        </section>
+    </main>
+
+    <footer class="market-footer">
+        <span>Portfolio backtest v2</span>
+        <span th:text="${portfolio.benchmarkLabel}">benchmark</span>
+        <span th:text="${portfolio.costAssumption}">cost</span>
+    </footer>
+</div>
+</body>
+</html>

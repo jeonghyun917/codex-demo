@@ -1,0 +1,582 @@
+﻿<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signal Backtest</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" placeholder="티커 검색" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="market-home backtest-page">
+        <section class="market-landing backtest-hero">
+            <div>
+                <p>Quant Signal 검증</p>
+                <h1>
+                    <strong>Backtest v2</strong>
+                    <span th:text="${backtest.indexCode + ' Signal snapshot, candle coverage, forward return 검증입니다.'}">
+                        Signal snapshot, candle coverage, forward return 검증입니다.
+                    </span>
+                </h1>
+            </div>
+            <div class="backtest-hero-actions">
+                <a class="market-link" th:href="@{/signals/portfolio}" href="/signals/portfolio">포트폴리오 검증</a>
+                <a class="market-link" th:href="@{/stocks}" href="/stocks">종목 목록</a>
+            </div>
+        </section>
+
+        <section class="index-card-row backtest-cards" aria-label="Backtest summary">
+            <article th:each="card : ${backtest.cards}" th:classappend="${card.tone}">
+                <span th:text="${card.label}">Metric</span>
+                <strong th:text="${card.value}">0</strong>
+                <p th:text="${card.note}">note</p>
+            </article>
+        </section>
+
+        <section class="backtest-grid">
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Weight Promotion Gate</p>
+                        <h2>BACKTEST_V1/V2 운영 반영 판정</h2>
+                    </div>
+                    <span>20D/60D spread, IC, top hit delta 기준</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.promotionGate)}">
+                    운영 판정에 필요한 Profile A/B 또는 Walk-forward 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table promotion-gate-table"
+                     th:if="${!#lists.isEmpty(backtest.promotionGate)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Scope</span>
+                        <span>Profile</span>
+                        <span>Decision</span>
+                        <span>Sample</span>
+                        <span>Default Spread</span>
+                        <span>Candidate Spread</span>
+                        <span>Spread 차이</span>
+                        <span>Default IC</span>
+                        <span>Candidate IC</span>
+                        <span>IC 차이</span>
+                        <span>Top Hit 차이</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.promotionGate}">
+                        <span th:text="${row.scope}">Profile A/B</span>
+                        <span th:text="${row.profile}">BACKTEST_V1</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.decision}">보류</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span th:text="${row.defaultSpread}">-</span>
+                        <span th:text="${row.candidateSpread}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spreadDelta}">-</span>
+                        <span th:text="${row.defaultIc}">-</span>
+                        <span th:text="${row.candidateIc}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.icDelta}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.topHitDelta}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Profile Change Diagnostics</p>
+                        <h2>Factor 가중치 변경 리스트</h2>
+                    </div>
+                    <span>DEFAULT 대비 후보 프로필 변경폭과 factor 근거를 함께 확인</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.profileDiagnostics)}">
+                    Profile 변경 진단에 필요한 factor 진단 결과가 아직 없습니다.
+                </p>
+                <div class="backtest-table profile-diagnostic-table"
+                     th:if="${!#lists.isEmpty(backtest.profileDiagnostics)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Profile</span>
+                        <span>Factor</span>
+                        <span>Default</span>
+                        <span>Candidate</span>
+                        <span>Delta</span>
+                        <span>20D Spread</span>
+                        <span>60D Spread</span>
+                        <span>20D IC</span>
+                        <span>Stable Years</span>
+                        <span>Diagnosis</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.profileDiagnostics}">
+                        <span th:text="${row.profile}">BACKTEST_V2</span>
+                        <span th:text="${row.factor}">Quality</span>
+                        <span th:text="${row.defaultWeight}">17.0%</span>
+                        <span th:text="${row.candidateWeight}">17.0%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.delta}">+0.0%p</span>
+                        <span th:text="${row.spread20d}">-</span>
+                        <span th:text="${row.spread60d}">-</span>
+                        <span th:text="${row.ic20d}">-</span>
+                        <span th:text="${row.stableYears}">-</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.diagnosis}">유지</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Factor Correlation Diagnostics</p>
+                        <h2>Factor 중복 노출 점검</h2>
+                    </div>
+                    <span>20D 백테스트 표본 기준 factor score 상관</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.factorCorrelations)}">
+                    절대 상관 0.45 이상인 factor pair가 없습니다.
+                </p>
+                <div class="backtest-table factor-correlation-table"
+                     th:if="${!#lists.isEmpty(backtest.factorCorrelations)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Factor A</span>
+                        <span>Factor B</span>
+                        <span>Sample</span>
+                        <span>Correlation</span>
+                        <span>Risk</span>
+                        <span>Note</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.factorCorrelations}">
+                        <span th:text="${row.leftFactor}">Quality</span>
+                        <span th:text="${row.rightFactor}">Growth</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.correlation}">+0.000</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.risk}">관찰</span>
+                        <span th:text="${row.note}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Candle Coverage</p>
+                        <h2>일봉 커버리지 검수</h2>
+                    </div>
+                    <span th:text="'평균 ' + ${backtest.coverage.averageYears} + ' / 최대 ' + ${backtest.coverage.maxYears}">
+                        평균 0.0Y / 최대 0.0Y
+                    </span>
+                </div>
+                <div class="backtest-mini-stats">
+                    <span th:text="'총 ' + ${backtest.coverage.totalSymbols}">총 0</span>
+                    <span th:text="'5D 가능 ' + ${backtest.coverage.enough5d}">5D 가능 0</span>
+                    <span th:text="'20D 가능 ' + ${backtest.coverage.enough20d}">20D 가능 0</span>
+                    <span th:text="'60D 가능 ' + ${backtest.coverage.enough60d}">60D 가능 0</span>
+                </div>
+                <div class="backtest-table coverage-table" th:if="${!#lists.isEmpty(backtest.weakCoverageRows)}">
+                    <div class="backtest-row backtest-head">
+                        <span>종목</span>
+                        <span>섹터</span>
+                        <span>일봉</span>
+                        <span>시작</span>
+                        <span>최근</span>
+                        <span>기간</span>
+                        <span>상태</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.weakCoverageRows}">
+                        <span>
+                            <b th:text="${row.symbol}">AAPL</b>
+                            <small th:text="${row.name}">Apple Inc</small>
+                        </span>
+                        <span th:text="${row.sector}">Technology</span>
+                        <span th:text="${row.candleCount}">0</span>
+                        <span th:text="${row.firstTradeDate}">-</span>
+                        <span th:text="${row.lastTradeDate}">-</span>
+                        <span th:text="${row.years}">0.0Y</span>
+                        <span class="backtest-badge caution" th:text="${row.status}">missing</span>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.weakCoverageRows)}">
+                    60거래일 검증에 필요한 최소 candle coverage를 모두 충족했습니다.
+                </p>
+            </article>
+
+            <article class="backtest-panel">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Signal Buckets</p>
+                        <h2>Signal 구간별 평균 수익률</h2>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${!backtest.result.hasResults}">
+                    아직 충분한 미래 수익률이 없습니다. Signal snapshot을 쌓고 5/20/60거래일이 지나면 결과가 채워집니다.
+                </p>
+                <div class="backtest-table bucket-table" th:if="${backtest.result.hasResults}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>점수</span>
+                        <span>표본</span>
+                        <span>평균 수익률</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.scoreBuckets}">
+                        <span th:text="${row.horizon}">5D</span>
+                        <span th:text="${row.bucket}">70-100</span>
+                        <span th:text="${row.count}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageReturn}">+0.00%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Top vs Bottom</p>
+                        <h2>상위 10% / 하위 10% 비교</h2>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.deciles)}">
+                    10분위 비교를 만들 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table decile-table" th:if="${!#lists.isEmpty(backtest.deciles)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>그룹</span>
+                        <span>표본</span>
+                        <span>평균 수익률</span>
+                        <span>Spread</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.deciles}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.group}">Top 10%</span>
+                        <span th:text="${row.count}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">+0.00%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Walk-forward Backtest</p>
+                        <h2>과거 학습 / 다음 연도 검증</h2>
+                    </div>
+                    <span>WALK_FORWARD_V1/V2는 검증 연도 이전 데이터만 사용해 가중치를 산출합니다.</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.walkForwardProfiles)}">
+                    Walk-forward 검증에 필요한 연도별 백테스트 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table walk-forward-table"
+                     th:if="${!#lists.isEmpty(backtest.walkForwardProfiles)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Train</span>
+                        <span>Test</span>
+                        <span>Profile</span>
+                        <span>기간</span>
+                        <span>표본</span>
+                        <span>평균</span>
+                        <span>Hit</span>
+                        <span>IC</span>
+                        <span>Top 10%</span>
+                        <span>Bottom 10%</span>
+                        <span>Spread</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.walkForwardProfiles}">
+                        <span th:text="${row.trainWindow}">2023</span>
+                        <span th:text="${row.testWindow}">2024</span>
+                        <span th:text="${row.profile}">WALK_FORWARD_V1</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span th:text="${row.averageReturn}">+0.00%</span>
+                        <span th:text="${row.hitRate}">+0.00%</span>
+                        <span th:text="${row.ic}">+0.000</span>
+                        <span th:text="${row.topReturn}">-</span>
+                        <span th:text="${row.bottomReturn}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Profile A/B Backtest</p>
+                        <h2>DEFAULT vs 후보 프로필</h2>
+                    </div>
+                    <span>BACKTEST_V1/V2는 비활성 후보이며 live Signal에는 미적용</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.profileComparisons)}">
+                    Profile 비교에 필요한 백테스트 결과가 아직 없습니다.
+                </p>
+                <div class="backtest-table profile-comparison-table"
+                     th:if="${!#lists.isEmpty(backtest.profileComparisons)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Profile</span>
+                        <span>Status</span>
+                        <span>기간</span>
+                        <span>표본</span>
+                        <span>평균</span>
+                        <span>Hit</span>
+                        <span>IC</span>
+                        <span>Top 10%</span>
+                        <span>Bottom 10%</span>
+                        <span>Spread</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.profileComparisons}">
+                        <span th:text="${row.profile}">DEFAULT</span>
+                        <span class="backtest-badge" th:classappend="${row.status == 'active'} ? 'positive' : 'neutral'"
+                              th:text="${row.status}">inactive</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span th:text="${row.averageReturn}">+0.00%</span>
+                        <span th:text="${row.hitRate}">+0.00%</span>
+                        <span th:text="${row.ic}">+0.000</span>
+                        <span th:text="${row.topReturn}">-</span>
+                        <span th:text="${row.bottomReturn}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Weight Profile Items</p>
+                        <h2>Factor 가중치 구성</h2>
+                    </div>
+                    <span>DEFAULT는 기준, BACKTEST_V1/V2는 검증용 후보</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.weightProfileItems)}">
+                    저장된 Weight Profile item이 아직 없습니다.
+                </p>
+                <div class="backtest-table weight-profile-table"
+                     th:if="${!#lists.isEmpty(backtest.weightProfileItems)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Profile</span>
+                        <span>Factor</span>
+                        <span>Weight</span>
+                        <span>변경</span>
+                        <span>근거</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.weightProfileItems}">
+                        <span th:text="${row.profile}">BACKTEST_V1</span>
+                        <span th:text="${row.factor}">Quality</span>
+                        <span th:text="${row.weight}">18.0%</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.state}">유지</span>
+                        <span th:text="${row.reason}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Factor Diagnostics</p>
+                        <h2>Factor별 IC / Hit Rate / Spread</h2>
+                    </div>
+                    <span>가중치 조정 근거 테이블</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.factorDiagnostics)}">
+                    Factor 진단에 필요한 백테스트 결과가 아직 없습니다.
+                </p>
+                <div class="backtest-table factor-diagnostic-table"
+                     th:if="${!#lists.isEmpty(backtest.factorDiagnostics)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>Factor</span>
+                        <span>표본</span>
+                        <span>평균</span>
+                        <span>Hit</span>
+                        <span>IC</span>
+                        <span>High</span>
+                        <span>High 평균</span>
+                        <span>Low</span>
+                        <span>Low 평균</span>
+                        <span>Spread</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.factorDiagnostics}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.factor}">Quality</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageReturn}">+0.00%</span>
+                        <span th:text="${row.hitRate}">-</span>
+                        <span th:text="${row.ic}">-</span>
+                        <span th:text="${row.highCount}">0</span>
+                        <span th:text="${row.highReturn}">-</span>
+                        <span th:text="${row.lowCount}">0</span>
+                        <span th:text="${row.lowReturn}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Sector Neutral Check</p>
+                        <h2>섹터 중립 Factor 검증</h2>
+                    </div>
+                    <span>섹터별 High/Low 표본 5개 이상만 포함</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.sectorNeutralDiagnostics)}">
+                    섹터 중립 검증에 필요한 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table sector-neutral-table"
+                     th:if="${!#lists.isEmpty(backtest.sectorNeutralDiagnostics)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>Factor</span>
+                        <span>섹터</span>
+                        <span>+ 섹터</span>
+                        <span>- 섹터</span>
+                        <span>평균 Spread</span>
+                        <span>Best</span>
+                        <span>Worst</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.sectorNeutralDiagnostics}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.factor}">Momentum</span>
+                        <span th:text="${row.sectorCount}">0</span>
+                        <span th:text="${row.positiveSectors}">0</span>
+                        <span th:text="${row.negativeSectors}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageSpread}">+0.00%</span>
+                        <span th:text="${row.bestSector}">-</span>
+                        <span th:text="${row.worstSector}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Year Stability</p>
+                        <h2>기간별 안정성 검증</h2>
+                    </div>
+                    <span>연도별 High/Low 표본 10개 이상만 포함</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.yearStabilityDiagnostics)}">
+                    연도별 안정성 검증에 필요한 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table year-stability-table"
+                     th:if="${!#lists.isEmpty(backtest.yearStabilityDiagnostics)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>Factor</span>
+                        <span>연도</span>
+                        <span>+ 연도</span>
+                        <span>평균 Spread</span>
+                        <span>최소</span>
+                        <span>최대</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.yearStabilityDiagnostics}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.factor}">Quality</span>
+                        <span th:text="${row.yearCount}">0</span>
+                        <span th:text="${row.positiveYears}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageSpread}">+0.00%</span>
+                        <span th:text="${row.minSpread}">-</span>
+                        <span th:text="${row.maxSpread}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Weight Candidates</p>
+                        <h2>Factor Weight 후보</h2>
+                    </div>
+                    <span>20D/60D spread, IC, 연도 안정성 기준</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.weightCandidates)}">
+                    가중치 후보를 산출할 Factor 진단 결과가 아직 없습니다.
+                </p>
+                <div class="backtest-table weight-candidate-table"
+                     th:if="${!#lists.isEmpty(backtest.weightCandidates)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Factor</span>
+                        <span>판정</span>
+                        <span>근거 강도</span>
+                        <span>근거</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.weightCandidates}">
+                        <span th:text="${row.factor}">Quality</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.action}">유지/관찰</span>
+                        <span th:text="${row.score}">50 / 100</span>
+                        <span th:text="${row.evidence}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Factor Validation</p>
+                        <h2>Factor별 성과 검증</h2>
+                    </div>
+                    <span>High 70+ / Low 40- 기준</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.factors)}">
+                    Factor별 성과를 판단할 표본이 아직 없습니다.
+                </p>
+                <div class="backtest-table factor-table" th:if="${!#lists.isEmpty(backtest.factors)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>Factor</span>
+                        <span>High 표본</span>
+                        <span>High 평균</span>
+                        <span>Low 표본</span>
+                        <span>Low 평균</span>
+                        <span>Spread</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.factors}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.factor}">Quality</span>
+                        <span th:text="${row.highCount}">0</span>
+                        <span th:text="${row.highReturn}">-</span>
+                        <span th:text="${row.lowCount}">0</span>
+                        <span th:text="${row.lowReturn}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Sector Bias</p>
+                        <h2>섹터별 영향 확인</h2>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.sectors)}">
+                    섹터별 영향을 판단할 결과가 아직 없습니다.
+                </p>
+                <div class="backtest-table sector-backtest-table" th:if="${!#lists.isEmpty(backtest.sectors)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>섹터</span>
+                        <span>표본</span>
+                        <span>평균 수익률</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.sectors}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.sector}">Technology</span>
+                        <span th:text="${row.count}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageReturn}">+0.00%</span>
+                    </div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <footer class="market-footer">
+        <span>Signal backtest v1</span>
+        <span th:text="'snapshots ' + ${backtest.result.snapshotCount}">snapshots 0</span>
+        <span th:text="'results ' + ${backtest.result.resultCount}">results 0</span>
+    </footer>
+</div>
+</body>
+</html>

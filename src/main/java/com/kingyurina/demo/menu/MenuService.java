@@ -41,12 +41,13 @@ public class MenuService {
 
     private static List<MenuItem> fallbackMainMenus() {
         return List.of(
-                new MenuItem("Dashboard", "#dashboard"),
+                new MenuItem("Dashboard", "/dashboard"),
                 new MenuItem("Stocks", "/stocks"),
                 new MenuItem("Heatmap", "/stocks/heatmap"),
-                new MenuItem("Atelier", "#atelier"),
+                new MenuItem("ETF", "/etfs"),
+                new MenuItem("Atelier", "/atelier"),
                 new MenuItem("Systems", "#systems"),
-                new MenuItem("Signal", "#signal"),
+                new MenuItem("Signal", "/signals/backtest"),
                 new MenuItem("Contact", "#contact"));
     }
 

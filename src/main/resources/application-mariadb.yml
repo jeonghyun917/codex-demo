@@ -8,7 +8,9 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema-mariadb.sql
-      data-locations: classpath:data-mariadb.sql
+      data-locations:
+        - classpath:data-mariadb.sql
+        - classpath:data-etf-seed.sql
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.SecCompanyMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.SecCompany">
+        SELECT
+            symbol,
+            cik,
+            ticker,
+            company_name,
+            source,
+            fetched_at
+        FROM stock_sec_company
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findSymbolsWithStaleFacts" resultType="string">
+        SELECT sc.symbol
+        FROM stock_sec_company sc
+        LEFT JOIN (
+            SELECT symbol, MAX(fetched_at) AS latest_fetched_at
+            FROM stock_sec_fact
+            GROUP BY symbol
+        ) f
+            ON f.symbol = sc.symbol
+        WHERE sc.symbol IN
+        <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
+            #{symbol}
+        </foreach>
+          AND (
+              f.latest_fetched_at IS NULL
+              OR f.latest_fetched_at &lt; TIMESTAMPADD(HOUR, -#{cacheHours}, CURRENT_TIMESTAMP)
+          )
+        ORDER BY sc.symbol
+        LIMIT #{limit}
+    </select>
+
+    <insert id="upsert" parameterType="com.kingyurina.demo.stock.SecCompany">
+        INSERT INTO stock_sec_company (
+            symbol, cik, ticker, company_name, source, fetched_at
+        )
+        VALUES (
+            #{symbol}, #{cik}, #{ticker}, #{companyName}, #{source}, #{fetchedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            cik = VALUES(cik),
+            ticker = VALUES(ticker),
+            company_name = VALUES(company_name),
+            source = VALUES(source),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

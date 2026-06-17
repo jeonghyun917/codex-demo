@@ -19,10 +19,13 @@ public class StockInfoViewService {
     private static final DateTimeFormatter PERIOD_FORMAT = DateTimeFormatter.ofPattern("yy.MM");
 
     private final StockCacheService cacheService;
+    private final StockDataQualityService dataQualityService;
     private final ObjectMapper objectMapper;
 
-    public StockInfoViewService(StockCacheService cacheService, ObjectMapper objectMapper) {
+    public StockInfoViewService(StockCacheService cacheService, StockDataQualityService dataQualityService,
+            ObjectMapper objectMapper) {
         this.cacheService = cacheService;
+        this.dataQualityService = dataQualityService;
         this.objectMapper = objectMapper;
     }
 
@@ -32,6 +35,7 @@ public class StockInfoViewService {
         StockMetricSnapshot metric = dashboard.metric();
         JsonNode root = readMetric(metric);
         JsonNode metricNode = root == null ? null : root.get("metric");
+        StockDataQualityLatest dataQuality = dataQualityService.assessAndSave(dashboard);
 
         List<StockInfoView.SeriesPoint> revenueSeries = quarterlySeries(root, "salesPerShare", "netMargin",
                 profile == null ? null : profile.getShareOutstanding(), "조정 순이익률");
@@ -44,9 +48,10 @@ public class StockInfoViewService {
                 metricNode, "주당배당");
 
         return new StockInfoView(
-                majorRows(profile, metricNode),
-                investmentCards(metric, metricNode),
-                financeCards(metricNode),
+                majorRows(profile, metricNode, dataQuality),
+                investmentCards(metric, metricNode, dataQuality),
+                institutionCards(dashboard.symbol()),
+                financeCards(metricNode, dataQuality),
                 revenueSeries,
                 stabilitySeries,
                 revenueSeries,
@@ -60,10 +65,13 @@ public class StockInfoViewService {
                 formatMoney(metricDecimal(metricNode, "enterpriseValue"), "백만 USD"),
                 formatNumber(profile == null ? null : profile.getShareOutstanding(), "백만주"),
                 metric == null || metric.getMetricDate() == null ? "Finnhub basic financials"
-                        : metric.getMetricDate() + " 기준 Finnhub basic financials");
+                        : metric.getMetricDate() + " 기준 Finnhub basic financials",
+                dataQualityCards(dataQuality),
+                dataQualityService.issueMessages(dataQuality, 6));
     }
 
-    private List<StockInfoView.InfoRow> majorRows(CompanyProfile profile, JsonNode metricNode) {
+    private List<StockInfoView.InfoRow> majorRows(CompanyProfile profile, JsonNode metricNode,
+            StockDataQualityLatest dataQuality) {
         List<StockInfoView.InfoRow> rows = new ArrayList<>();
         rows.add(new StockInfoView.InfoRow("국가", profile == null ? "-" : value(profile.getCountry())));
         rows.add(new StockInfoView.InfoRow("거래소", profile == null ? "-" : value(profile.getExchange())));
@@ -71,33 +79,84 @@ public class StockInfoViewService {
         rows.add(new StockInfoView.InfoRow("시가총액", formatMarketCap(profile == null ? null : profile.getMarketCap())));
         rows.add(new StockInfoView.InfoRow("기업가치", formatMoney(metricDecimal(metricNode, "enterpriseValue"), "백만 USD")));
         rows.add(new StockInfoView.InfoRow("발행주식수", formatNumber(profile == null ? null : profile.getShareOutstanding(), "백만주")));
-        rows.add(new StockInfoView.InfoRow("52주 최고", formatMoney(metricDecimal(metricNode, "52WeekHigh"), "USD")));
-        rows.add(new StockInfoView.InfoRow("52주 최저", formatMoney(metricDecimal(metricNode, "52WeekLow"), "USD")));
+        rows.add(new StockInfoView.InfoRow("52주 최고",
+                formatMoney(dataQualityService.clean(dataQuality, "52WeekHigh", metricDecimal(metricNode, "52WeekHigh")), "USD")));
+        rows.add(new StockInfoView.InfoRow("52주 최저",
+                formatMoney(dataQualityService.clean(dataQuality, "52WeekLow", metricDecimal(metricNode, "52WeekLow")), "USD")));
         return rows;
     }
 
-    private List<StockInfoView.MetricCard> investmentCards(StockMetricSnapshot metric, JsonNode metricNode) {
+    private List<StockInfoView.MetricCard> investmentCards(StockMetricSnapshot metric, JsonNode metricNode,
+            StockDataQualityLatest dataQuality) {
         return List.of(
-                new StockInfoView.MetricCard("PER", formatRatio(metric == null ? null : metric.getPeNormalizedAnnual(), "배"),
-                        "peNormalizedAnnual"),
-                new StockInfoView.MetricCard("PBR", formatRatio(metric == null ? null : metric.getPbAnnual(), "배"),
-                        "pbAnnual"),
-                new StockInfoView.MetricCard("PSR", formatRatio(metricDecimal(metricNode, "psTTM"), "배"), "psTTM"),
-                new StockInfoView.MetricCard("EPS", formatMoney(metric == null ? null : metric.getEpsTtm(), "USD"),
-                        "epsTTM"),
-                new StockInfoView.MetricCard("ROE", formatPercent(metric == null ? null : metric.getRoeTtm()), "roeTTM"),
-                new StockInfoView.MetricCard("순이익률", formatPercent(metricDecimal(metricNode, "netProfitMarginTTM")),
-                        "netProfitMarginTTM"));
+                new StockInfoView.MetricCard("PER",
+                        formatRatio(dataQualityService.clean(dataQuality, "peNormalizedAnnual",
+                                metric == null ? null : metric.getPeNormalizedAnnual()), "배"),
+                        dataQualityService.metricNote(dataQuality, "peNormalizedAnnual", "peNormalizedAnnual")),
+                new StockInfoView.MetricCard("PBR",
+                        formatRatio(dataQualityService.clean(dataQuality, "pbAnnual",
+                                metric == null ? null : metric.getPbAnnual()), "배"),
+                        dataQualityService.metricNote(dataQuality, "pbAnnual", "pbAnnual")),
+                new StockInfoView.MetricCard("PSR",
+                        formatRatio(dataQualityService.clean(dataQuality, "psTTM", metricDecimal(metricNode, "psTTM")), "배"),
+                        dataQualityService.metricNote(dataQuality, "psTTM", "psTTM")),
+                new StockInfoView.MetricCard("EPS",
+                        formatMoney(dataQualityService.clean(dataQuality, "epsTTM",
+                                metric == null ? null : metric.getEpsTtm()), "USD"),
+                        dataQualityService.metricNote(dataQuality, "epsTTM", "epsTTM")),
+                new StockInfoView.MetricCard("ROE",
+                        formatPercent(dataQualityService.clean(dataQuality, "roeTTM",
+                                metric == null ? null : metric.getRoeTtm())),
+                        dataQualityService.metricNote(dataQuality, "roeTTM", "roeTTM")),
+                new StockInfoView.MetricCard("순이익률",
+                        formatPercent(dataQualityService.clean(dataQuality, "netProfitMarginTTM",
+                                metricDecimal(metricNode, "netProfitMarginTTM"))),
+                        dataQualityService.metricNote(dataQuality, "netProfitMarginTTM", "netProfitMarginTTM")));
     }
 
-    private List<StockInfoView.MetricCard> financeCards(JsonNode metricNode) {
+    private List<StockInfoView.MetricCard> institutionCards(String symbol) {
+        StockInstitutionFlow flow = cacheService.findLatestInstitutionFlow(symbol);
+        if (flow == null) {
+            return List.of(
+                    new StockInfoView.MetricCard("기관 보유 증감", "-", "13F 데이터 없음"),
+                    new StockInfoView.MetricCard("기관 보유액", "-", "13F 데이터 없음"),
+                    new StockInfoView.MetricCard("주요 보유기관", "-", "13F 데이터 없음"));
+        }
+        String quarter = flow.getReportQuarter() == null ? "13F" : flow.getReportQuarter().toString();
         return List.of(
-                new StockInfoView.MetricCard("부채비율", formatPercent(metricDecimal(metricNode, "totalDebt/totalEquityQuarterly")),
-                        "totalDebt/totalEquityQuarterly"),
-                new StockInfoView.MetricCard("유동비율", formatPercent(metricDecimal(metricNode, "currentRatioQuarterly")),
-                        "currentRatioQuarterly"),
+                new StockInfoView.MetricCard("기관 보유 증감", formatPercent(flow.getSharesChangePct()), quarter + " shares QoQ"),
+                new StockInfoView.MetricCard("기관 보유액", formatMoney(flow.getTotalValueUsdThousands(), "천 USD"),
+                        "기관 " + (flow.getHolderCount() == null ? "-" : flow.getHolderCount()) + "곳"),
+                new StockInfoView.MetricCard("주요 보유기관", value(flow.getTopManagerName()),
+                        formatMoney(flow.getTopManagerValueUsdThousands(), "천 USD")));
+    }
+
+    private List<StockInfoView.MetricCard> financeCards(JsonNode metricNode, StockDataQualityLatest dataQuality) {
+        return List.of(
+                new StockInfoView.MetricCard("부채비율",
+                        formatPercent(dataQualityService.clean(dataQuality, "totalDebt/totalEquityQuarterly",
+                                metricDecimal(metricNode, "totalDebt/totalEquityQuarterly"))),
+                        dataQualityService.metricNote(dataQuality, "totalDebt/totalEquityQuarterly",
+                                "totalDebt/totalEquityQuarterly")),
+                new StockInfoView.MetricCard("유동비율",
+                        formatPercent(dataQualityService.clean(dataQuality, "currentRatioQuarterly",
+                                metricDecimal(metricNode, "currentRatioQuarterly"))),
+                        dataQualityService.metricNote(dataQuality, "currentRatioQuarterly", "currentRatioQuarterly")),
                 new StockInfoView.MetricCard("자기자본가치", formatMoney(metricDecimal(metricNode, "bookValuePerShareQuarterly"), "USD/주"),
                         "bookValuePerShareQuarterly"));
+    }
+
+    private List<StockInfoView.MetricCard> dataQualityCards(StockDataQualityLatest quality) {
+        if (quality == null) {
+            return List.of();
+        }
+        return List.of(
+                new StockInfoView.MetricCard("품질 점수", formatScore(quality.getQualityScore()), value(quality.getQualityLabel())),
+                new StockInfoView.MetricCard("커버리지", formatScore(quality.getCoverageScore()), "원천 데이터 보유율"),
+                new StockInfoView.MetricCard("최신성", formatScore(quality.getFreshnessScore()), "오래된 데이터 감점"),
+                new StockInfoView.MetricCard("제외 필드",
+                        (quality.getExcludedMetricCount() == null ? "-" : quality.getExcludedMetricCount()) + "개",
+                        "품질 룰로 분석 제외"));
     }
 
     private List<StockInfoView.MetricCard> dividendCards(JsonNode metricNode) {
@@ -144,13 +203,15 @@ public class StockInfoViewService {
         List<StockInfoView.PeerRow> rows = new ArrayList<>();
         int rank = 1;
         for (StockPeerComparison peer : peers) {
+            StockDataQualityLatest peerQuality = dataQualityService.findLatest(peer.getSymbol());
             rows.add(new StockInfoView.PeerRow(String.valueOf(rank++), peer.getSymbol(),
                     peer.getName() == null ? peer.getSymbol() : peer.getName(),
-                    formatRatio(peer.getPeNormalizedAnnual(), "배"),
+                    formatRatio(dataQualityService.clean(peerQuality, "peNormalizedAnnual",
+                            peer.getPeNormalizedAnnual()), "배"),
                     formatMarketCap(peer.getMarketCap()),
                     formatMoney(peer.getCurrentPrice(), "USD"),
-                    formatRatio(peer.getPbAnnual(), "배"),
-                    formatPercent(peer.getRoeTtm()),
+                    formatRatio(dataQualityService.clean(peerQuality, "pbAnnual", peer.getPbAnnual()), "배"),
+                    formatPercent(dataQualityService.clean(peerQuality, "roeTTM", peer.getRoeTtm())),
                     peer.getSymbol() != null && peer.getSymbol().equalsIgnoreCase(symbol)));
         }
         return rows;
@@ -298,6 +359,10 @@ public class StockInfoViewService {
             return "-";
         }
         return value.setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() + "%";
+    }
+
+    private static String formatScore(Integer score) {
+        return score == null ? "-" : score + " / 100";
     }
 
     private static String value(String text) {

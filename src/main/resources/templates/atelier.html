@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Atelier</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+    <script defer th:src="@{/js/atelier.js}" src="../static/js/atelier.js"></script>
+</head>
+<body class="market-body atelier-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:classappend="${menu.label == 'Atelier'} ? ' active' : ''"
+               th:text="${menu.label}"
+               href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" placeholder="티커 검색" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="atelier-page">
+        <section class="atelier-hero">
+            <div>
+                <p>Personal stock research workspace</p>
+                <h1>Atelier</h1>
+                <span>S&P 500 캐시 데이터를 조합해 관심 종목, 스크리너, 비교, 가중치, 리포트를 관리합니다.</span>
+            </div>
+            <div class="atelier-command">
+                <label for="atelier-symbol-input">종목 추가</label>
+                <div>
+                    <input id="atelier-symbol-input" list="atelier-symbols" placeholder="NVDA, TSLA, MSFT" autocomplete="off">
+                    <button type="button" data-add-watch>관심</button>
+                    <button type="button" data-add-compare>비교</button>
+                </div>
+                <datalist id="atelier-symbols"></datalist>
+            </div>
+        </section>
+
+        <section class="atelier-summary" aria-label="Atelier summary">
+            <article>
+                <span>관심 종목</span>
+                <strong data-watch-count>0</strong>
+                <p>브라우저 저장 기준</p>
+            </article>
+            <article>
+                <span>최근 본 종목</span>
+                <strong data-recent-count>0</strong>
+                <p>상세 페이지 방문 기록</p>
+            </article>
+            <article>
+                <span>스크리너 결과</span>
+                <strong data-screen-count>0</strong>
+                <p>현재 필터 기준</p>
+            </article>
+            <article>
+                <span>가중 점수 평균</span>
+                <strong data-weighted-average>-</strong>
+                <p>비교 종목 기준</p>
+            </article>
+        </section>
+
+        <section class="atelier-grid">
+            <aside class="atelier-panel atelier-panel-small" id="watchlist">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Watchlist</p>
+                        <h2>관심 종목</h2>
+                    </div>
+                    <button type="button" data-clear-watch>초기화</button>
+                </div>
+                <div class="atelier-list" data-watch-list></div>
+                <p class="atelier-empty" data-watch-empty>관심 종목이 없습니다. 위 입력창이나 스크리너에서 추가하세요.</p>
+            </aside>
+
+            <aside class="atelier-panel atelier-panel-small" id="recent">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Recent</p>
+                        <h2>최근 본 종목</h2>
+                    </div>
+                    <button type="button" data-clear-recent>삭제</button>
+                </div>
+                <div class="atelier-list" data-recent-list></div>
+                <p class="atelier-empty" data-recent-empty>상세 페이지를 방문하면 이곳에 기록됩니다.</p>
+            </aside>
+
+            <section class="atelier-panel atelier-screener" id="screener">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Custom Screener</p>
+                        <h2>커스텀 스크리너</h2>
+                    </div>
+                    <button type="button" data-reset-screen>필터 초기화</button>
+                </div>
+                <div class="atelier-filters">
+                    <label>
+                        <span>검색</span>
+                        <input data-filter-search placeholder="티커 또는 기업명">
+                    </label>
+                    <label>
+                        <span>섹터</span>
+                        <select data-filter-sector>
+                            <option value="">전체</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Signal 최소</span>
+                        <input data-filter-signal type="number" min="0" max="100" value="60">
+                    </label>
+                    <label>
+                        <span>PER 최대</span>
+                        <input data-filter-per type="number" min="0" value="80">
+                    </label>
+                    <label>
+                        <span>ROE 최소</span>
+                        <input data-filter-roe type="number" value="0">
+                    </label>
+                </div>
+                <div class="atelier-table" data-screen-table></div>
+            </section>
+
+            <section class="atelier-panel atelier-compare" id="compare">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Compare</p>
+                        <h2>종목 비교</h2>
+                    </div>
+                    <button type="button" data-clear-compare>비교 초기화</button>
+                </div>
+                <div class="atelier-compare-chips" data-compare-chips></div>
+                <div class="atelier-compare-table" data-compare-table></div>
+                <p class="atelier-empty" data-compare-empty>비교할 종목을 2개 이상 추가하세요.</p>
+            </section>
+
+            <section class="atelier-panel atelier-weights" id="weights">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Signal Studio</p>
+                        <h2>Signal 가중치 조절</h2>
+                    </div>
+                    <button type="button" data-reset-weights>기본값</button>
+                </div>
+                <div class="atelier-weight-list" data-weight-list></div>
+            </section>
+
+            <section class="atelier-panel atelier-report" id="reports">
+                <div class="atelier-panel-head">
+                    <div>
+                        <p>Reports</p>
+                        <h2>리포트 저장/출력</h2>
+                    </div>
+                    <div class="atelier-actions">
+                        <button type="button" data-create-report>리포트 저장</button>
+                        <button type="button" data-export-report>HTML 출력</button>
+                    </div>
+                </div>
+                <div class="atelier-report-layout">
+                    <div class="atelier-list" data-report-list></div>
+                    <article class="atelier-report-preview" data-report-preview>
+                        <span>Report Preview</span>
+                        <h3>저장된 리포트가 없습니다.</h3>
+                        <p>비교 종목과 현재 가중치를 기준으로 리포트를 저장할 수 있습니다.</p>
+                    </article>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <footer class="market-footer">
+        <span>Atelier workspace</span>
+        <span th:text="${market.totalMembers + ' stocks cached'}">stocks cached</span>
+        <span>local workspace storage</span>
+    </footer>
+</div>
+<script th:inline="javascript">
+    window.KY_ATELIER_ROWS = /*[[${market.rows}]]*/ [];
+</script>
+</body>
+</html>

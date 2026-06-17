@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${etf.symbol + ' ETF'}">ETF Detail</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+</head>
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
+            <a th:each="menu : ${mainMenus}"
+               th:href="${menu.href}"
+               th:text="${menu.label}"
+               th:classappend="${menu.href == '/etfs'} ? 'active' : ''"
+               href="/">Dashboard</a>
+        </nav>
+        <form class="market-search" th:action="@{/etfs}" method="get">
+            <label for="symbol">ETF</label>
+            <input id="symbol" name="symbol" th:value="${etf.symbol}" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <section class="ticker-strip">
+        <div>
+            <strong th:text="${etf.name}">ETF Name</strong>
+            <span th:text="${etf.symbol}">SPY</span>
+        </div>
+        <div>
+            <strong th:text="${etf.priceKrw}">-</strong>
+            <span th:classappend="${#strings.startsWith(etf.change, '-') ? ' down' : ' up'}" th:text="${etf.change}">-</span>
+        </div>
+        <div class="ticker-meta">
+            <span th:text="${etf.category}">category</span>
+            <span th:text="${etf.expenseRatio}">expense</span>
+            <span th:text="${etf.priceSourceLabel}">source</span>
+        </div>
+    </section>
+
+    <main class="stock-info-layout etf-detail-layout">
+        <aside class="stock-info-menu" aria-label="ETF menu">
+            <a class="active" href="#overview">주요 정보</a>
+            <a href="#signal">Signal</a>
+            <a href="#price">가격 추세</a>
+            <a href="#profile">ETF 구조</a>
+        </aside>
+
+        <div class="stock-info-content">
+            <section id="overview" class="market-section">
+                <div class="section-heading">
+                    <div class="stock-title-row">
+                        <span class="stock-logo detail"><span th:text="${#strings.substring(etf.symbol, 0, 1)}">E</span></span>
+                        <div class="stock-title-copy">
+                            <p th:text="${etf.issuer + ' · ' + etf.category}">issuer</p>
+                            <h1 th:text="${etf.name}">ETF Name</h1>
+                        </div>
+                    </div>
+                    <a th:if="${etf.website != null}" th:href="${etf.website}" target="_blank" rel="noopener noreferrer">홈페이지</a>
+                </div>
+                <p class="company-summary" th:text="${etf.description}">ETF description</p>
+
+                <div class="metric-card-grid">
+                    <article>
+                        <span>현재가</span>
+                        <strong th:text="${etf.priceKrw}">-</strong>
+                        <p th:text="${etf.priceUsd}">USD</p>
+                    </article>
+                    <article>
+                        <span>총보수</span>
+                        <strong th:text="${etf.expenseRatio}">-</strong>
+                        <p>manual profile 기준</p>
+                    </article>
+                    <article>
+                        <span>AUM</span>
+                        <strong th:text="${etf.aum}">-</strong>
+                        <p>없으면 데이터 미수집</p>
+                    </article>
+                    <article>
+                        <span>보유 종목</span>
+                        <strong th:text="${etf.holdingsCount}">-</strong>
+                        <p>profile seed 기준</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="signal" class="market-section">
+                <section class="signal-panel" th:if="${etf.signal != null}" aria-label="ETF signal">
+                    <div class="signal-overview" th:classappend="${etf.signal.tone}">
+                        <span>ETF Signal</span>
+                        <strong th:text="${etf.signal.label}">중립</strong>
+                        <p th:text="${etf.signal.summary}">summary</p>
+                        <div>
+                            <b th:text="${etf.signal.score + ' / 100'}">50 / 100</b>
+                            <small th:text="${etf.signal.confidence}">신뢰도</small>
+                        </div>
+                    </div>
+                    <div class="signal-card-grid">
+                        <article th:each="card : ${etf.signal.cards}" th:classappend="${card.tone}">
+                            <span th:text="${card.title}">Cost</span>
+                            <strong th:text="${card.label}">저비용</strong>
+                            <b th:text="${card.score + '점'}">80점</b>
+                            <p th:text="${card.detail}">detail</p>
+                        </article>
+                    </div>
+                    <ul class="signal-reasons" th:if="${!etf.signal.reasons.isEmpty()}">
+                        <li th:each="reason : ${etf.signal.reasons}" th:text="${reason}">reason</li>
+                    </ul>
+                </section>
+            </section>
+
+            <section id="price" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p th:text="${etf.priceSourceLabel}">Yahoo chart</p>
+                        <h2>가격 추세</h2>
+                    </div>
+                </div>
+                <div class="etf-price-chart" th:if="${!etf.chartPoints.isEmpty()}">
+                    <div th:each="point : ${etf.chartPoints}" class="etf-price-bar"
+                         th:style="'--height:' + ${point.height} + '%'"
+                         th:title="${point.label + ' ' + point.value}">
+                        <span></span>
+                    </div>
+                </div>
+                <p class="empty-state" th:if="${etf.chartPoints.isEmpty()}">
+                    아직 ETF 일봉 데이터가 없습니다. ETF Yahoo batch를 실행하면 가격 추세와 모멘텀 Signal이 채워집니다.
+                </p>
+            </section>
+
+            <section id="profile" class="market-section">
+                <div class="section-heading">
+                    <div>
+                        <p>ETF profile</p>
+                        <h2>ETF 구조</h2>
+                    </div>
+                </div>
+                <div class="info-table">
+                    <div th:each="row : ${etf.infoRows}">
+                        <span th:text="${row.label}">운용사</span>
+                        <strong th:text="${row.value}">-</strong>
+                    </div>
+                    <div>
+                        <span>배당수익률</span>
+                        <strong th:text="${etf.dividendYield}">-</strong>
+                    </div>
+                    <div>
+                        <span>거래량</span>
+                        <strong th:text="${etf.volume}">-</strong>
+                    </div>
+                    <div>
+                        <span>상장일</span>
+                        <strong th:text="${etf.inceptionDate}">-</strong>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="market-footer">
+        <span>ETF analysis</span>
+        <span th:text="${etf.symbol}">ETF</span>
+        <span th:text="${etf.priceSourceLabel}">source</span>
+    </footer>
+</div>
+<script>
+    (() => {
+        const links = Array.from(document.querySelectorAll(".stock-info-menu a"));
+        const sections = links.map((link) => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+        const setActive = (id) => {
+            links.forEach((link) => link.classList.toggle("active", link.getAttribute("href") === `#${id}`));
+        };
+        const update = () => {
+            const marker = window.scrollY + 150;
+            const current = sections.reduce((active, section) => section.offsetTop <= marker ? section : active, sections[0]);
+            if (current) {
+                setActive(current.id);
+            }
+        };
+        links.forEach((link) => link.addEventListener("click", () => setActive(link.getAttribute("href").slice(1))));
+        window.addEventListener("scroll", update, { passive: true });
+        update();
+    })();
+</script>
+</body>
+</html>

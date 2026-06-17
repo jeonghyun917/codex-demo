@@ -16,6 +16,10 @@ public class StockSignalLatest {
     private String valuationLabel;
     private Integer qualityScore;
     private String qualityLabel;
+    private Integer growthScore;
+    private String growthLabel;
+    private Integer stabilityScore;
+    private String stabilityLabel;
     private Integer earningsScore;
     private String earningsLabel;
     private Integer analystScore;
@@ -24,10 +28,17 @@ public class StockSignalLatest {
     private String newsLabel;
     private Integer momentumScore;
     private String momentumLabel;
+    private Integer riskScore;
+    private String riskLabel;
+    private Integer institutionScore;
+    private String institutionLabel;
     private String reasonsJson;
     private String cardsJson;
     private String sourceFreshnessJson;
     private String rawJson;
+    private Integer dataQualityScore;
+    private Integer dataQualityExcludedMetricCount;
+    private Integer dataQualityIssueCount;
 
     public String getSymbol() {
         return symbol;
@@ -125,6 +136,38 @@ public class StockSignalLatest {
         this.qualityLabel = qualityLabel;
     }
 
+    public Integer getGrowthScore() {
+        return growthScore;
+    }
+
+    public void setGrowthScore(Integer growthScore) {
+        this.growthScore = growthScore;
+    }
+
+    public String getGrowthLabel() {
+        return growthLabel;
+    }
+
+    public void setGrowthLabel(String growthLabel) {
+        this.growthLabel = growthLabel;
+    }
+
+    public Integer getStabilityScore() {
+        return stabilityScore;
+    }
+
+    public void setStabilityScore(Integer stabilityScore) {
+        this.stabilityScore = stabilityScore;
+    }
+
+    public String getStabilityLabel() {
+        return stabilityLabel;
+    }
+
+    public void setStabilityLabel(String stabilityLabel) {
+        this.stabilityLabel = stabilityLabel;
+    }
+
     public Integer getEarningsScore() {
         return earningsScore;
     }
@@ -189,6 +232,38 @@ public class StockSignalLatest {
         this.momentumLabel = momentumLabel;
     }
 
+    public Integer getRiskScore() {
+        return riskScore;
+    }
+
+    public void setRiskScore(Integer riskScore) {
+        this.riskScore = riskScore;
+    }
+
+    public String getRiskLabel() {
+        return riskLabel;
+    }
+
+    public void setRiskLabel(String riskLabel) {
+        this.riskLabel = riskLabel;
+    }
+
+    public Integer getInstitutionScore() {
+        return institutionScore;
+    }
+
+    public void setInstitutionScore(Integer institutionScore) {
+        this.institutionScore = institutionScore;
+    }
+
+    public String getInstitutionLabel() {
+        return institutionLabel;
+    }
+
+    public void setInstitutionLabel(String institutionLabel) {
+        this.institutionLabel = institutionLabel;
+    }
+
     public String getReasonsJson() {
         return reasonsJson;
     }
@@ -219,5 +294,29 @@ public class StockSignalLatest {
 
     public void setRawJson(String rawJson) {
         this.rawJson = rawJson;
+    }
+
+    public Integer getDataQualityScore() {
+        return dataQualityScore;
+    }
+
+    public void setDataQualityScore(Integer dataQualityScore) {
+        this.dataQualityScore = dataQualityScore;
+    }
+
+    public Integer getDataQualityExcludedMetricCount() {
+        return dataQualityExcludedMetricCount;
+    }
+
+    public void setDataQualityExcludedMetricCount(Integer dataQualityExcludedMetricCount) {
+        this.dataQualityExcludedMetricCount = dataQualityExcludedMetricCount;
+    }
+
+    public Integer getDataQualityIssueCount() {
+        return dataQualityIssueCount;
+    }
+
+    public void setDataQualityIssueCount(Integer dataQualityIssueCount) {
+        this.dataQualityIssueCount = dataQualityIssueCount;
     }
 }

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.SecFinancialStandardMapper">
+    <select id="countBySymbol" resultType="int">
+        SELECT COUNT(*)
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findSymbolsMissingStandard" resultType="string">
+        SELECT sc.symbol
+        FROM stock_sec_company sc
+        LEFT JOIN stock_sec_financial_standard fs
+            ON fs.symbol = sc.symbol
+        WHERE sc.symbol IN
+        <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
+            #{symbol}
+        </foreach>
+        GROUP BY sc.symbol
+        HAVING COUNT(fs.id) = 0
+        ORDER BY sc.symbol
+        LIMIT #{limit}
+    </select>
+
+    <select id="findLatestAnnual" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period = 'FY'
+        ORDER BY
+            end_date DESC,
+            CASE
+                WHEN form IN ('10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A') THEN 0
+                ELSE 1
+            END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findPreviousAnnual" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period = 'FY'
+          AND end_date &lt; #{endDate}
+        ORDER BY
+            end_date DESC,
+            CASE
+                WHEN form IN ('10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A') THEN 0
+                ELSE 1
+            END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findLatestQuarter" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+        ORDER BY
+            end_date DESC,
+            CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findPreviousQuarter" resultType="com.kingyurina.demo.stock.SecFinancialStandard">
+        SELECT *
+        FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+          AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+          AND end_date &lt; #{endDate}
+        ORDER BY
+            end_date DESC,
+            CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
+            filed_at DESC,
+            id DESC
+        LIMIT 1
+    </select>
+
+    <delete id="deleteBySymbol">
+        DELETE FROM stock_sec_financial_standard
+        WHERE symbol = #{symbol}
+    </delete>
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_sec_financial_standard (
+            symbol,
+            cik,
+            fiscal_year,
+            fiscal_period,
+            form,
+            filed_at,
+            start_date,
+            end_date,
+            accession_number,
+            period_days,
+            currency,
+            revenue,
+            operating_income,
+            net_income,
+            eps_diluted,
+            assets,
+            liabilities,
+            equity,
+            operating_cash_flow,
+            eps_unit,
+            raw_json,
+            mapped_at
+        )
+        VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (
+                #{row.symbol},
+                #{row.cik},
+                #{row.fiscalYear},
+                #{row.fiscalPeriod},
+                #{row.form},
+                #{row.filedAt},
+                #{row.startDate},
+                #{row.endDate},
+                #{row.accessionNumber},
+                #{row.periodDays},
+                #{row.currency},
+                #{row.revenue},
+                #{row.operatingIncome},
+                #{row.netIncome},
+                #{row.epsDiluted},
+                #{row.assets},
+                #{row.liabilities},
+                #{row.equity},
+                #{row.operatingCashFlow},
+                #{row.epsUnit},
+                #{row.rawJson},
+                #{row.mappedAt}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            filed_at = VALUES(filed_at),
+            start_date = VALUES(start_date),
+            period_days = VALUES(period_days),
+            currency = VALUES(currency),
+            revenue = VALUES(revenue),
+            operating_income = VALUES(operating_income),
+            net_income = VALUES(net_income),
+            eps_diluted = VALUES(eps_diluted),
+            assets = VALUES(assets),
+            liabilities = VALUES(liabilities),
+            equity = VALUES(equity),
+            operating_cash_flow = VALUES(operating_cash_flow),
+            eps_unit = VALUES(eps_unit),
+            raw_json = VALUES(raw_json),
+            mapped_at = VALUES(mapped_at)
+    </insert>
+</mapper>
