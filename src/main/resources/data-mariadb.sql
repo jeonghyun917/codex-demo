@@ -1,6 +1,6 @@
 INSERT INTO main_menu (code, label, href, sort_order, enabled)
 VALUES
-    ('dashboard', 'Dashboard', '/dashboard', 10, TRUE),
+    ('dashboard', 'Quant', '/quant', 10, TRUE),
     ('stocks', 'Stocks', '/stocks', 20, TRUE),
     ('heatmap', 'Heatmap', '/stocks/heatmap', 30, TRUE),
     ('etfs', 'ETF', '/etfs', 35, TRUE),

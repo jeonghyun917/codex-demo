@@ -16,22 +16,36 @@ import org.springframework.stereotype.Service;
 public class StockSignalRefreshService {
 
     private static final Logger log = LoggerFactory.getLogger(StockSignalRefreshService.class);
+    private static final List<String> QUANT_INDEX_CODES = List.of("SP500", "NASDAQ100", "DOW30");
 
     private final ObjectProvider<IndexConstituentMapper> indexConstituentMapper;
     private final ObjectProvider<StockSignalSnapshotMapper> stockSignalSnapshotMapper;
     private final StockSignalService stockSignalService;
     private final StockCacheService stockCacheService;
     private final StockBacktestService stockBacktestService;
+    private final StockPortfolioBacktestService stockPortfolioBacktestService;
+    private final StockMacroFeatureService stockMacroFeatureService;
+    private final StockExpectedReturnV8Service stockExpectedReturnV8Service;
+    private final StockExpectedReturnV9Service stockExpectedReturnV9Service;
+    private final StockDashboardViewSnapshotService stockDashboardViewSnapshotService;
 
     public StockSignalRefreshService(ObjectProvider<IndexConstituentMapper> indexConstituentMapper,
             ObjectProvider<StockSignalSnapshotMapper> stockSignalSnapshotMapper,
             StockSignalService stockSignalService, StockCacheService stockCacheService,
-            StockBacktestService stockBacktestService) {
+            StockBacktestService stockBacktestService, StockPortfolioBacktestService stockPortfolioBacktestService,
+            StockMacroFeatureService stockMacroFeatureService, StockExpectedReturnV8Service stockExpectedReturnV8Service,
+            StockExpectedReturnV9Service stockExpectedReturnV9Service,
+            StockDashboardViewSnapshotService stockDashboardViewSnapshotService) {
         this.indexConstituentMapper = indexConstituentMapper;
         this.stockSignalSnapshotMapper = stockSignalSnapshotMapper;
         this.stockSignalService = stockSignalService;
         this.stockCacheService = stockCacheService;
         this.stockBacktestService = stockBacktestService;
+        this.stockPortfolioBacktestService = stockPortfolioBacktestService;
+        this.stockMacroFeatureService = stockMacroFeatureService;
+        this.stockExpectedReturnV8Service = stockExpectedReturnV8Service;
+        this.stockExpectedReturnV9Service = stockExpectedReturnV9Service;
+        this.stockDashboardViewSnapshotService = stockDashboardViewSnapshotService;
     }
 
     public RefreshResult recalculateIndexLatest(String indexCode) {
@@ -76,8 +90,27 @@ public class StockSignalRefreshService {
         }
         try {
             stockBacktestService.refreshCompletedResults(5_000);
+            stockPortfolioBacktestService.refreshRiskSnapshots("SP500", 100_000);
+            stockPortfolioBacktestService.refreshLatestRiskSnapshots("SP500", 100_000);
+            for (String indexCode : QUANT_INDEX_CODES) {
+                stockPortfolioBacktestService.refreshLatestCovarianceSnapshot(indexCode, 120, 126);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnSnapshots(indexCode, 100_000, 300);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnV3Snapshots(indexCode, 100_000, 300);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnV4Snapshots(indexCode, 100_000, 300);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnV5Snapshots(indexCode, 100_000, 300);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnV6Snapshots(indexCode, 100_000, 300);
+                stockPortfolioBacktestService.refreshLatestExpectedReturnV7Snapshots(indexCode, 100_000, 300);
+                stockMacroFeatureService.refreshLatestMacroFeature(indexCode);
+                stockExpectedReturnV8Service.refreshLatest(indexCode);
+                stockExpectedReturnV9Service.refreshLatest(indexCode);
+            }
+            stockBacktestService.refreshBacktestViewSnapshot("SP500");
+            stockPortfolioBacktestService.refreshPortfolioViewSnapshot("SP500");
+            for (String dashboardIndexCode : QUANT_INDEX_CODES) {
+                stockDashboardViewSnapshotService.refreshDashboardViewSnapshot(dashboardIndexCode);
+            }
         } catch (RuntimeException ex) {
-            log.warn("Failed to refresh stock signal backtest results.", ex);
+            log.warn("Failed to refresh stock signal backtest, risk/covariance snapshot, live expected return, or materialized views.", ex);
         }
         return new RefreshResult(requested, success, fail);
     }

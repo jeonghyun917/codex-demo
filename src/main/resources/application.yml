@@ -43,8 +43,32 @@ yahoo-chart:
   default-years: 5
   request-delay-millis: 250
 
+toss:
+  api-key: ${TOSS_API_KEY:}
+  secret-key: ${TOSS_SECRET_KEY:}
+  base-url: https://openapi.tossinvest.com
+  timeout-seconds: 15
+
 app:
   batch:
+    toss:
+      enabled: false
+      exit-on-complete: false
+      symbol-limit: 100
+      candle-count: 120
+      trade-count: 20
+      delay-millis: 250
+      index-codes: SP500
+      symbols: ""
+      prices: true
+      stock-info: true
+      candles: true
+      warnings: true
+      price-limits: false
+      exchange-rate: true
+      calendar: true
+      orderbook: false
+      trades: false
     yahoo-candle:
       enabled: false
       exit-on-complete: false
@@ -90,6 +114,106 @@ app:
       sp500-sync-enabled: false
       nasdaq100-sync-enabled: false
       dow30-sync-enabled: false
+    risk-snapshot:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      result-limit: 100000
+    market-snapshot:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      index-codes: SP500,NASDAQ100,DOW30
+      years: 5
+      from-date: ""
+      to-date: ""
+    covariance-snapshot:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      index-codes: SP500,NASDAQ100,DOW30
+      date-limit: 80
+      candidate-limit: 120
+      lookback-days: 126
+    risk-free-rate:
+      enabled: false
+      exit-on-complete: false
+      fetch-fred: false
+      fallback-on-failure: false
+      index-code: SP500
+      series-code: DGS3MO
+      fred-url: ""
+      csv-path: ""
+      years: 5
+      from-date: ""
+      to-date: ""
+    pit-import:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      membership-csv-path: ""
+      shares-csv-path: ""
+      expand-open-ended-ranges: false
+      open-ended-to-date: ""
+    macro-vintage:
+      enabled: false
+      exit-on-complete: false
+      fetch-fred-api: false
+      index-code: SP500
+      series-codes: DGS3MO,FEDFUNDS,CPIAUCSL,UNRATE
+      api-key: ${FRED_API_KEY:}
+      csv-path: ""
+      years: 5
+      from-date: ""
+      to-date: ""
+    macro-regime:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      date-limit: 1500
+      lookback-days: 126
+    expected-return:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      index-codes: SP500,NASDAQ100,DOW30
+      result-limit: 100000
+      date-limit: 80
+      min-training-rows: 300
+      historical-enabled: true
+      live-enabled: true
+      v3-enabled: true
+      v3-historical-enabled: true
+      v3-live-enabled: true
+      v4-enabled: true
+      v4-historical-enabled: true
+      v4-live-enabled: true
+      v5-enabled: true
+      v5-historical-enabled: true
+      v5-live-enabled: true
+      v6-enabled: true
+      v6-historical-enabled: true
+      v6-live-enabled: true
+    portfolio-view:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+    optimizer-shadow:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      result-limit: 100000
+      date-limit: 0
+    dashboard-view:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      index-codes: SP500,NASDAQ100,DOW30
+    backtest-view:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      index-codes: SP500
   signal:
     refresh:
       enabled: true

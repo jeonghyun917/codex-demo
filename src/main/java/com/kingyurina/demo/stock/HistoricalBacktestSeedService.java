@@ -55,16 +55,20 @@ public class HistoricalBacktestSeedService {
             return new HistoricalBacktestSeedResult(0, 0, 0, 0, 0);
         }
 
-        List<String> symbols = constituentMapper.findCurrentSymbols(indexCode);
-        if (symbolLimit > 0 && symbols.size() > symbolLimit) {
-            symbols = symbols.subList(0, symbolLimit);
-        }
-
         List<LocalDate> seedDates = seedDates(mapper, years, dateLimit);
         int snapshots = 0;
         int skipped = 0;
+        LinkedHashSet<String> symbolUniverse = new LinkedHashSet<>();
 
         for (LocalDate seedDate : seedDates) {
+            List<String> symbols = constituentMapper.findMemberSymbolsOnDate(indexCode, seedDate);
+            if (symbols == null || symbols.isEmpty()) {
+                symbols = constituentMapper.findCurrentSymbols(indexCode);
+            }
+            if (symbolLimit > 0 && symbols.size() > symbolLimit) {
+                symbols = symbols.subList(0, symbolLimit);
+            }
+            symbolUniverse.addAll(symbols);
             List<StockSignalSnapshot> dailySignals = new ArrayList<>();
             for (String symbol : symbols) {
                 StockSignalSnapshot snapshot = buildSnapshot(mapper, symbol, seedDate);
@@ -83,7 +87,7 @@ public class HistoricalBacktestSeedService {
         }
 
         int results = stockBacktestService.refreshCompletedResults(Math.max(50_000, snapshots * 3));
-        return new HistoricalBacktestSeedResult(seedDates.size(), symbols.size(), snapshots, skipped, results);
+        return new HistoricalBacktestSeedResult(seedDates.size(), symbolUniverse.size(), snapshots, skipped, results);
     }
 
     private List<LocalDate> seedDates(HistoricalBacktestSeedMapper mapper, int years, int dateLimit) {

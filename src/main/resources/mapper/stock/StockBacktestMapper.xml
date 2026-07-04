@@ -156,6 +156,1530 @@
         ORDER BY c.symbol, c.trade_date
     </select>
 
+    <select id="findRiskSnapshots" resultType="com.kingyurina.demo.stock.StockRiskSnapshot">
+        SELECT
+            r.symbol,
+            r.signal_date AS signalDate,
+            r.beta,
+            r.volatility_pct AS volatilityPct,
+            r.avg_dollar_volume AS avgDollarVolume,
+            r.observations,
+            r.source,
+            r.calculated_at AS calculatedAt
+        FROM stock_risk_snapshot r
+        INNER JOIN index_constituent i
+            ON i.symbol = r.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        WHERE r.signal_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY r.symbol, r.signal_date
+    </select>
+
+    <select id="findLatestRiskSnapshotBySymbol" resultType="com.kingyurina.demo.stock.StockRiskSnapshot">
+        SELECT
+            r.symbol,
+            r.signal_date AS signalDate,
+            r.beta,
+            r.volatility_pct AS volatilityPct,
+            r.avg_dollar_volume AS avgDollarVolume,
+            r.observations,
+            r.source,
+            r.calculated_at AS calculatedAt
+        FROM stock_risk_snapshot r
+        WHERE r.symbol = #{symbol}
+          AND r.signal_date = (
+              SELECT MAX(signal_date)
+              FROM stock_risk_snapshot
+              WHERE symbol = #{symbol}
+          )
+        LIMIT 1
+    </select>
+
+    <insert id="refreshMarketSnapshots">
+        INSERT INTO stock_market_snapshot (
+            index_code, symbol, snapshot_date, sector, industry, exchange, market, currency, close_price, volume,
+            shares_outstanding, market_cap_usd, price_source, shares_source, market_cap_source
+        )
+        SELECT
+            #{indexCode} AS index_code,
+            c.symbol,
+            c.trade_date AS snapshot_date,
+            COALESCE(m.sector, i.sector, '-') AS sector,
+            m.industry,
+            COALESCE(p.exchange, m.exchange, i.exchange) AS exchange,
+            t.market,
+            COALESCE(t.currency, p.currency, 'USD') AS currency,
+            c.close_price,
+            c.volume,
+            CASE
+                WHEN s.shares_outstanding IS NOT NULL AND s.shares_outstanding &gt; 0
+                    THEN s.shares_outstanding
+                WHEN t.shares_outstanding IS NOT NULL AND t.shares_outstanding &gt; 0
+                    THEN t.shares_outstanding
+                WHEN p.share_outstanding IS NOT NULL AND p.share_outstanding &gt; 0
+                    THEN p.share_outstanding * 1000000
+                ELSE NULL
+            END AS shares_outstanding,
+            CASE
+                WHEN s.shares_outstanding IS NOT NULL AND s.shares_outstanding &gt; 0
+                    THEN c.close_price * s.shares_outstanding
+                WHEN t.shares_outstanding IS NOT NULL AND t.shares_outstanding &gt; 0
+                    THEN c.close_price * t.shares_outstanding
+                WHEN p.share_outstanding IS NOT NULL AND p.share_outstanding &gt; 0
+                    THEN c.close_price * p.share_outstanding * 1000000
+                WHEN p.market_cap IS NOT NULL AND p.market_cap &gt; 0
+                    THEN p.market_cap * 1000000
+                ELSE NULL
+            END AS market_cap_usd,
+            c.source AS price_source,
+            CASE
+                WHEN s.shares_outstanding IS NOT NULL AND s.shares_outstanding &gt; 0 THEN s.source
+                WHEN t.shares_outstanding IS NOT NULL AND t.shares_outstanding &gt; 0 THEN 'TOSS_CURRENT'
+                WHEN p.share_outstanding IS NOT NULL AND p.share_outstanding &gt; 0
+                    THEN CASE
+                        WHEN pa.data_symbol IS NOT NULL THEN 'FINNHUB_CURRENT_ALIAS'
+                        ELSE 'FINNHUB_CURRENT'
+                    END
+                ELSE NULL
+            END AS shares_source,
+            CASE
+                WHEN s.shares_outstanding IS NOT NULL AND s.shares_outstanding &gt; 0 THEN CONCAT('PRICE_X_', s.source)
+                WHEN t.shares_outstanding IS NOT NULL AND t.shares_outstanding &gt; 0 THEN 'PRICE_X_TOSS_CURRENT_SHARES'
+                WHEN p.share_outstanding IS NOT NULL AND p.share_outstanding &gt; 0
+                    THEN CASE
+                        WHEN pa.data_symbol IS NOT NULL THEN 'PRICE_X_FINNHUB_CURRENT_ALIAS_SHARES'
+                        ELSE 'PRICE_X_FINNHUB_CURRENT_SHARES'
+                    END
+                WHEN p.market_cap IS NOT NULL AND p.market_cap &gt; 0
+                    THEN CASE
+                        WHEN pa.data_symbol IS NOT NULL THEN 'FINNHUB_CURRENT_ALIAS_MARKET_CAP'
+                        ELSE 'FINNHUB_CURRENT_MARKET_CAP'
+                    END
+                ELSE NULL
+            END AS market_cap_source
+        FROM stock_candle_daily c
+        LEFT JOIN stock_index_membership_snapshot m
+            ON m.index_code = #{indexCode}
+           AND m.symbol = c.symbol
+           AND m.snapshot_date = c.trade_date
+        LEFT JOIN index_constituent i
+            ON i.symbol = c.symbol
+           AND i.index_code = #{indexCode}
+        LEFT JOIN stock_shares_outstanding_snapshot s
+            ON s.index_code = #{indexCode}
+           AND s.symbol = c.symbol
+           AND s.snapshot_date = c.trade_date
+        LEFT JOIN toss_stock_info t
+            ON t.symbol = c.symbol
+        LEFT JOIN stock_symbol_data_alias pa
+            ON pa.symbol = c.symbol
+           AND pa.data_source = 'PROFILE'
+           AND pa.active = TRUE
+        LEFT JOIN company_profile p
+            ON p.symbol = COALESCE(pa.data_symbol, c.symbol)
+        WHERE c.trade_date BETWEEN #{fromDate} AND #{toDate}
+          AND c.close_price IS NOT NULL
+          AND c.close_price &gt; 0
+          AND c.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(m.sector, i.sector, '')) &lt;&gt; 'TICKER'
+          AND COALESCE(m.is_member, i.current_member, FALSE) = TRUE
+          AND (
+              (s.shares_outstanding IS NOT NULL AND s.shares_outstanding &gt; 0)
+              OR (t.shares_outstanding IS NOT NULL AND t.shares_outstanding &gt; 0)
+              OR (p.share_outstanding IS NOT NULL AND p.share_outstanding &gt; 0)
+              OR (p.market_cap IS NOT NULL AND p.market_cap &gt; 0)
+          )
+        ON DUPLICATE KEY UPDATE
+            sector = VALUES(sector),
+            industry = VALUES(industry),
+            exchange = VALUES(exchange),
+            market = VALUES(market),
+            currency = VALUES(currency),
+            close_price = VALUES(close_price),
+            volume = VALUES(volume),
+            shares_outstanding = VALUES(shares_outstanding),
+            market_cap_usd = VALUES(market_cap_usd),
+            price_source = VALUES(price_source),
+            shares_source = VALUES(shares_source),
+            market_cap_source = VALUES(market_cap_source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="deactivateStaleCurrentMembershipSnapshots">
+        UPDATE stock_index_membership_snapshot m
+        LEFT JOIN index_constituent i
+            ON i.index_code = m.index_code
+           AND i.symbol = m.symbol
+        SET
+            m.is_member = FALSE,
+            m.source = 'CURRENT_MEMBERSHIP_PROXY_REMOVED',
+            m.calculated_at = CURRENT_TIMESTAMP
+        WHERE m.index_code = #{indexCode}
+          AND m.snapshot_date BETWEEN #{fromDate} AND #{toDate}
+          AND m.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+          AND (
+              i.symbol IS NULL
+              OR i.current_member = FALSE
+              OR m.symbol IN ('TICKER', 'SECURITY')
+              OR UPPER(COALESCE(i.sector, '')) = 'TICKER'
+          )
+    </update>
+
+    <delete id="deleteStaleMarketSnapshots">
+        DELETE ms
+        FROM stock_market_snapshot ms
+        LEFT JOIN stock_index_membership_snapshot m
+            ON m.index_code = ms.index_code
+           AND m.symbol = ms.symbol
+           AND m.snapshot_date = ms.snapshot_date
+        LEFT JOIN index_constituent i
+            ON i.index_code = ms.index_code
+           AND i.symbol = ms.symbol
+        WHERE ms.index_code = #{indexCode}
+          AND ms.snapshot_date BETWEEN #{fromDate} AND #{toDate}
+          AND (
+              COALESCE(m.is_member, i.current_member, FALSE) = FALSE
+              OR ms.market_cap_usd IS NULL
+              OR ms.market_cap_usd &lt;= 0
+          )
+    </delete>
+
+    <insert id="refreshIndexMembershipSnapshots">
+        INSERT INTO stock_index_membership_snapshot (
+            index_code, symbol, snapshot_date, sector, industry, exchange, is_member, source
+        )
+        SELECT
+            #{indexCode} AS index_code,
+            i.symbol,
+            d.snapshot_date,
+            COALESCE(i.sector, '-') AS sector,
+            NULL AS industry,
+            i.exchange,
+            TRUE AS is_member,
+            'CURRENT_MEMBERSHIP_PROXY' AS source
+        FROM index_constituent i
+        INNER JOIN (
+            SELECT DISTINCT c.trade_date AS snapshot_date
+            FROM stock_candle_daily c
+            INNER JOIN index_constituent ci
+                ON ci.symbol = c.symbol
+               AND ci.index_code = #{indexCode}
+               AND ci.current_member = TRUE
+            WHERE c.trade_date BETWEEN #{fromDate} AND #{toDate}
+        ) d
+        WHERE i.index_code = #{indexCode}
+          AND i.current_member = TRUE
+          AND i.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        ON DUPLICATE KEY UPDATE
+            sector = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN VALUES(sector)
+                ELSE stock_index_membership_snapshot.sector
+            END,
+            industry = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN VALUES(industry)
+                ELSE stock_index_membership_snapshot.industry
+            END,
+            exchange = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN VALUES(exchange)
+                ELSE stock_index_membership_snapshot.exchange
+            END,
+            is_member = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN VALUES(is_member)
+                ELSE stock_index_membership_snapshot.is_member
+            END,
+            source = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN VALUES(source)
+                ELSE stock_index_membership_snapshot.source
+            END,
+            calculated_at = CASE
+                WHEN stock_index_membership_snapshot.source LIKE 'CURRENT_MEMBERSHIP_PROXY%'
+                    THEN CURRENT_TIMESTAMP
+                ELSE stock_index_membership_snapshot.calculated_at
+            END
+    </insert>
+
+    <insert id="refreshSharesOutstandingSnapshots">
+        INSERT INTO stock_shares_outstanding_snapshot (
+            index_code, symbol, snapshot_date, shares_outstanding, source
+        )
+        SELECT
+            index_code,
+            symbol,
+            snapshot_date,
+            shares_outstanding,
+            CASE
+                WHEN shares_source = 'SEC_XBRL_DEI_ENTITY_COMMON_SHARES'
+                    THEN shares_source
+                WHEN shares_source LIKE 'TOSS_CURRENT%' THEN 'TOSS_CURRENT_PROXY'
+                WHEN shares_source LIKE 'FINNHUB_CURRENT%' THEN 'FINNHUB_CURRENT_PROXY'
+                WHEN shares_source IS NULL THEN 'MISSING_SHARES'
+                ELSE CONCAT(shares_source, '_PROXY')
+            END AS source
+        FROM stock_market_snapshot
+        WHERE index_code = #{indexCode}
+          AND snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ON DUPLICATE KEY UPDATE
+            shares_outstanding = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source = 'MISSING_SHARES'
+                    THEN VALUES(shares_outstanding)
+                ELSE stock_shares_outstanding_snapshot.shares_outstanding
+            END,
+            source = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source = 'MISSING_SHARES'
+                    THEN VALUES(source)
+                ELSE stock_shares_outstanding_snapshot.source
+            END,
+            calculated_at = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source = 'MISSING_SHARES'
+                    THEN CURRENT_TIMESTAMP
+                ELSE stock_shares_outstanding_snapshot.calculated_at
+            END
+    </insert>
+
+    <insert id="refreshSecSharesOutstandingSnapshots">
+        INSERT INTO stock_shares_outstanding_snapshot (
+            index_code, symbol, snapshot_date, shares_outstanding, source
+        )
+        SELECT
+            #{indexCode} AS index_code,
+            selected.symbol,
+            selected.snapshot_date,
+            selected.shares_outstanding,
+            'SEC_XBRL_DEI_ENTITY_COMMON_SHARES' AS source
+        FROM (
+            SELECT
+                base.symbol,
+                base.snapshot_date,
+                (
+                    SELECT f.value
+                    FROM stock_sec_fact f
+                    WHERE f.symbol = base.sec_symbol
+                      AND f.taxonomy = 'dei'
+                      AND f.concept = 'EntityCommonStockSharesOutstanding'
+                      AND f.unit = 'shares'
+                      AND f.value BETWEEN 1000 AND 100000000000
+                      AND f.filed_at IS NOT NULL
+                      AND f.filed_at &lt;= base.snapshot_date
+                      AND (f.end_date IS NULL OR f.end_date &lt;= base.snapshot_date)
+                    ORDER BY f.filed_at DESC, f.end_date DESC, f.id DESC
+                    LIMIT 1
+                ) AS shares_outstanding
+            FROM (
+                SELECT DISTINCT
+                    i.symbol,
+                    COALESCE(a.data_symbol, i.symbol) AS sec_symbol,
+                    c.trade_date AS snapshot_date
+                FROM index_constituent i
+                LEFT JOIN stock_symbol_data_alias a
+                    ON a.symbol = i.symbol
+                   AND a.data_source = 'SEC'
+                   AND a.active = TRUE
+                INNER JOIN stock_candle_daily c
+                    ON c.symbol = i.symbol
+                WHERE i.index_code = #{indexCode}
+                  AND i.current_member = TRUE
+                  AND i.symbol NOT IN ('TICKER', 'SECURITY')
+                  AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+                  AND c.trade_date BETWEEN #{fromDate} AND #{toDate}
+            ) base
+        ) selected
+        WHERE selected.shares_outstanding IS NOT NULL
+          AND selected.shares_outstanding &gt; 0
+        ON DUPLICATE KEY UPDATE
+            shares_outstanding = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source IN (
+                        'MISSING_SHARES',
+                        'SEC_XBRL_DEI_ENTITY_COMMON_SHARES'
+                  )
+                    THEN VALUES(shares_outstanding)
+                ELSE stock_shares_outstanding_snapshot.shares_outstanding
+            END,
+            source = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source IN (
+                        'MISSING_SHARES',
+                        'SEC_XBRL_DEI_ENTITY_COMMON_SHARES'
+                  )
+                    THEN VALUES(source)
+                ELSE stock_shares_outstanding_snapshot.source
+            END,
+            calculated_at = CASE
+                WHEN stock_shares_outstanding_snapshot.source LIKE '%PROXY%'
+                  OR stock_shares_outstanding_snapshot.source IN (
+                        'MISSING_SHARES',
+                        'SEC_XBRL_DEI_ENTITY_COMMON_SHARES'
+                  )
+                    THEN CURRENT_TIMESTAMP
+                ELSE stock_shares_outstanding_snapshot.calculated_at
+            END
+    </insert>
+
+    <select id="findMarketSnapshots" resultType="com.kingyurina.demo.stock.StockMarketSnapshot">
+        SELECT
+            index_code AS indexCode,
+            symbol,
+            snapshot_date AS snapshotDate,
+            sector,
+            industry,
+            exchange,
+            market,
+            currency,
+            close_price AS closePrice,
+            volume,
+            shares_outstanding AS sharesOutstanding,
+            market_cap_usd AS marketCapUsd,
+            price_source AS priceSource,
+            shares_source AS sharesSource,
+            market_cap_source AS marketCapSource,
+            calculated_at AS calculatedAt
+        FROM stock_market_snapshot
+        WHERE index_code = #{indexCode}
+          AND snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY symbol, snapshot_date
+    </select>
+
+    <select id="findBenchmarkReturns" resultType="com.kingyurina.demo.stock.StockBenchmarkReturn">
+        SELECT
+            index_code AS indexCode,
+            trade_date AS tradeDate,
+            benchmark_level AS benchmarkLevel,
+            return_pct AS returnPct,
+            total_market_cap_usd AS totalMarketCapUsd,
+            constituent_count AS constituentCount,
+            coverage_count AS coverageCount,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_benchmark_return_series
+        WHERE index_code = #{indexCode}
+          AND trade_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY trade_date
+    </select>
+
+    <select id="findRiskFreeRateSnapshots" resultType="com.kingyurina.demo.stock.StockRiskFreeRateSnapshot">
+        SELECT
+            index_code AS indexCode,
+            series_code AS seriesCode,
+            rate_date AS rateDate,
+            annual_rate_pct AS annualRatePct,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_risk_free_rate_snapshot
+        WHERE index_code = #{indexCode}
+          AND rate_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY series_code, rate_date
+    </select>
+
+    <select id="findMacroRegimeSnapshotDates" resultType="java.time.LocalDate">
+        SELECT trade_date
+        FROM stock_benchmark_return_series
+        WHERE index_code = #{indexCode}
+        ORDER BY trade_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findMacroVintageSnapshots" resultType="com.kingyurina.demo.stock.StockMacroVintageSnapshot">
+        SELECT
+            index_code AS indexCode,
+            series_code AS seriesCode,
+            observation_date AS observationDate,
+            realtime_start AS realtimeStart,
+            realtime_end AS realtimeEnd,
+            value,
+            source
+        FROM stock_macro_vintage_snapshot
+        WHERE index_code = #{indexCode}
+          AND observation_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY series_code, observation_date, realtime_start
+    </select>
+
+    <select id="findMacroFeatureSnapshots" resultType="com.kingyurina.demo.stock.StockMacroFeatureSnapshot">
+        SELECT
+            index_code AS indexCode,
+            snapshot_date AS snapshotDate,
+            short_rate_pct AS shortRatePct,
+            long_rate_pct AS longRatePct,
+            yield_spread_pct AS yieldSpreadPct,
+            fed_funds_pct AS fedFundsPct,
+            cpi_yoy_pct AS cpiYoyPct,
+            cpi_mom_pct AS cpiMomPct,
+            unemployment_rate_pct AS unemploymentRatePct,
+            unemployment_change_3m_pct AS unemploymentChange3mPct,
+            vix_level AS vixLevel,
+            vix_change_20d_pct AS vixChange20dPct,
+            dollar_index AS dollarIndex,
+            dollar_change_20d_pct AS dollarChange20dPct,
+            macro_tightness_score AS macroTightnessScore,
+            macro_growth_stress_score AS macroGrowthStressScore,
+            macro_risk_score AS macroRiskScore,
+            macro_feature_score AS macroFeatureScore,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_macro_feature_snapshot
+        WHERE index_code = #{indexCode}
+          AND snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY snapshot_date
+    </select>
+
+    <select id="findLatestMacroFeatureSnapshot" resultType="com.kingyurina.demo.stock.StockMacroFeatureSnapshot">
+        SELECT
+            index_code AS indexCode,
+            snapshot_date AS snapshotDate,
+            short_rate_pct AS shortRatePct,
+            long_rate_pct AS longRatePct,
+            yield_spread_pct AS yieldSpreadPct,
+            fed_funds_pct AS fedFundsPct,
+            cpi_yoy_pct AS cpiYoyPct,
+            cpi_mom_pct AS cpiMomPct,
+            unemployment_rate_pct AS unemploymentRatePct,
+            unemployment_change_3m_pct AS unemploymentChange3mPct,
+            vix_level AS vixLevel,
+            vix_change_20d_pct AS vixChange20dPct,
+            dollar_index AS dollarIndex,
+            dollar_change_20d_pct AS dollarChange20dPct,
+            macro_tightness_score AS macroTightnessScore,
+            macro_growth_stress_score AS macroGrowthStressScore,
+            macro_risk_score AS macroRiskScore,
+            macro_feature_score AS macroFeatureScore,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_macro_feature_snapshot
+        WHERE index_code = #{indexCode}
+        ORDER BY snapshot_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="findMacroRegimeSnapshots" resultType="com.kingyurina.demo.stock.StockMacroRegimeSnapshot">
+        SELECT
+            index_code AS indexCode,
+            snapshot_date AS snapshotDate,
+            regime_label AS regimeLabel,
+            macro_score AS macroScore,
+            trend_score AS trendScore,
+            volatility_score AS volatilityScore,
+            breadth_score AS breadthScore,
+            liquidity_score AS liquidityScore,
+            dollar_score AS dollarScore,
+            rate_score AS rateScore,
+            benchmark_return_20d_pct AS benchmarkReturn20dPct,
+            benchmark_return_60d_pct AS benchmarkReturn60dPct,
+            realized_volatility_20d_pct AS realizedVolatility20dPct,
+            realized_volatility_60d_pct AS realizedVolatility60dPct,
+            breadth_advancer_pct AS breadthAdvancerPct,
+            benchmark_coverage_count AS benchmarkCoverageCount,
+            vix_level AS vixLevel,
+            vix_change_20d_pct AS vixChange20dPct,
+            dollar_proxy_return_20d_pct AS dollarProxyReturn20dPct,
+            rate_proxy_return_20d_pct AS rateProxyReturn20dPct,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_macro_regime_snapshot
+        WHERE index_code = #{indexCode}
+          AND snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY snapshot_date
+    </select>
+
+    <select id="findLatestMacroRegimeSnapshot" resultType="com.kingyurina.demo.stock.StockMacroRegimeSnapshot">
+        SELECT
+            index_code AS indexCode,
+            snapshot_date AS snapshotDate,
+            regime_label AS regimeLabel,
+            macro_score AS macroScore,
+            trend_score AS trendScore,
+            volatility_score AS volatilityScore,
+            breadth_score AS breadthScore,
+            liquidity_score AS liquidityScore,
+            dollar_score AS dollarScore,
+            rate_score AS rateScore,
+            benchmark_return_20d_pct AS benchmarkReturn20dPct,
+            benchmark_return_60d_pct AS benchmarkReturn60dPct,
+            realized_volatility_20d_pct AS realizedVolatility20dPct,
+            realized_volatility_60d_pct AS realizedVolatility60dPct,
+            breadth_advancer_pct AS breadthAdvancerPct,
+            benchmark_coverage_count AS benchmarkCoverageCount,
+            vix_level AS vixLevel,
+            vix_change_20d_pct AS vixChange20dPct,
+            dollar_proxy_return_20d_pct AS dollarProxyReturn20dPct,
+            rate_proxy_return_20d_pct AS rateProxyReturn20dPct,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_macro_regime_snapshot
+        WHERE index_code = #{indexCode}
+        ORDER BY snapshot_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="findCovarianceSnapshotDates" resultType="java.time.LocalDate">
+        SELECT DISTINCT r.signal_date
+        FROM stock_signal_backtest_result r
+        INNER JOIN index_constituent i
+            ON i.symbol = r.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        ORDER BY r.signal_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findCovarianceCandidateSymbols" resultType="string">
+        SELECT ranked.symbol
+        FROM (
+            SELECT
+                r.symbol,
+                MAX(r.integrated_score) AS score,
+                MAX(COALESCE(ms.market_cap_usd, p.market_cap * 1000000, 0)) AS market_cap_usd
+            FROM stock_signal_backtest_result r
+            INNER JOIN index_constituent i
+                ON i.symbol = r.symbol
+               AND i.index_code = #{indexCode}
+               AND i.current_member = TRUE
+               AND i.symbol NOT IN ('TICKER', 'SECURITY')
+               AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+            LEFT JOIN stock_market_snapshot ms
+                ON ms.index_code = #{indexCode}
+               AND ms.symbol = r.symbol
+               AND ms.snapshot_date = r.signal_date
+            LEFT JOIN company_profile p
+                ON p.symbol = r.symbol
+            WHERE r.signal_date = #{signalDate}
+            GROUP BY r.symbol
+        ) ranked
+        ORDER BY ranked.score DESC, ranked.market_cap_usd DESC, ranked.symbol
+        LIMIT #{limit}
+    </select>
+
+    <select id="findCandlesForSymbols" resultType="com.kingyurina.demo.stock.StockCandleDaily">
+        SELECT
+            symbol,
+            trade_date AS tradeDate,
+            open_price AS openPrice,
+            high_price AS highPrice,
+            low_price AS lowPrice,
+            close_price AS closePrice,
+            volume,
+            source,
+            updated_at AS updatedAt
+        FROM stock_candle_daily
+        WHERE symbol IN
+        <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
+            #{symbol}
+        </foreach>
+          AND trade_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY symbol, trade_date
+    </select>
+
+    <select id="findCovarianceSnapshots" resultType="com.kingyurina.demo.stock.StockCovarianceSnapshot">
+        SELECT
+            cov.index_code AS indexCode,
+            cov.snapshot_date AS snapshotDate,
+            cov.symbol_a AS symbolA,
+            cov.symbol_b AS symbolB,
+            corr.correlation,
+            cov.covariance,
+            cov.volatility_a_pct AS volatilityAPct,
+            cov.volatility_b_pct AS volatilityBPct,
+            cov.observations,
+            cov.lookback_days AS lookbackDays,
+            cov.source,
+            cov.calculated_at AS calculatedAt
+        FROM stock_covariance_snapshot cov
+        LEFT JOIN stock_correlation_snapshot corr
+            ON corr.index_code = cov.index_code
+           AND corr.snapshot_date = cov.snapshot_date
+           AND corr.symbol_a = cov.symbol_a
+           AND corr.symbol_b = cov.symbol_b
+        WHERE cov.index_code = #{indexCode}
+          AND cov.snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY cov.snapshot_date, cov.symbol_a, cov.symbol_b
+    </select>
+
+    <select id="findExpectedReturnSnapshots" resultType="com.kingyurina.demo.stock.StockExpectedReturnSnapshot">
+        SELECT
+            index_code AS indexCode,
+            signal_date AS signalDate,
+            symbol,
+            horizon_days AS horizonDays,
+            expected_return_pct AS expectedReturnPct,
+            expected_excess_return_pct AS expectedExcessReturnPct,
+            return_p10_pct AS returnP10Pct,
+            return_p50_pct AS returnP50Pct,
+            return_p90_pct AS returnP90Pct,
+            excess_p10_pct AS excessP10Pct,
+            excess_p50_pct AS excessP50Pct,
+            excess_p90_pct AS excessP90Pct,
+            upside_probability_pct AS upsideProbabilityPct,
+            calibrated_upside_probability_pct AS calibratedUpsideProbabilityPct,
+            downside_probability_pct AS downsideProbabilityPct,
+            drawdown_risk_pct AS drawdownRiskPct,
+            confidence,
+            sample_count AS sampleCount,
+            sector_sample_count AS sectorSampleCount,
+            score_bucket AS scoreBucket,
+            calibration_bucket AS calibrationBucket,
+            calibration_error_pct AS calibrationErrorPct,
+            model_version AS modelVersion,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND signal_date BETWEEN #{fromDate} AND #{toDate}
+          AND model_version IN ('EXPECTED_RETURN_V1', 'EXPECTED_RETURN_V2', 'EXPECTED_RETURN_V3', 'EXPECTED_RETURN_V4', 'EXPECTED_RETURN_V5', 'EXPECTED_RETURN_V6', 'EXPECTED_RETURN_V7', 'EXPECTED_RETURN_V8', 'EXPECTED_RETURN_V9')
+        ORDER BY signal_date, horizon_days, symbol,
+            CASE model_version
+                WHEN 'EXPECTED_RETURN_V1' THEN 1
+                WHEN 'EXPECTED_RETURN_V2' THEN 2
+                WHEN 'EXPECTED_RETURN_V3' THEN 3
+                WHEN 'EXPECTED_RETURN_V4' THEN 4
+                WHEN 'EXPECTED_RETURN_V5' THEN 5
+                WHEN 'EXPECTED_RETURN_V6' THEN 6
+                WHEN 'EXPECTED_RETURN_V7' THEN 7
+                WHEN 'EXPECTED_RETURN_V8' THEN 8
+                WHEN 'EXPECTED_RETURN_V9' THEN 9
+                ELSE 0
+            END
+    </select>
+
+    <select id="findExpectedReturnCalibrations" resultType="com.kingyurina.demo.stock.StockExpectedReturnCalibration">
+        SELECT
+            index_code AS indexCode,
+            model_version AS modelVersion,
+            horizon_days AS horizonDays,
+            probability_bucket AS probabilityBucket,
+            sample_count AS sampleCount,
+            average_predicted_upside_pct AS averagePredictedUpsidePct,
+            actual_upside_rate_pct AS actualUpsideRatePct,
+            calibration_error_pct AS calibrationErrorPct,
+            brier_score AS brierScore,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_expected_return_calibration
+        WHERE index_code = #{indexCode}
+          AND model_version = #{modelVersion}
+        ORDER BY horizon_days, probability_bucket
+    </select>
+
+    <select id="findLatestPortfolioViewSnapshot" resultType="com.kingyurina.demo.stock.StockPortfolioViewSnapshot">
+        SELECT
+            index_code AS indexCode,
+            view_version AS viewVersion,
+            generated_at AS generatedAt,
+            source,
+            payload_json AS payloadJson
+        FROM stock_portfolio_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = #{viewVersion}
+        LIMIT 1
+    </select>
+
+    <select id="findLatestDashboardViewSnapshot" resultType="com.kingyurina.demo.stock.StockDashboardViewSnapshot">
+        SELECT
+            index_code AS indexCode,
+            view_version AS viewVersion,
+            generated_at AS generatedAt,
+            source,
+            payload_json AS payloadJson
+        FROM stock_dashboard_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = #{viewVersion}
+        LIMIT 1
+    </select>
+
+    <select id="findLatestBacktestViewSnapshot" resultType="com.kingyurina.demo.stock.StockBacktestViewSnapshot">
+        SELECT
+            index_code AS indexCode,
+            view_version AS viewVersion,
+            generated_at AS generatedAt,
+            source,
+            payload_json AS payloadJson
+        FROM stock_backtest_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = #{viewVersion}
+        LIMIT 1
+    </select>
+
+    <select id="findLatestSignalRows" resultType="com.kingyurina.demo.stock.StockBacktestResult">
+        SELECT
+            sl.symbol,
+            COALESCE(p.name, i.name, sl.symbol) AS name,
+            CURRENT_DATE AS signalDate,
+            sl.integrated_score AS integratedScore,
+            sl.valuation_score AS valuationScore,
+            sl.quality_score AS qualityScore,
+            sl.growth_score AS growthScore,
+            sl.stability_score AS stabilityScore,
+            sl.earnings_score AS earningsScore,
+            sl.analyst_score AS analystScore,
+            sl.news_score AS newsScore,
+            sl.momentum_score AS momentumScore,
+            sl.risk_score AS riskScore,
+            sl.institution_score AS institutionScore,
+            dq.quality_score AS dataQualityScore,
+            COALESCE(ms.market_cap_usd, p.market_cap) AS marketCap,
+            COALESCE(i.sector, '-') AS sector,
+            sl.calculated_at AS calculatedAt
+        FROM stock_signal_latest sl
+        INNER JOIN index_constituent i
+            ON i.symbol = sl.symbol
+           AND i.index_code = #{indexCode}
+           AND i.current_member = TRUE
+           AND i.symbol NOT IN ('TICKER', 'SECURITY')
+           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        LEFT JOIN company_profile p
+            ON p.symbol = sl.symbol
+        LEFT JOIN stock_data_quality_latest dq
+            ON dq.symbol = sl.symbol
+        LEFT JOIN stock_market_snapshot ms
+            ON ms.index_code = #{indexCode}
+           AND ms.symbol = sl.symbol
+           AND ms.snapshot_date = (
+                SELECT MAX(snapshot_date)
+                FROM stock_market_snapshot
+                WHERE index_code = #{indexCode}
+                  AND symbol = sl.symbol
+           )
+        WHERE sl.integrated_score IS NOT NULL
+        ORDER BY COALESCE(ms.market_cap_usd, p.market_cap) DESC, sl.symbol
+    </select>
+
+    <select id="findLatestExpectedReturnSnapshotsBySymbol" resultType="com.kingyurina.demo.stock.StockExpectedReturnSnapshot">
+        SELECT
+            index_code AS indexCode,
+            signal_date AS signalDate,
+            symbol,
+            horizon_days AS horizonDays,
+            expected_return_pct AS expectedReturnPct,
+            expected_excess_return_pct AS expectedExcessReturnPct,
+            return_p10_pct AS returnP10Pct,
+            return_p50_pct AS returnP50Pct,
+            return_p90_pct AS returnP90Pct,
+            excess_p10_pct AS excessP10Pct,
+            excess_p50_pct AS excessP50Pct,
+            excess_p90_pct AS excessP90Pct,
+            upside_probability_pct AS upsideProbabilityPct,
+            calibrated_upside_probability_pct AS calibratedUpsideProbabilityPct,
+            downside_probability_pct AS downsideProbabilityPct,
+            drawdown_risk_pct AS drawdownRiskPct,
+            confidence,
+            sample_count AS sampleCount,
+            sector_sample_count AS sectorSampleCount,
+            score_bucket AS scoreBucket,
+            calibration_bucket AS calibrationBucket,
+            calibration_error_pct AS calibrationErrorPct,
+            model_version AS modelVersion,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_expected_return_snapshot
+        WHERE symbol = #{symbol}
+          AND model_version = #{modelVersion}
+          AND signal_date = (
+              SELECT MAX(signal_date)
+              FROM stock_expected_return_snapshot
+              WHERE symbol = #{symbol}
+                AND model_version = #{modelVersion}
+          )
+          AND index_code = (
+              SELECT selected.index_code
+              FROM (
+                  SELECT index_code
+                  FROM stock_expected_return_snapshot
+                  WHERE symbol = #{symbol}
+                    AND model_version = #{modelVersion}
+                    AND signal_date = (
+                        SELECT MAX(signal_date)
+                        FROM stock_expected_return_snapshot
+                        WHERE symbol = #{symbol}
+                          AND model_version = #{modelVersion}
+                    )
+                  GROUP BY index_code
+                  ORDER BY CASE index_code
+                      WHEN 'SP500' THEN 1
+                      WHEN 'NASDAQ100' THEN 2
+                      WHEN 'DOW30' THEN 3
+                      ELSE 9
+                  END
+                  LIMIT 1
+              ) selected
+          )
+        ORDER BY horizon_days
+    </select>
+
+    <select id="findLatestMarketSnapshotBySymbol" resultType="com.kingyurina.demo.stock.StockMarketSnapshot">
+        SELECT
+            index_code AS indexCode,
+            symbol,
+            snapshot_date AS snapshotDate,
+            sector,
+            industry,
+            exchange,
+            market,
+            currency,
+            close_price AS closePrice,
+            volume,
+            shares_outstanding AS sharesOutstanding,
+            market_cap_usd AS marketCapUsd,
+            price_source AS priceSource,
+            shares_source AS sharesSource,
+            market_cap_source AS marketCapSource,
+            calculated_at AS calculatedAt
+        FROM stock_market_snapshot
+        WHERE symbol = #{symbol}
+        ORDER BY snapshot_date DESC, calculated_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="findExpectedReturnFactorContributions"
+            resultType="com.kingyurina.demo.stock.StockExpectedReturnFactorContribution">
+        SELECT
+            index_code AS indexCode,
+            signal_date AS signalDate,
+            symbol,
+            horizon_days AS horizonDays,
+            model_version AS modelVersion,
+            factor,
+            exposure_score AS exposureScore,
+            coefficient,
+            contribution_pct AS contributionPct,
+            sample_count AS sampleCount,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_expected_return_factor_contribution
+        WHERE index_code = #{indexCode}
+          AND model_version = #{modelVersion}
+          AND horizon_days = #{horizonDays}
+          AND signal_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY signal_date, factor, symbol
+    </select>
+
+    <select id="findLatestExpectedReturnFactorContributionsBySymbol"
+            resultType="com.kingyurina.demo.stock.StockExpectedReturnFactorContribution">
+        SELECT
+            index_code AS indexCode,
+            signal_date AS signalDate,
+            symbol,
+            horizon_days AS horizonDays,
+            model_version AS modelVersion,
+            factor,
+            exposure_score AS exposureScore,
+            coefficient,
+            contribution_pct AS contributionPct,
+            sample_count AS sampleCount,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_expected_return_factor_contribution
+        WHERE symbol = #{symbol}
+          AND model_version = #{modelVersion}
+          AND horizon_days = #{horizonDays}
+          AND signal_date = (
+              SELECT MAX(signal_date)
+              FROM stock_expected_return_factor_contribution
+              WHERE symbol = #{symbol}
+                AND model_version = #{modelVersion}
+                AND horizon_days = #{horizonDays}
+          )
+          AND index_code = (
+              SELECT selected.index_code
+              FROM (
+                  SELECT index_code
+                  FROM stock_expected_return_factor_contribution
+                  WHERE symbol = #{symbol}
+                    AND model_version = #{modelVersion}
+                    AND horizon_days = #{horizonDays}
+                    AND signal_date = (
+                        SELECT MAX(signal_date)
+                        FROM stock_expected_return_factor_contribution
+                        WHERE symbol = #{symbol}
+                          AND model_version = #{modelVersion}
+                          AND horizon_days = #{horizonDays}
+                    )
+                  GROUP BY index_code
+                  ORDER BY CASE index_code
+                      WHEN 'SP500' THEN 1
+                      WHEN 'NASDAQ100' THEN 2
+                      WHEN 'DOW30' THEN 3
+                      ELSE 9
+                  END
+                  LIMIT 1
+              ) selected
+          )
+        ORDER BY ABS(COALESCE(contribution_pct, 0)) DESC, factor
+    </select>
+
+    <select id="findQuantModelHealth" resultType="com.kingyurina.demo.stock.StockQuantModelHealthMetric">
+        SELECT
+            'Index universe' AS layer,
+            'UNIVERSE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT i.symbol) AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            CAST(NULL AS DATETIME) AS latestCalculatedAt,
+            '현재 지수 편입 종목 기준입니다.' AS note
+        FROM index_constituent i
+        WHERE i.index_code = #{indexCode}
+          AND i.current_member = TRUE
+          AND i.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        UNION ALL
+        SELECT
+            'Signal latest' AS layer,
+            'SIGNAL_LATEST' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT sl.symbol) AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(sl.calculated_at) AS latestCalculatedAt,
+            '리스트/상세 화면이 우선 조회하는 최신 Signal 저장값입니다.' AS note
+        FROM stock_signal_latest sl
+        WHERE EXISTS (
+            SELECT 1
+            FROM index_constituent i
+            WHERE i.symbol = sl.symbol
+              AND i.index_code = #{indexCode}
+              AND i.current_member = TRUE
+              AND i.symbol NOT IN ('TICKER', 'SECURITY')
+              AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        )
+        UNION ALL
+        SELECT
+            'Data quality' AS layer,
+            'DATA_QUALITY' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT dq.symbol) AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(dq.calculated_at) AS latestCalculatedAt,
+            '커버리지, 최신성, 이상치, 원천 충돌을 반영한 품질 점수입니다.' AS note
+        FROM stock_data_quality_latest dq
+        WHERE EXISTS (
+            SELECT 1
+            FROM index_constituent i
+            WHERE i.symbol = dq.symbol
+              AND i.index_code = #{indexCode}
+              AND i.current_member = TRUE
+              AND i.symbol NOT IN ('TICKER', 'SECURITY')
+              AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        )
+        UNION ALL
+        SELECT
+            'Market snapshot' AS layer,
+            'MARKET_SNAPSHOT' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            '일봉 가격, 거래량, 주식수, 시가총액의 point-in-time proxy입니다.' AS note
+        FROM stock_market_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Membership PIT audit' AS layer,
+            'MEMBERSHIP_PIT' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            CONCAT(
+                'Membership snapshot source: ',
+                COALESCE(GROUP_CONCAT(DISTINCT source ORDER BY source SEPARATOR ', '), '-'),
+                '. Current proxy rows are separated from future true PIT rows.'
+            ) AS note
+        FROM stock_index_membership_snapshot
+        WHERE index_code = #{indexCode}
+          AND is_member = TRUE
+        UNION ALL
+        SELECT
+            'Shares PIT audit' AS layer,
+            'SHARES_PIT' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            CONCAT(
+                'Shares snapshot source: ',
+                COALESCE(GROUP_CONCAT(DISTINCT source ORDER BY source SEPARATOR ', '), '-'),
+                '. Current proxy rows are separated from future true PIT rows.'
+            ) AS note
+        FROM stock_shares_outstanding_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Benchmark return' AS layer,
+            'BENCHMARK' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            COUNT(DISTINCT trade_date) AS dateCount,
+            MAX(trade_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'market-cap weighted benchmark proxy와 초과수익 계산 기준입니다.' AS note
+        FROM stock_benchmark_return_series
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Risk snapshot' AS layer,
+            'RISK_SNAPSHOT' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT r.symbol) AS symbolCount,
+            COUNT(DISTINCT r.signal_date) AS dateCount,
+            MAX(r.signal_date) AS latestDate,
+            MAX(r.calculated_at) AS latestCalculatedAt,
+            'beta, trailing volatility, dollar volume을 저장한 포트폴리오 리스크 입력입니다.' AS note
+        FROM stock_risk_snapshot r
+        WHERE EXISTS (
+            SELECT 1
+            FROM index_constituent i
+            WHERE i.symbol = r.symbol
+              AND i.index_code = #{indexCode}
+              AND i.current_member = TRUE
+              AND i.symbol NOT IN ('TICKER', 'SECURITY')
+              AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        )
+        UNION ALL
+        SELECT
+            'Risk-free rate' AS layer,
+            'RISK_FREE' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            COUNT(DISTINCT rate_date) AS dateCount,
+            MAX(rate_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            CASE
+                WHEN COUNT(*) = 0 THEN '비어 있으면 포트폴리오 설정값으로 fallback합니다.'
+                WHEN SUM(CASE WHEN source LIKE 'CONFIG_%' THEN 1 ELSE 0 END) = COUNT(*)
+                    THEN CONCAT('설정 기반 fallback risk-free rows입니다. source=', COALESCE(MAX(source), '-'))
+                ELSE CONCAT('point-in-time risk-free series입니다. latest source=', COALESCE(MAX(source), '-'))
+            END AS note
+        FROM stock_risk_free_rate_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Macro regime' AS layer,
+            'MACRO_REGIME' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Risk-on/neutral/risk-off 국면과 factor 가중치 조정 입력입니다.' AS note
+        FROM stock_macro_regime_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Macro vintage' AS layer,
+            'MACRO_VINTAGE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT series_code) AS symbolCount,
+            COUNT(DISTINCT observation_date) AS dateCount,
+            MAX(observation_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            CONCAT(
+                'FRED/ALFRED vintage observation rows. Sources=',
+                COALESCE(GROUP_CONCAT(DISTINCT source ORDER BY source SEPARATOR ', '), '-')
+            ) AS note
+        FROM stock_macro_vintage_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Macro feature' AS layer,
+            'MACRO_FEATURE' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'FRED macro feature snapshot used by Expected Return v8.' AS note
+        FROM stock_macro_feature_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Factor exposure' AS layer,
+            'FACTOR_EXPOSURE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            '섹터/시총 중립 factor exposure snapshot입니다.' AS note
+        FROM stock_factor_exposure_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Expected return v4' AS layer,
+            'EXPECTED_RETURN_V4' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            '국면별 factor 효과를 반영한 기대수익/확률 snapshot입니다.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V4'
+        UNION ALL
+        SELECT
+            'Expected return v5' AS layer,
+            'EXPECTED_RETURN_V5' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Regime-aware nonlinear interaction expected-return snapshot.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V5'
+        UNION ALL
+        SELECT
+            'Expected return v6' AS layer,
+            'EXPECTED_RETURN_V6' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Calibration-stabilized expected-return snapshot used as the current production expected-return layer.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V6'
+        UNION ALL
+        SELECT
+            'Expected return v7' AS layer,
+            'EXPECTED_RETURN_V7' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Horizon-decay stabilized expected-return snapshot used as the current production expected-return layer.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V7'
+        UNION ALL
+        SELECT
+            'Expected return v8' AS layer,
+            'EXPECTED_RETURN_V8' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'FRED macro feature adjusted expected-return snapshot used as the current production expected-return layer.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V8'
+        UNION ALL
+        SELECT
+            'Expected return v9' AS layer,
+            'EXPECTED_RETURN_V9' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Provenance-stabilized expected-return snapshot used as the current production expected-return layer.' AS note
+        FROM stock_expected_return_snapshot
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V9'
+        UNION ALL
+        SELECT
+            'Factor contribution' AS layer,
+            'FACTOR_CONTRIBUTION' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol) AS symbolCount,
+            COUNT(DISTINCT signal_date) AS dateCount,
+            MAX(signal_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Quant Opinion에서 factor별 기대수익 기여도를 설명하는 원천입니다.' AS note
+        FROM stock_expected_return_factor_contribution
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V9'
+        UNION ALL
+        SELECT
+            'Probability calibration' AS layer,
+            'CALIBRATION' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            COUNT(DISTINCT horizon_days) AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            '상승확률 예측값이 실제 적중률과 얼마나 맞는지 보는 calibration bucket입니다.' AS note
+        FROM stock_expected_return_calibration
+        WHERE index_code = #{indexCode}
+          AND model_version = 'EXPECTED_RETURN_V9'
+        UNION ALL
+        SELECT
+            'Covariance snapshot' AS layer,
+            'COVARIANCE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT symbol_a) AS symbolCount,
+            COUNT(DISTINCT snapshot_date) AS dateCount,
+            MAX(snapshot_date) AS latestDate,
+            MAX(calculated_at) AS latestCalculatedAt,
+            'Optimized v3가 고상관 종목 쏠림을 줄일 때 쓰는 공분산 입력입니다.' AS note
+        FROM stock_covariance_snapshot
+        WHERE index_code = #{indexCode}
+        UNION ALL
+        SELECT
+            'Portfolio view snapshot' AS layer,
+            'PORTFOLIO_VIEW' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(generated_at) AS latestCalculatedAt,
+            CONCAT(
+                'Materialized /signals/portfolio payload. Source=',
+                COALESCE(MAX(source), '-')
+            ) AS note
+        FROM stock_portfolio_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = 'PORTFOLIO_OPTIMIZATION_V5'
+        UNION ALL
+        SELECT
+            'Backtest view snapshot' AS layer,
+            'BACKTEST_VIEW' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(generated_at) AS latestCalculatedAt,
+            CONCAT(
+                'Materialized /signals/backtest payload. Source=',
+                COALESCE(MAX(source), '-')
+            ) AS note
+        FROM stock_backtest_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = 'BACKTEST_RESEARCH_V1'
+        UNION ALL
+        SELECT
+            'Quant view snapshot' AS layer,
+            'DASHBOARD_VIEW' AS metricKey,
+            COUNT(*) AS rowCount,
+            0 AS symbolCount,
+            0 AS dateCount,
+            CAST(NULL AS DATE) AS latestDate,
+            MAX(generated_at) AS latestCalculatedAt,
+            CONCAT(
+                'Materialized /quant payload. Source=',
+                COALESCE(MAX(source), '-')
+            ) AS note
+        FROM stock_dashboard_view_snapshot
+        WHERE index_code = #{indexCode}
+          AND view_version = 'DASHBOARD_QUANT_AI_V1'
+        ORDER BY CASE metricKey
+            WHEN 'UNIVERSE' THEN 1
+            WHEN 'SIGNAL_LATEST' THEN 2
+            WHEN 'DATA_QUALITY' THEN 3
+            WHEN 'MARKET_SNAPSHOT' THEN 4
+            WHEN 'MEMBERSHIP_PIT' THEN 5
+            WHEN 'SHARES_PIT' THEN 6
+            WHEN 'BENCHMARK' THEN 7
+            WHEN 'RISK_SNAPSHOT' THEN 8
+            WHEN 'RISK_FREE' THEN 9
+            WHEN 'MACRO_REGIME' THEN 10
+            WHEN 'MACRO_VINTAGE' THEN 11
+            WHEN 'MACRO_FEATURE' THEN 12
+            WHEN 'FACTOR_EXPOSURE' THEN 13
+            WHEN 'EXPECTED_RETURN_V4' THEN 14
+            WHEN 'EXPECTED_RETURN_V5' THEN 15
+            WHEN 'EXPECTED_RETURN_V6' THEN 16
+            WHEN 'EXPECTED_RETURN_V7' THEN 17
+            WHEN 'EXPECTED_RETURN_V8' THEN 18
+            WHEN 'EXPECTED_RETURN_V9' THEN 19
+            WHEN 'FACTOR_CONTRIBUTION' THEN 20
+            WHEN 'CALIBRATION' THEN 21
+            WHEN 'COVARIANCE' THEN 22
+            WHEN 'PORTFOLIO_VIEW' THEN 23
+            WHEN 'BACKTEST_VIEW' THEN 24
+            WHEN 'DASHBOARD_VIEW' THEN 25
+            ELSE 99
+        END
+    </select>
+
+    <select id="findQuantOperationHealth" resultType="com.kingyurina.demo.stock.StockQuantOperationHealthMetric">
+        SELECT *
+        FROM (
+            SELECT
+                'Finnhub batch' AS operation,
+                status,
+                started_at AS startedAt,
+                finished_at AS finishedAt,
+                requested_count AS requestedCount,
+                success_count AS successCount,
+                fail_count AS failCount,
+                message
+            FROM finnhub_batch_run
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+        ) latest_finnhub
+        UNION ALL
+        SELECT *
+        FROM (
+            SELECT
+                'Yahoo candle batch' AS operation,
+                status,
+                started_at AS startedAt,
+                finished_at AS finishedAt,
+                requested_count AS requestedCount,
+                success_count AS successCount,
+                fail_count AS failCount,
+                message
+            FROM yahoo_candle_batch_run
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+        ) latest_yahoo
+        UNION ALL
+        SELECT *
+        FROM (
+            SELECT
+                'Toss market data batch' AS operation,
+                status,
+                started_at AS startedAt,
+                finished_at AS finishedAt,
+                requested_count AS requestedCount,
+                success_count AS successCount,
+                fail_count AS failCount,
+                message
+            FROM toss_batch_run
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+        ) latest_toss
+        UNION ALL
+        SELECT *
+        FROM (
+            SELECT
+                'SEC EDGAR batch' AS operation,
+                status,
+                started_at AS startedAt,
+                finished_at AS finishedAt,
+                requested_count AS requestedCount,
+                success_count AS successCount,
+                fail_count AS failCount,
+                message
+            FROM sec_edgar_batch_run
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+        ) latest_sec
+        UNION ALL
+        SELECT *
+        FROM (
+            SELECT
+                'Institution 13F batch' AS operation,
+                status,
+                started_at AS startedAt,
+                finished_at AS finishedAt,
+                requested_count AS requestedCount,
+                success_count AS successCount,
+                fail_count AS failCount,
+                message
+            FROM institution_13f_batch_run
+            ORDER BY started_at DESC, id DESC
+            LIMIT 1
+        ) latest_13f
+        UNION ALL
+        SELECT
+            'API calls 24h' AS operation,
+            CASE
+                WHEN SUM(CASE WHEN status_code IS NULL OR status_code &gt;= 400 THEN 1 ELSE 0 END) &gt; 0
+                    THEN 'WARNING'
+                ELSE 'OK'
+            END AS status,
+            MAX(requested_at) AS startedAt,
+            MAX(requested_at) AS finishedAt,
+            COUNT(*) AS requestedCount,
+            SUM(CASE WHEN status_code BETWEEN 200 AND 399 THEN 1 ELSE 0 END) AS successCount,
+            SUM(CASE WHEN status_code IS NULL OR status_code &gt;= 400 THEN 1 ELSE 0 END) AS failCount,
+            CONCAT(
+                '최근 24시간 API 호출 ',
+                COUNT(*),
+                '건, 실패 ',
+                SUM(CASE WHEN status_code IS NULL OR status_code &gt;= 400 THEN 1 ELSE 0 END),
+                '건'
+            ) AS message
+        FROM api_call_log
+        WHERE requested_at &gt;= DATE_SUB(NOW(), INTERVAL 1 DAY)
+    </select>
+
+    <select id="findPitQuality" resultType="com.kingyurina.demo.stock.StockPitQualityMetric">
+        SELECT
+            'Membership PIT' AS layer,
+            COUNT(*) AS totalRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%'
+                    THEN 1 ELSE 0 END) AS officialRows,
+            0 AS secRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'WIKIPEDIA%'
+                    THEN 1 ELSE 0 END) AS wikipediaRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%'
+                    THEN 1 ELSE 0 END) AS proxyRows,
+            AVG(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%' THEN 100
+                WHEN UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%' THEN 90
+                WHEN UPPER(COALESCE(source, '')) LIKE 'WIKIPEDIA%' THEN 65
+                WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%' THEN 35
+                ELSE 50
+            END) AS score
+        FROM stock_index_membership_snapshot
+        WHERE index_code = #{indexCode}
+          AND is_member = TRUE
+        UNION ALL
+        SELECT
+            'Shares PIT' AS layer,
+            COUNT(*) AS totalRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%'
+                    THEN 1 ELSE 0 END) AS officialRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'SEC%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%SEC%'
+                    THEN 1 ELSE 0 END) AS secRows,
+            0 AS wikipediaRows,
+            SUM(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FINNHUB%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%TOSS%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%MISSING%'
+                    THEN 1 ELSE 0 END) AS proxyRows,
+            AVG(CASE
+                WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%' THEN 100
+                WHEN UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%' THEN 90
+                WHEN UPPER(COALESCE(source, '')) LIKE 'SEC%' OR UPPER(COALESCE(source, '')) LIKE '%SEC%' THEN 85
+                WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
+                  OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%FINNHUB%'
+                  OR UPPER(COALESCE(source, '')) LIKE '%TOSS%' THEN 40
+                WHEN UPPER(COALESCE(source, '')) LIKE '%MISSING%' THEN 0
+                ELSE 50
+            END) AS score
+        FROM stock_shares_outstanding_snapshot
+        WHERE index_code = #{indexCode}
+    </select>
+
     <select id="findSectorForSymbol" resultType="string">
         SELECT COALESCE(MIN(sector), '-')
         FROM index_constituent
@@ -199,6 +1723,505 @@
             calculated_at = CURRENT_TIMESTAMP
     </insert>
 
+    <insert id="upsertRiskSnapshot">
+        INSERT INTO stock_risk_snapshot (
+            symbol, signal_date, beta, volatility_pct, avg_dollar_volume, observations, source
+        )
+        VALUES (
+            #{symbol}, #{signalDate}, #{beta}, #{volatilityPct}, #{avgDollarVolume}, #{observations}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            beta = VALUES(beta),
+            volatility_pct = VALUES(volatility_pct),
+            avg_dollar_volume = VALUES(avg_dollar_volume),
+            observations = VALUES(observations),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertBenchmarkReturn">
+        INSERT INTO stock_benchmark_return_series (
+            index_code, trade_date, benchmark_level, return_pct, total_market_cap_usd,
+            constituent_count, coverage_count, source
+        )
+        VALUES (
+            #{indexCode}, #{tradeDate}, #{benchmarkLevel}, #{returnPct}, #{totalMarketCapUsd},
+            #{constituentCount}, #{coverageCount}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            benchmark_level = VALUES(benchmark_level),
+            return_pct = VALUES(return_pct),
+            total_market_cap_usd = VALUES(total_market_cap_usd),
+            constituent_count = VALUES(constituent_count),
+            coverage_count = VALUES(coverage_count),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertRiskFreeRateSnapshot">
+        INSERT INTO stock_risk_free_rate_snapshot (
+            index_code, series_code, rate_date, annual_rate_pct, source
+        )
+        VALUES (
+            #{indexCode}, #{seriesCode}, #{rateDate}, #{annualRatePct}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            annual_rate_pct = VALUES(annual_rate_pct),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertIndexMembershipSnapshot">
+        INSERT INTO stock_index_membership_snapshot (
+            index_code, symbol, snapshot_date, sector, industry, exchange, is_member, source
+        )
+        VALUES (
+            #{indexCode},
+            #{symbol},
+            #{snapshotDate},
+            #{sector},
+            #{industry},
+            #{exchange},
+            COALESCE(#{member}, TRUE),
+            COALESCE(NULLIF(#{source}, ''), 'CSV_IMPORT')
+        )
+        ON DUPLICATE KEY UPDATE
+            sector = VALUES(sector),
+            industry = VALUES(industry),
+            exchange = VALUES(exchange),
+            is_member = VALUES(is_member),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertSharesOutstandingSnapshot">
+        INSERT INTO stock_shares_outstanding_snapshot (
+            index_code, symbol, snapshot_date, shares_outstanding, source
+        )
+        VALUES (
+            #{indexCode},
+            #{symbol},
+            #{snapshotDate},
+            #{sharesOutstanding},
+            COALESCE(NULLIF(#{source}, ''), 'CSV_IMPORT')
+        )
+        ON DUPLICATE KEY UPDATE
+            shares_outstanding = VALUES(shares_outstanding),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertMacroVintageSnapshot">
+        INSERT INTO stock_macro_vintage_snapshot (
+            index_code, series_code, observation_date, realtime_start, realtime_end, value, source
+        )
+        VALUES (
+            #{indexCode},
+            #{seriesCode},
+            #{observationDate},
+            #{realtimeStart},
+            #{realtimeEnd},
+            #{value},
+            COALESCE(NULLIF(#{source}, ''), 'FRED_API')
+        )
+        ON DUPLICATE KEY UPDATE
+            value = VALUES(value),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertMacroFeatureSnapshot">
+        INSERT INTO stock_macro_feature_snapshot (
+            index_code, snapshot_date, short_rate_pct, long_rate_pct, yield_spread_pct,
+            fed_funds_pct, cpi_yoy_pct, cpi_mom_pct, unemployment_rate_pct,
+            unemployment_change_3m_pct, vix_level, vix_change_20d_pct,
+            dollar_index, dollar_change_20d_pct, macro_tightness_score,
+            macro_growth_stress_score, macro_risk_score, macro_feature_score, source
+        )
+        VALUES (
+            #{indexCode}, #{snapshotDate}, #{shortRatePct}, #{longRatePct}, #{yieldSpreadPct},
+            #{fedFundsPct}, #{cpiYoyPct}, #{cpiMomPct}, #{unemploymentRatePct},
+            #{unemploymentChange3mPct}, #{vixLevel}, #{vixChange20dPct},
+            #{dollarIndex}, #{dollarChange20dPct}, #{macroTightnessScore},
+            #{macroGrowthStressScore}, #{macroRiskScore}, #{macroFeatureScore}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            short_rate_pct = VALUES(short_rate_pct),
+            long_rate_pct = VALUES(long_rate_pct),
+            yield_spread_pct = VALUES(yield_spread_pct),
+            fed_funds_pct = VALUES(fed_funds_pct),
+            cpi_yoy_pct = VALUES(cpi_yoy_pct),
+            cpi_mom_pct = VALUES(cpi_mom_pct),
+            unemployment_rate_pct = VALUES(unemployment_rate_pct),
+            unemployment_change_3m_pct = VALUES(unemployment_change_3m_pct),
+            vix_level = VALUES(vix_level),
+            vix_change_20d_pct = VALUES(vix_change_20d_pct),
+            dollar_index = VALUES(dollar_index),
+            dollar_change_20d_pct = VALUES(dollar_change_20d_pct),
+            macro_tightness_score = VALUES(macro_tightness_score),
+            macro_growth_stress_score = VALUES(macro_growth_stress_score),
+            macro_risk_score = VALUES(macro_risk_score),
+            macro_feature_score = VALUES(macro_feature_score),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertMacroRegimeSnapshot">
+        INSERT INTO stock_macro_regime_snapshot (
+            index_code, snapshot_date, regime_label, macro_score, trend_score,
+            volatility_score, breadth_score, liquidity_score, dollar_score, rate_score,
+            benchmark_return_20d_pct, benchmark_return_60d_pct,
+            realized_volatility_20d_pct, realized_volatility_60d_pct,
+            breadth_advancer_pct, benchmark_coverage_count, vix_level, vix_change_20d_pct,
+            dollar_proxy_return_20d_pct, rate_proxy_return_20d_pct, source
+        )
+        VALUES (
+            #{indexCode}, #{snapshotDate}, #{regimeLabel}, #{macroScore}, #{trendScore},
+            #{volatilityScore}, #{breadthScore}, #{liquidityScore}, #{dollarScore}, #{rateScore},
+            #{benchmarkReturn20dPct}, #{benchmarkReturn60dPct},
+            #{realizedVolatility20dPct}, #{realizedVolatility60dPct},
+            #{breadthAdvancerPct}, #{benchmarkCoverageCount}, #{vixLevel}, #{vixChange20dPct},
+            #{dollarProxyReturn20dPct}, #{rateProxyReturn20dPct}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            regime_label = VALUES(regime_label),
+            macro_score = VALUES(macro_score),
+            trend_score = VALUES(trend_score),
+            volatility_score = VALUES(volatility_score),
+            breadth_score = VALUES(breadth_score),
+            liquidity_score = VALUES(liquidity_score),
+            dollar_score = VALUES(dollar_score),
+            rate_score = VALUES(rate_score),
+            benchmark_return_20d_pct = VALUES(benchmark_return_20d_pct),
+            benchmark_return_60d_pct = VALUES(benchmark_return_60d_pct),
+            realized_volatility_20d_pct = VALUES(realized_volatility_20d_pct),
+            realized_volatility_60d_pct = VALUES(realized_volatility_60d_pct),
+            breadth_advancer_pct = VALUES(breadth_advancer_pct),
+            benchmark_coverage_count = VALUES(benchmark_coverage_count),
+            vix_level = VALUES(vix_level),
+            vix_change_20d_pct = VALUES(vix_change_20d_pct),
+            dollar_proxy_return_20d_pct = VALUES(dollar_proxy_return_20d_pct),
+            rate_proxy_return_20d_pct = VALUES(rate_proxy_return_20d_pct),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertCorrelationSnapshot">
+        INSERT INTO stock_correlation_snapshot (
+            index_code, snapshot_date, symbol_a, symbol_b, correlation, observations, lookback_days, source
+        )
+        VALUES (
+            #{indexCode}, #{snapshotDate}, #{symbolA}, #{symbolB}, #{correlation},
+            #{observations}, #{lookbackDays}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            correlation = VALUES(correlation),
+            observations = VALUES(observations),
+            lookback_days = VALUES(lookback_days),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertCovarianceSnapshot">
+        INSERT INTO stock_covariance_snapshot (
+            index_code, snapshot_date, symbol_a, symbol_b, covariance,
+            volatility_a_pct, volatility_b_pct, observations, lookback_days, source
+        )
+        VALUES (
+            #{indexCode}, #{snapshotDate}, #{symbolA}, #{symbolB}, #{covariance},
+            #{volatilityAPct}, #{volatilityBPct}, #{observations}, #{lookbackDays}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            covariance = VALUES(covariance),
+            volatility_a_pct = VALUES(volatility_a_pct),
+            volatility_b_pct = VALUES(volatility_b_pct),
+            observations = VALUES(observations),
+            lookback_days = VALUES(lookback_days),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertExpectedReturnSnapshot">
+        INSERT INTO stock_expected_return_snapshot (
+            index_code, signal_date, symbol, horizon_days, expected_return_pct,
+            expected_excess_return_pct, return_p10_pct, return_p50_pct, return_p90_pct,
+            excess_p10_pct, excess_p50_pct, excess_p90_pct, upside_probability_pct,
+            calibrated_upside_probability_pct, downside_probability_pct, drawdown_risk_pct,
+            confidence, sample_count, sector_sample_count, score_bucket, calibration_bucket,
+            calibration_error_pct, model_version, source
+        )
+        VALUES (
+            #{indexCode}, #{signalDate}, #{symbol}, #{horizonDays}, #{expectedReturnPct},
+            #{expectedExcessReturnPct}, #{returnP10Pct}, #{returnP50Pct}, #{returnP90Pct},
+            #{excessP10Pct}, #{excessP50Pct}, #{excessP90Pct}, #{upsideProbabilityPct},
+            #{calibratedUpsideProbabilityPct}, #{downsideProbabilityPct}, #{drawdownRiskPct},
+            #{confidence}, #{sampleCount}, #{sectorSampleCount}, #{scoreBucket}, #{calibrationBucket},
+            #{calibrationErrorPct}, #{modelVersion}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            expected_return_pct = VALUES(expected_return_pct),
+            expected_excess_return_pct = VALUES(expected_excess_return_pct),
+            return_p10_pct = VALUES(return_p10_pct),
+            return_p50_pct = VALUES(return_p50_pct),
+            return_p90_pct = VALUES(return_p90_pct),
+            excess_p10_pct = VALUES(excess_p10_pct),
+            excess_p50_pct = VALUES(excess_p50_pct),
+            excess_p90_pct = VALUES(excess_p90_pct),
+            upside_probability_pct = VALUES(upside_probability_pct),
+            calibrated_upside_probability_pct = VALUES(calibrated_upside_probability_pct),
+            downside_probability_pct = VALUES(downside_probability_pct),
+            drawdown_risk_pct = VALUES(drawdown_risk_pct),
+            confidence = VALUES(confidence),
+            sample_count = VALUES(sample_count),
+            sector_sample_count = VALUES(sector_sample_count),
+            score_bucket = VALUES(score_bucket),
+            calibration_bucket = VALUES(calibration_bucket),
+            calibration_error_pct = VALUES(calibration_error_pct),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertFactorExposureSnapshot">
+        INSERT INTO stock_factor_exposure_snapshot (
+            index_code, signal_date, symbol, factor, raw_score, exposure_score,
+            sector, market_cap, data_quality_score, source
+        )
+        VALUES (
+            #{indexCode}, #{signalDate}, #{symbol}, #{factor}, #{rawScore}, #{exposureScore},
+            #{sector}, #{marketCap}, #{dataQualityScore}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            raw_score = VALUES(raw_score),
+            exposure_score = VALUES(exposure_score),
+            sector = VALUES(sector),
+            market_cap = VALUES(market_cap),
+            data_quality_score = VALUES(data_quality_score),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteExpectedReturnFactorContributions">
+        DELETE FROM stock_expected_return_factor_contribution
+        WHERE index_code = #{indexCode}
+          AND signal_date = #{signalDate}
+          AND model_version = #{modelVersion}
+    </delete>
+
+    <insert id="copyExpectedReturnFactorContributions">
+        INSERT INTO stock_expected_return_factor_contribution (
+            index_code, signal_date, symbol, horizon_days, model_version, factor,
+            exposure_score, coefficient, contribution_pct, sample_count, source
+        )
+        SELECT
+            index_code, signal_date, symbol, horizon_days, #{targetModelVersion}, factor,
+            exposure_score, coefficient, contribution_pct, sample_count, #{source}
+        FROM stock_expected_return_factor_contribution
+        WHERE index_code = #{indexCode}
+          AND signal_date = #{signalDate}
+          AND model_version = #{sourceModelVersion}
+          AND horizon_days = 20
+        ON DUPLICATE KEY UPDATE
+            exposure_score = VALUES(exposure_score),
+            coefficient = VALUES(coefficient),
+            contribution_pct = VALUES(contribution_pct),
+            sample_count = VALUES(sample_count),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertExpectedReturnFactorContribution">
+        INSERT INTO stock_expected_return_factor_contribution (
+            index_code, signal_date, symbol, horizon_days, model_version, factor,
+            exposure_score, coefficient, contribution_pct, sample_count, source
+        )
+        VALUES (
+            #{indexCode}, #{signalDate}, #{symbol}, #{horizonDays}, #{modelVersion}, #{factor},
+            #{exposureScore}, #{coefficient}, #{contributionPct}, #{sampleCount}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            exposure_score = VALUES(exposure_score),
+            coefficient = VALUES(coefficient),
+            contribution_pct = VALUES(contribution_pct),
+            sample_count = VALUES(sample_count),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteExpectedReturnCalibrations">
+        DELETE FROM stock_expected_return_calibration
+        WHERE index_code = #{indexCode}
+          AND model_version = #{modelVersion}
+    </delete>
+
+    <insert id="upsertExpectedReturnCalibration">
+        INSERT INTO stock_expected_return_calibration (
+            index_code, model_version, horizon_days, probability_bucket, sample_count,
+            average_predicted_upside_pct, actual_upside_rate_pct, calibration_error_pct,
+            brier_score, source
+        )
+        VALUES (
+            #{indexCode}, #{modelVersion}, #{horizonDays}, #{probabilityBucket}, #{sampleCount},
+            #{averagePredictedUpsidePct}, #{actualUpsideRatePct}, #{calibrationErrorPct},
+            #{brierScore}, #{source}
+        )
+        ON DUPLICATE KEY UPDATE
+            sample_count = VALUES(sample_count),
+            average_predicted_upside_pct = VALUES(average_predicted_upside_pct),
+            actual_upside_rate_pct = VALUES(actual_upside_rate_pct),
+            calibration_error_pct = VALUES(calibration_error_pct),
+            brier_score = VALUES(brier_score),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertPortfolioViewSnapshot">
+        INSERT INTO stock_portfolio_view_snapshot (
+            index_code, view_version, generated_at, source, payload_json
+        )
+        VALUES (
+            #{indexCode}, #{viewVersion}, COALESCE(#{generatedAt}, CURRENT_TIMESTAMP),
+            COALESCE(NULLIF(#{source}, ''), 'ON_DEMAND'), #{payloadJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            generated_at = VALUES(generated_at),
+            source = VALUES(source),
+            payload_json = VALUES(payload_json)
+    </insert>
+
+    <insert id="upsertDashboardViewSnapshot">
+        INSERT INTO stock_dashboard_view_snapshot (
+            index_code, view_version, generated_at, source, payload_json
+        )
+        VALUES (
+            #{indexCode}, #{viewVersion}, COALESCE(#{generatedAt}, CURRENT_TIMESTAMP),
+            COALESCE(NULLIF(#{source}, ''), 'ON_DEMAND'), #{payloadJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            generated_at = VALUES(generated_at),
+            source = VALUES(source),
+            payload_json = VALUES(payload_json)
+    </insert>
+
+    <insert id="upsertBacktestViewSnapshot">
+        INSERT INTO stock_backtest_view_snapshot (
+            index_code, view_version, generated_at, source, payload_json
+        )
+        VALUES (
+            #{indexCode}, #{viewVersion}, COALESCE(#{generatedAt}, CURRENT_TIMESTAMP),
+            COALESCE(NULLIF(#{source}, ''), 'ON_DEMAND'), #{payloadJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            generated_at = VALUES(generated_at),
+            source = VALUES(source),
+            payload_json = VALUES(payload_json)
+    </insert>
+
+    <insert id="upsertOptimizerShadowSnapshot">
+        INSERT INTO stock_optimizer_shadow_snapshot (
+            index_code, signal_date, horizon_days, top_count, weighting,
+            baseline_optimizer, candidate_optimizer, solver_status, usable, message,
+            baseline_objective, candidate_objective, objective_gap, weight_distance_pct,
+            baseline_net_return_pct, candidate_net_return_pct, benchmark_return_pct,
+            candidate_turnover_pct, candidate_transaction_cost_pct, candidate_beta,
+            candidate_volatility_pct, candidate_liquidity, candidate_max_sector_weight_pct,
+            candidate_max_position_weight_pct, candidate_active_sector_deviation_pct,
+            candidate_invested_weight_pct, beta_breach, volatility_breach, sector_breach,
+            position_breach, turnover_breach, objective_breach, weight_distance_breach,
+            constraint_breach_count, source
+        )
+        VALUES (
+            #{indexCode}, #{signalDate}, #{horizonDays}, #{topCount}, #{weighting},
+            #{baselineOptimizer}, #{candidateOptimizer}, #{solverStatus},
+            COALESCE(#{usable}, FALSE), #{message},
+            #{baselineObjective}, #{candidateObjective}, #{objectiveGap}, #{weightDistancePct},
+            #{baselineNetReturnPct}, #{candidateNetReturnPct}, #{benchmarkReturnPct},
+            #{candidateTurnoverPct}, #{candidateTransactionCostPct}, #{candidateBeta},
+            #{candidateVolatilityPct}, #{candidateLiquidity}, #{candidateMaxSectorWeightPct},
+            #{candidateMaxPositionWeightPct}, #{candidateActiveSectorDeviationPct},
+            #{candidateInvestedWeightPct}, COALESCE(#{betaBreach}, FALSE),
+            COALESCE(#{volatilityBreach}, FALSE), COALESCE(#{sectorBreach}, FALSE),
+            COALESCE(#{positionBreach}, FALSE), COALESCE(#{turnoverBreach}, FALSE),
+            COALESCE(#{objectiveBreach}, FALSE), COALESCE(#{weightDistanceBreach}, FALSE),
+            COALESCE(#{constraintBreachCount}, 0), COALESCE(NULLIF(#{source}, ''), 'OJALGO_QP_SHADOW_V1')
+        )
+        ON DUPLICATE KEY UPDATE
+            baseline_optimizer = VALUES(baseline_optimizer),
+            solver_status = VALUES(solver_status),
+            usable = VALUES(usable),
+            message = VALUES(message),
+            baseline_objective = VALUES(baseline_objective),
+            candidate_objective = VALUES(candidate_objective),
+            objective_gap = VALUES(objective_gap),
+            weight_distance_pct = VALUES(weight_distance_pct),
+            baseline_net_return_pct = VALUES(baseline_net_return_pct),
+            candidate_net_return_pct = VALUES(candidate_net_return_pct),
+            benchmark_return_pct = VALUES(benchmark_return_pct),
+            candidate_turnover_pct = VALUES(candidate_turnover_pct),
+            candidate_transaction_cost_pct = VALUES(candidate_transaction_cost_pct),
+            candidate_beta = VALUES(candidate_beta),
+            candidate_volatility_pct = VALUES(candidate_volatility_pct),
+            candidate_liquidity = VALUES(candidate_liquidity),
+            candidate_max_sector_weight_pct = VALUES(candidate_max_sector_weight_pct),
+            candidate_max_position_weight_pct = VALUES(candidate_max_position_weight_pct),
+            candidate_active_sector_deviation_pct = VALUES(candidate_active_sector_deviation_pct),
+            candidate_invested_weight_pct = VALUES(candidate_invested_weight_pct),
+            beta_breach = VALUES(beta_breach),
+            volatility_breach = VALUES(volatility_breach),
+            sector_breach = VALUES(sector_breach),
+            position_breach = VALUES(position_breach),
+            turnover_breach = VALUES(turnover_breach),
+            objective_breach = VALUES(objective_breach),
+            weight_distance_breach = VALUES(weight_distance_breach),
+            constraint_breach_count = VALUES(constraint_breach_count),
+            source = VALUES(source),
+            calculated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="findOptimizerShadowSnapshots" resultType="com.kingyurina.demo.stock.StockOptimizerShadowSnapshot">
+        SELECT
+            index_code AS indexCode,
+            signal_date AS signalDate,
+            horizon_days AS horizonDays,
+            top_count AS topCount,
+            weighting,
+            baseline_optimizer AS baselineOptimizer,
+            candidate_optimizer AS candidateOptimizer,
+            solver_status AS solverStatus,
+            usable,
+            message,
+            baseline_objective AS baselineObjective,
+            candidate_objective AS candidateObjective,
+            objective_gap AS objectiveGap,
+            weight_distance_pct AS weightDistancePct,
+            baseline_net_return_pct AS baselineNetReturnPct,
+            candidate_net_return_pct AS candidateNetReturnPct,
+            benchmark_return_pct AS benchmarkReturnPct,
+            candidate_turnover_pct AS candidateTurnoverPct,
+            candidate_transaction_cost_pct AS candidateTransactionCostPct,
+            candidate_beta AS candidateBeta,
+            candidate_volatility_pct AS candidateVolatilityPct,
+            candidate_liquidity AS candidateLiquidity,
+            candidate_max_sector_weight_pct AS candidateMaxSectorWeightPct,
+            candidate_max_position_weight_pct AS candidateMaxPositionWeightPct,
+            candidate_active_sector_deviation_pct AS candidateActiveSectorDeviationPct,
+            candidate_invested_weight_pct AS candidateInvestedWeightPct,
+            beta_breach AS betaBreach,
+            volatility_breach AS volatilityBreach,
+            sector_breach AS sectorBreach,
+            position_breach AS positionBreach,
+            turnover_breach AS turnoverBreach,
+            objective_breach AS objectiveBreach,
+            weight_distance_breach AS weightDistanceBreach,
+            constraint_breach_count AS constraintBreachCount,
+            source,
+            calculated_at AS calculatedAt
+        FROM stock_optimizer_shadow_snapshot
+        WHERE index_code = #{indexCode}
+          AND candidate_optimizer = #{candidateOptimizer}
+        ORDER BY signal_date DESC
+        LIMIT #{limit}
+    </select>
+
     <select id="findResults" resultType="com.kingyurina.demo.stock.StockBacktestResult">
         SELECT
             r.snapshot_id AS snapshotId,
@@ -223,7 +2246,7 @@
             r.risk_score AS riskScore,
             r.institution_score AS institutionScore,
             r.data_quality_score AS dataQualityScore,
-            p.market_cap AS marketCap,
+            COALESCE(ms.market_cap_usd / 1000000, p.market_cap) AS marketCap,
             r.sector,
             r.calculated_at AS calculatedAt
         FROM stock_signal_backtest_result r
@@ -235,6 +2258,10 @@
            AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
         LEFT JOIN company_profile p
             ON p.symbol = r.symbol
+        LEFT JOIN stock_market_snapshot ms
+            ON ms.index_code = #{indexCode}
+           AND ms.symbol = r.symbol
+           AND ms.snapshot_date = r.signal_date
         ORDER BY r.signal_date DESC, r.symbol, r.horizon_days
         LIMIT #{limit}
     </select>

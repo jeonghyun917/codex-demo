@@ -11,7 +11,7 @@
     <header class="market-topbar">
         <a class="market-logo" th:href="@{/}" href="/">KY</a>
         <nav class="market-nav" aria-label="Global menu">
-            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/quant">Quant</a>
         </nav>
         <form class="market-search" th:action="@{/stocks}" method="get">
             <label for="symbol">Ticker</label>
@@ -23,12 +23,12 @@
     <main class="market-home backtest-page">
         <section class="market-landing backtest-hero">
             <div>
-                <p>Portfolio Backtest v2</p>
+                <p>Portfolio Optimization v5</p>
                 <h1>
-                    <strong>Portfolio v2</strong>
+                    <strong>Portfolio Optimizer</strong>
                     <span>
                         <span th:text="${portfolio.indexCode}">SP500</span>
-                        Signal is tested as an investable portfolio with turnover, costs, drawdown, and benchmark excess return.
+                        Signal is tested as an investable portfolio with explicit beta, volatility, turnover, covariance, cost, drawdown, and benchmark excess return constraints.
                     </span>
                 </h1>
             </div>
@@ -46,12 +46,119 @@
             </article>
         </section>
 
+        <section class="portfolio-health-strip"
+                 th:if="${!#lists.isEmpty(portfolio.healthAlerts)}"
+                 aria-label="Portfolio model health">
+            <article th:each="alert : ${portfolio.healthAlerts}" th:classappend="${alert.tone}">
+                <span th:text="${alert.layer}">Model layer</span>
+                <strong th:text="${alert.status}">normal</strong>
+                <p th:text="${alert.note}">note</p>
+            </article>
+        </section>
+
         <section class="backtest-grid">
             <article class="backtest-panel backtest-panel-wide">
                 <div class="backtest-panel-head">
                     <div>
-                        <p>Risk Model v1</p>
-                        <h2>Portfolio constraints and trailing risk inputs</h2>
+                        <p>Live Quant Portfolio</p>
+                        <h2>Current Signal + Expected Return v8 recommendation</h2>
+                    </div>
+                    <span>Read-only output. No order automation.</span>
+                </div>
+                <div class="portfolio-live-metrics"
+                     th:if="${!#lists.isEmpty(portfolio.liveCards)}">
+                    <div class="portfolio-live-metric" th:each="card : ${portfolio.liveCards}" th:classappend="${card.tone}">
+                        <span th:text="${card.label}">Metric</span>
+                        <strong th:text="${card.value}">0</strong>
+                        <p th:text="${card.note}">note</p>
+                    </div>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.livePositions)}">
+                    Live portfolio positions are not available yet.
+                </p>
+                <div class="backtest-table portfolio-live-position-table"
+                     th:if="${!#lists.isEmpty(portfolio.livePositions)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Rank</span>
+                        <span>Symbol</span>
+                        <span>Sector</span>
+                        <span>Signal</span>
+                        <span>Weight</span>
+                        <span>Expected</span>
+                        <span>Range</span>
+                        <span>Upside</span>
+                        <span>Conf</span>
+                        <span>Beta</span>
+                        <span>Trail Vol</span>
+                        <span>Liquidity</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.livePositions}">
+                        <span th:text="${row.rank}">1</span>
+                        <span>
+                            <b th:text="${row.symbol}">NVDA</b>
+                            <small th:text="${row.name}">NVIDIA Corp</small>
+                        </span>
+                        <span th:text="${row.sector}">Technology</span>
+                        <span th:text="${row.score}">80</span>
+                        <span th:text="${row.weight}">5.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.expectedExcessReturn}">+0.00%</span>
+                        <span th:text="${row.expectedRange}">-</span>
+                        <span th:text="${row.upsideProbability}">50.00%</span>
+                        <span th:text="${row.expectedConfidence}">60 / 100</span>
+                        <span th:text="${row.beta}">1.00</span>
+                        <span th:text="${row.trailingVolatility}">0.00%</span>
+                        <span th:text="${row.liquidity}">$0.0M</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Optimizer Shadow Path Review</p>
+                        <h2>ojAlgo candidates versus Optimized v5 return path</h2>
+                    </div>
+                    <span>Promotion gate: constraints, objective, drift, Sharpe, MDD, excess</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.optimizerShadowPaths)}">
+                    Materialized optimizer shadow path rows are not available.
+                </p>
+                <div class="backtest-table portfolio-optimizer-shadow-path-table"
+                     th:if="${!#lists.isEmpty(portfolio.optimizerShadowPaths)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Candidate</span>
+                        <span>Sample</span>
+                        <span>Pass</span>
+                        <span>Objective</span>
+                        <span>Drift</span>
+                        <span>Sharpe</span>
+                        <span>MDD</span>
+                        <span>Excess</span>
+                        <span>Beta</span>
+                        <span>Turnover</span>
+                        <span>Verdict</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.optimizerShadowPaths}">
+                        <span th:text="${row.candidateOptimizer}">OJALGO_QP_SHADOW_V2</span>
+                        <span th:text="${row.sample}">38 rows</span>
+                        <span th:text="${row.hardPassRate}">80.00%</span>
+                        <span th:text="${row.objectiveGap}">0.00</span>
+                        <span th:text="${row.weightDistance}">0.00%</span>
+                        <span th:text="${row.sharpeDelta}">+0.00</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.drawdownDelta}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessDelta}">+0.00%</span>
+                        <span th:text="${row.betaBreaches}">0</span>
+                        <span th:text="${row.turnoverBreaches}">0</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.verdict}">Watch</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Risk Model + Optimizer</p>
+                        <h2>Portfolio constraints, trailing risk inputs, and beta target</h2>
                     </div>
                     <span>Sector cap, position cap, volatility, liquidity, beta</span>
                 </div>
@@ -66,6 +173,42 @@
                         <span th:text="${row.metric}">Risk</span>
                         <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.value}">0</span>
                         <span th:text="${row.rule}">rule</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Optimizer Validation</p>
+                        <h2>Constraint checks for covariance optimizer candidates</h2>
+                    </div>
+                    <span>Pass, watch, or breach against explicit optimizer limits</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.optimizerValidations)}">
+                    Optimizer validation rows are not available.
+                </p>
+                <div class="backtest-table portfolio-optimizer-validation-table"
+                     th:if="${!#lists.isEmpty(portfolio.optimizerValidations)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Strategy</span>
+                        <span>Horizon</span>
+                        <span>Top N</span>
+                        <span>Objective</span>
+                        <span>Target</span>
+                        <span>Observed</span>
+                        <span>Gap</span>
+                        <span>Verdict</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${portfolio.optimizerValidations}">
+                        <span th:text="${row.strategy}">Top 20 Signal / Optimized v5</span>
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.topCount}">20</span>
+                        <span th:text="${row.objective}">Beta target</span>
+                        <span th:text="${row.target}">0.95</span>
+                        <span th:text="${row.observed}">1.00</span>
+                        <span th:text="${row.gap}">+0.00</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.verdict}">Pass</span>
                     </div>
                 </div>
             </article>
@@ -101,6 +244,7 @@
                         <span>Beat</span>
                         <span>Turnover</span>
                         <span>Avg Cost</span>
+                        <span>Invested</span>
                         <span>Max Sector</span>
                         <span>Max Position</span>
                         <span>Avg Beta</span>
@@ -125,6 +269,7 @@
                         <span th:text="${row.benchmarkBeatRate}">0.00%</span>
                         <span th:text="${row.averageTurnover}">0.00%</span>
                         <span th:text="${row.averageTransactionCost}">0.00%</span>
+                        <span th:text="${row.averageInvestedWeight}">100.00%</span>
                         <span th:text="${row.averageMaxSectorWeight}">0.00%</span>
                         <span th:text="${row.averageMaxPositionWeight}">0.00%</span>
                         <span th:text="${row.averageBeta}">1.00</span>
@@ -138,17 +283,18 @@
                 <div class="backtest-panel-head">
                     <div>
                         <p>Risk Impact Review</p>
-                        <h2>Risk-controlled strategy versus matching Base strategy</h2>
+                        <h2>Controlled and optimized strategies versus matching Base strategy</h2>
                     </div>
                     <span>Positive MDD delta means drawdown improved</span>
                 </div>
                 <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.riskImpacts)}">
-                    No matching Base and Risk-controlled strategy pairs are available.
+                    No matching Base and controlled strategy pairs are available.
                 </p>
                 <div class="backtest-table portfolio-risk-impact-table"
                      th:if="${!#lists.isEmpty(portfolio.riskImpacts)}">
                     <div class="backtest-row backtest-head">
                         <span>Strategy</span>
+                        <span>Risk</span>
                         <span>Horizon</span>
                         <span>Top N</span>
                         <span>Weighting</span>
@@ -162,6 +308,7 @@
                     </div>
                     <div class="backtest-row" th:each="row : ${portfolio.riskImpacts}">
                         <span th:text="${row.strategy}">Top 20 Signal</span>
+                        <span th:text="${row.riskModel}">Optimized</span>
                         <span th:text="${row.horizon}">20D</span>
                         <span th:text="${row.topCount}">20</span>
                         <span th:text="${row.weighting}">Signal weight</span>
@@ -182,7 +329,7 @@
                         <p>Selected Strategy Path</p>
                         <h2>Recent rebalance periods</h2>
                     </div>
-                    <span>Default detail: Top 20 Signal weight / Risk controlled, 20D</span>
+                    <span>Default detail: Top 20 Signal weight / Optimized v5, 20D</span>
                 </div>
                 <p class="backtest-empty" th:if="${#lists.isEmpty(portfolio.recentPeriods)}">
                     No rebalance periods are available.
@@ -198,10 +345,11 @@
                         <span>Net</span>
                         <span>Benchmark</span>
                     <span>Excess</span>
-                    <span>Turnover</span>
-                    <span>Cost</span>
-                    <span>Beta</span>
-                    <span>Trail Vol</span>
+                        <span>Turnover</span>
+                        <span>Cost</span>
+                        <span>Cash</span>
+                        <span>Beta</span>
+                        <span>Trail Vol</span>
                     <span>Liquidity</span>
                     <span>Equity</span>
                     <span>Bench Equity</span>
@@ -217,6 +365,7 @@
                         <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessReturn}">+0.00%</span>
                         <span th:text="${row.turnover}">0.00%</span>
                         <span th:text="${row.transactionCost}">0.00%</span>
+                        <span th:text="${row.cashWeight}">0.00%</span>
                         <span th:text="${row.beta}">1.00</span>
                         <span th:text="${row.trailingVolatility}">0.00%</span>
                         <span th:text="${row.liquidity}">$0.0M</span>
@@ -273,6 +422,10 @@
                         <span>Sector</span>
                         <span>Signal</span>
                         <span>Weight</span>
+                        <span>Expected</span>
+                        <span>Range</span>
+                        <span>Upside</span>
+                        <span>Conf</span>
                         <span>Forward</span>
                         <span>Beta</span>
                         <span>Trail Vol</span>
@@ -287,6 +440,10 @@
                         <span th:text="${row.sector}">Technology</span>
                         <span th:text="${row.score}">70</span>
                         <span th:text="${row.weight}">5.00%</span>
+                        <span th:text="${row.expectedExcessReturn}">+0.00%</span>
+                        <span th:text="${row.expectedRange}">-2.00% / +1.00% / +4.00%</span>
+                        <span th:text="${row.upsideProbability}">50.00%</span>
+                        <span th:text="${row.expectedConfidence}">70 / 100</span>
                         <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.forwardReturn}">+0.00%</span>
                         <span th:text="${row.beta}">1.00</span>
                         <span th:text="${row.trailingVolatility}">0.00%</span>
@@ -311,7 +468,7 @@
     </main>
 
     <footer class="market-footer">
-        <span>Portfolio backtest v2</span>
+        <span>Portfolio optimization v5</span>
         <span th:text="${portfolio.benchmarkLabel}">benchmark</span>
         <span th:text="${portfolio.costAssumption}">cost</span>
     </footer>

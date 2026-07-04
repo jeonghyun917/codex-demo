@@ -11,7 +11,7 @@
     <header class="market-topbar">
         <a class="market-logo" th:href="@{/}" href="/">KY</a>
         <nav class="market-nav" aria-label="Global menu">
-            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/quant">Quant</a>
         </nav>
         <form class="market-search" th:action="@{/stocks}" method="get">
             <label for="symbol">Ticker</label>
@@ -163,6 +163,160 @@
             <article class="backtest-panel backtest-panel-wide">
                 <div class="backtest-panel-head">
                     <div>
+                        <p>Regime Factor Diagnostics</p>
+                        <h2>시장 국면별 Factor 검증</h2>
+                    </div>
+                    <span>Risk-on / Neutral / Risk-off별 20D 초과수익, IC, Hit, High-Low spread</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.regimeFactorDiagnostics)}">
+                    Regime별 factor 기여도와 백테스트 결과를 매칭할 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table regime-factor-table"
+                     th:if="${!#lists.isEmpty(backtest.regimeFactorDiagnostics)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Regime</span>
+                        <span>Factor</span>
+                        <span>표본</span>
+                        <span>평균 기여</span>
+                        <span>Hit</span>
+                        <span>IC</span>
+                        <span>High</span>
+                        <span>High 초과</span>
+                        <span>Low</span>
+                        <span>Low 초과</span>
+                        <span>Spread</span>
+                        <span>판정</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.regimeFactorDiagnostics}">
+                        <span th:text="${row.regime}">Risk-on</span>
+                        <span th:text="${row.factor}">Momentum</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.avgContribution}">+0.00%</span>
+                        <span th:text="${row.hitRate}">-</span>
+                        <span th:text="${row.ic}">-</span>
+                        <span th:text="${row.highCount}">0</span>
+                        <span th:text="${row.highExcessReturn}">-</span>
+                        <span th:text="${row.lowCount}">0</span>
+                        <span th:text="${row.lowExcessReturn}">-</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.spread}">-</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.decision}">유지/관찰</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Expected Return Calibration</p>
+                        <h2>예상 초과수익 구간별 실제 성과</h2>
+                    </div>
+                    <span>EXPECTED_RETURN_V9 예측값을 같은 날짜 universe 평균 대비 실제 초과수익과 비교합니다.</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.expectedExcessCalibrations)}">
+                    예상 초과수익 calibration에 필요한 EXPECTED_RETURN_V9와 완료된 forward return 매칭 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table expected-calibration-table"
+                     th:if="${!#lists.isEmpty(backtest.expectedExcessCalibrations)}">
+                    <div class="backtest-row backtest-head">
+                        <span>기간</span>
+                        <span>예상 초과수익</span>
+                        <span>표본</span>
+                        <span>예측 평균</span>
+                        <span>실제 평균</span>
+                        <span>오차</span>
+                        <span>Hit</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.expectedExcessCalibrations}">
+                        <span th:text="${row.horizon}">20D</span>
+                        <span th:text="${row.bucket}">0% ~ +1%</span>
+                        <span th:text="${row.sampleCount}">0</span>
+                        <span th:text="${row.averageExpectedExcess}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.averageActualExcess}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.error}">+0.00%</span>
+                        <span th:text="${row.hitRate}">50.00%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Live-like Performance Review</p>
+                        <h2>월별 Expected Return v8 상위 종목 성과</h2>
+                    </div>
+                    <span>각 signal date의 EXPECTED_RETURN_V9 상위 10%를 골라 20D 실제 수익률을 universe 평균과 비교합니다.</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.monthlyModelPerformance)}">
+                    월별 실전 검증에 필요한 EXPECTED_RETURN_V9와 20D forward return 매칭 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table monthly-performance-table"
+                     th:if="${!#lists.isEmpty(backtest.monthlyModelPerformance)}">
+                    <div class="backtest-row backtest-head">
+                        <span>월</span>
+                        <span>Signal Dates</span>
+                        <span>선택 종목</span>
+                        <span>Benchmark</span>
+                        <span>Model Top</span>
+                        <span>초과수익</span>
+                        <span>Hit</span>
+                        <span>예상 초과</span>
+                        <span>신뢰도</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.monthlyModelPerformance}">
+                        <span th:text="${row.month}">2026-01</span>
+                        <span th:text="${row.signalDates}">0</span>
+                        <span th:text="${row.selectedCount}">0</span>
+                        <span th:text="${row.benchmarkReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.modelReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessReturn}">+0.00%</span>
+                        <span th:text="${row.hitRate}">50.0%</span>
+                        <span th:text="${row.averageExpectedExcess}">+0.00%</span>
+                        <span th:text="${row.confidence}">60.0%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Quarterly Performance Review</p>
+                        <h2>분기별 Expected Return v8 상위 종목 성과</h2>
+                    </div>
+                    <span>월별 표본의 노이즈를 줄이기 위해 분기 단위로 Model Top 성과와 benchmark 초과수익을 다시 검수합니다.</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.quarterlyModelPerformance)}">
+                    분기별 실전 검증에 필요한 EXPECTED_RETURN_V9와 20D forward return 매칭 표본이 아직 부족합니다.
+                </p>
+                <div class="backtest-table monthly-performance-table"
+                     th:if="${!#lists.isEmpty(backtest.quarterlyModelPerformance)}">
+                    <div class="backtest-row backtest-head">
+                        <span>분기</span>
+                        <span>Signal Dates</span>
+                        <span>선택 종목</span>
+                        <span>Benchmark</span>
+                        <span>Model Top</span>
+                        <span>초과수익</span>
+                        <span>Hit</span>
+                        <span>예상 초과</span>
+                        <span>신뢰도</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.quarterlyModelPerformance}">
+                        <span th:text="${row.month}">2026-Q1</span>
+                        <span th:text="${row.signalDates}">0</span>
+                        <span th:text="${row.selectedCount}">0</span>
+                        <span th:text="${row.benchmarkReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.modelReturn}">+0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.excessReturn}">+0.00%</span>
+                        <span th:text="${row.hitRate}">50.0%</span>
+                        <span th:text="${row.averageExpectedExcess}">+0.00%</span>
+                        <span th:text="${row.confidence}">60.0%</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
                         <p>Candle Coverage</p>
                         <h2>일봉 커버리지 검수</h2>
                     </div>
@@ -264,7 +418,7 @@
                         <p>Walk-forward Backtest</p>
                         <h2>과거 학습 / 다음 연도 검증</h2>
                     </div>
-                    <span>WALK_FORWARD_V1/V2는 검증 연도 이전 데이터만 사용해 가중치를 산출합니다.</span>
+                    <span>WALK_FORWARD_V1/V2와 REGIME_V1은 검증 연도 이전 데이터와 macro regime만 사용합니다.</span>
                 </div>
                 <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.walkForwardProfiles)}">
                     Walk-forward 검증에 필요한 연도별 백테스트 표본이 아직 부족합니다.
@@ -306,7 +460,7 @@
                         <p>Profile A/B Backtest</p>
                         <h2>DEFAULT vs 후보 프로필</h2>
                     </div>
-                    <span>BACKTEST_V1/V2는 비활성 후보이며 live Signal에는 미적용</span>
+                    <span>BACKTEST_V1/V2/REGIME_V1은 비활성 후보이며 live Signal에는 미적용</span>
                 </div>
                 <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.profileComparisons)}">
                     Profile 비교에 필요한 백테스트 결과가 아직 없습니다.
@@ -347,7 +501,7 @@
                         <p>Weight Profile Items</p>
                         <h2>Factor 가중치 구성</h2>
                     </div>
-                    <span>DEFAULT는 기준, BACKTEST_V1/V2는 검증용 후보</span>
+                    <span>DEFAULT는 기준, BACKTEST_V1/V2/REGIME_V1은 검증용 후보</span>
                 </div>
                 <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.weightProfileItems)}">
                     저장된 Weight Profile item이 아직 없습니다.
@@ -367,6 +521,38 @@
                         <span th:text="${row.weight}">18.0%</span>
                         <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.state}">유지</span>
                         <span th:text="${row.reason}">-</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="backtest-panel backtest-panel-wide">
+                <div class="backtest-panel-head">
+                    <div>
+                        <p>Regime-aware Weights</p>
+                        <h2>REGIME_V1 국면별 factor 가중치</h2>
+                    </div>
+                    <span>Signal date의 Risk-on / Neutral / Risk-off 국면에 따라 factor weight를 다르게 적용합니다.</span>
+                </div>
+                <p class="backtest-empty" th:if="${#lists.isEmpty(backtest.regimeWeightItems)}">
+                    Regime-aware 후보 프로필이 아직 없습니다.
+                </p>
+                <div class="backtest-table regime-weight-table"
+                     th:if="${!#lists.isEmpty(backtest.regimeWeightItems)}">
+                    <div class="backtest-row backtest-head">
+                        <span>Regime</span>
+                        <span>Factor</span>
+                        <span>Base</span>
+                        <span>Regime</span>
+                        <span>차이</span>
+                        <span>상태</span>
+                    </div>
+                    <div class="backtest-row" th:each="row : ${backtest.regimeWeightItems}">
+                        <span th:text="${row.regime}">Risk-on</span>
+                        <span th:text="${row.factor}">Momentum</span>
+                        <span th:text="${row.baseWeight}">0.00%</span>
+                        <span th:text="${row.regimeWeight}">0.00%</span>
+                        <span class="backtest-return" th:classappend="${row.tone}" th:text="${row.delta}">+0.00%</span>
+                        <span class="backtest-badge" th:classappend="${row.tone}" th:text="${row.state}">유지</span>
                     </div>
                 </div>
             </article>

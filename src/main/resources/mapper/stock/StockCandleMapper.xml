@@ -32,15 +32,15 @@
         LIMIT #{limit}
     </select>
 
-    <insert id="upsertBatch">
-        INSERT INTO stock_candle_daily (
-            symbol, trade_date, open_price, high_price, low_price, close_price, volume, source
+    <insert id="upsertSourceBatch">
+        INSERT INTO stock_candle_daily_source (
+            symbol, trade_date, source, open_price, high_price, low_price, close_price, volume
         )
         VALUES
         <foreach collection="items" item="item" separator=",">
             (
-                #{item.symbol}, #{item.tradeDate}, #{item.openPrice}, #{item.highPrice}, #{item.lowPrice},
-                #{item.closePrice}, #{item.volume}, #{item.source}
+                #{item.symbol}, #{item.tradeDate}, COALESCE(NULLIF(#{item.source}, ''), 'UNKNOWN'),
+                #{item.openPrice}, #{item.highPrice}, #{item.lowPrice}, #{item.closePrice}, #{item.volume}
             )
         </foreach>
         ON DUPLICATE KEY UPDATE
@@ -49,7 +49,105 @@
             low_price = VALUES(low_price),
             close_price = VALUES(close_price),
             volume = VALUES(volume),
-            source = VALUES(source),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_candle_daily (
+            symbol, trade_date, open_price, high_price, low_price, close_price, volume, source
+        )
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.symbol}, #{item.tradeDate}, #{item.openPrice}, #{item.highPrice}, #{item.lowPrice},
+                #{item.closePrice}, #{item.volume}, COALESCE(NULLIF(#{item.source}, ''), 'UNKNOWN')
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            open_price = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(open_price) ELSE open_price END,
+            high_price = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(high_price) ELSE high_price END,
+            low_price = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(low_price) ELSE low_price END,
+            close_price = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(close_price) ELSE close_price END,
+            volume = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(volume) ELSE volume END,
+            source = CASE WHEN
+                CASE UPPER(COALESCE(VALUES(source), ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END &gt;= CASE UPPER(COALESCE(source, ''))
+                    WHEN 'YAHOO-CHART' THEN 100
+                    WHEN 'STOOQ' THEN 80
+                    WHEN 'TOSS' THEN 60
+                    WHEN 'FINNHUB' THEN 10
+                    ELSE 0
+                END THEN VALUES(source) ELSE source END,
             updated_at = CURRENT_TIMESTAMP
     </insert>
 </mapper>

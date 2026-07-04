@@ -11,7 +11,7 @@
     <header class="market-topbar">
         <a class="market-logo" th:href="@{/}" href="/">KY</a>
         <nav class="market-nav" aria-label="Global menu">
-            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/quant">Quant</a>
         </nav>
         <form class="market-search" th:action="@{/stocks}" method="get">
             <label for="symbol">Ticker</label>
@@ -139,7 +139,7 @@
     </main>
 
     <footer class="market-footer">
-        <span>S&amp;P 500 dashboard</span>
+        <span>S&amp;P 500 Quant</span>
         <span th:text="${market.aggregateMarketCap}">market cap</span>
         <span th:text="${market.averageChange}">change</span>
     </footer>

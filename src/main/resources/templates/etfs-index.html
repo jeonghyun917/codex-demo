@@ -15,7 +15,7 @@
                th:href="${menu.href}"
                th:text="${menu.label}"
                th:classappend="${menu.href == '/etfs'} ? 'active' : ''"
-               href="/">Dashboard</a>
+               href="/quant">Quant</a>
         </nav>
         <form class="market-search" th:action="@{/etfs}" method="get">
             <label for="symbol">ETF</label>
@@ -125,7 +125,7 @@
     </main>
 
     <footer class="market-footer">
-        <span>ETF dashboard</span>
+        <span>ETF Quant</span>
         <span th:text="${market.averageExpense}">expense</span>
         <span th:text="${market.averageChange}">change</span>
     </footer>

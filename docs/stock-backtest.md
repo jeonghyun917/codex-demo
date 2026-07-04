@@ -92,6 +92,14 @@ Signal refresh flow:
 3. Save `stock_signal_latest`.
 4. Save `stock_signal_snapshot`.
 5. Ask `StockBacktestService` to fill any completed forward-return rows.
+6. Refresh stored risk snapshots for backtest dates.
+7. Refresh current-day live Expected Return rows from `stock_signal_latest` for `SP500`, `NASDAQ100`, and `DOW30`.
+
+Historical Expected Return recalculation and calibration are intentionally not part of normal Signal refresh. They are batch jobs because they scan many historical rows and should not block ordinary page freshness.
+
+Normal Signal refresh does update the lightweight live Expected Return rows for all three Quant universes. This keeps `/quant` from showing a complete Signal column but missing `20D expected`, `upside probability`, or `model confidence` for Nasdaq 100 and Dow 30 constituents.
+
+When a dedicated batch flag is enabled, the startup and scheduled Signal refresh jobs are skipped. This prevents long-running risk, market snapshot, covariance, expected-return, or Toss collection batches from competing with the normal Signal refresh loop.
 
 ### HistoricalBacktestSeedService
 
@@ -155,9 +163,9 @@ Portfolio v1 strategy grid:
 - Holding horizons: 20D and 60D
 - Portfolio sizes: Top 10, Top 20, Top 50
 - Weight methods: equal weight, Signal weight, market-cap adjusted weight
-- Risk modes: Base and Risk controlled
+- Risk modes: Base, Risk controlled, Optimized
 - Transaction cost: dynamic traded-notional cost
-- Benchmark: same-date S&P 500 current-constituent market-cap weighted proxy
+- Benchmark: same-date S&P 500 current-constituent market-cap weighted proxy, using `stock_market_snapshot` when available
 
 Risk Model v1 adds a second portfolio construction path without changing live Signal:
 
@@ -167,7 +175,7 @@ Risk Model v1 adds a second portfolio construction path without changing live Si
 - Position concentration is limited with an 8% cap, or 12% for Top 10 portfolios.
 - Trailing volatility uses 126 daily returns from `stock_candle_daily`.
 - Liquidity uses trailing 63D average dollar volume.
-- Beta uses trailing 126D covariance against an equal-weight universe return proxy.
+- Beta uses trailing 126D covariance against `stock_benchmark_return_series` when available.
 
 Risk-controlled portfolios may hold implicit cash when all selected names or sectors hit their caps. This is intentional in v1 because forcing 100% investment can break the risk constraints.
 
@@ -178,9 +186,133 @@ Portfolio Backtest v2 adds a more realistic cost and comparison layer:
 - Liquidity impact increases cost when trailing 63D average dollar volume is low.
 - Volatility impact increases cost when trailing 126D volatility is high.
 - Beta impact increases cost for high-beta names.
-- `Risk Impact Review` pairs every Risk-controlled strategy with the matching Base strategy.
+- `Risk Impact Review` pairs every Risk-controlled and Optimized strategy with the matching Base strategy.
 - The review compares Sharpe delta, MDD delta, beta delta, sector concentration delta, cost delta, and excess return delta.
-- Positive MDD delta means drawdown improved because the Risk-controlled MDD is less negative than Base.
+- Positive MDD delta means drawdown improved because the controlled or optimized MDD is less negative than Base.
+- Strategy Comparison now exposes average invested weight, and Selected Strategy Path exposes cash weight per rebalance. This prevents a risk-controlled result from looking better without showing that part of the portfolio was held as cash.
+- Sharpe is calculated as `(annualized portfolio return - configured annual risk-free rate) / annualized volatility`. The current configurable rate is `quant.portfolio.risk-free-rate-pct`, defaulting to 0 until point-in-time rate snapshots are collected.
+
+Portfolio Optimization adds two optimizer construction paths:
+
+- `Optimized` keeps the same Top N validation frame, but final weights are recalculated by an optimizer heuristic.
+- Signal score is treated as the alpha proxy.
+- Target beta is 0.95.
+- High volatility, weak liquidity, high beta, and high estimated trading cost reduce target weight.
+- Existing holdings get a small continuity boost to reduce unnecessary turnover.
+- After initial weights are calculated, the same sector and position caps are applied.
+- A final beta-tilt step shifts small weight increments from high-beta names to lower-beta names when capacity exists.
+- `Optimized v2` starts from the same heuristic optimizer, then uses stored pairwise correlation snapshots to reduce crowding in highly correlated holdings.
+- `Optimized v3` starts from the v2 weights and then runs an explicit local-search optimizer.
+- The v3 objective penalizes beta distance from 0.95, annualized volatility above 24%, covariance concentration, turnover above the strategy budget, sector cap violations, position cap violations, and excessive cash.
+- The v3 objective also penalizes active sector deviation against the same-date benchmark sector mix. This is stricter than a raw sector cap because it controls benchmark-relative sector bets.
+- The v3/v4/v5 objectives also keep an alpha reward from Signal and the latest expected-return model so risk reduction does not blindly destroy expected return.
+- `Optimized v4` starts from the same constrained portfolio and then runs a projected-gradient covariance objective.
+- The v4 objective keeps the same beta, volatility, turnover, sector, position, active-sector, and alpha constraints, but directly optimizes the covariance objective instead of only using local-search swaps.
+- `Optimized v5` keeps the v4 covariance objective, then runs a multi-start projected-gradient search from signal, low-risk, sector-balanced, and previous-position seeds.
+- The v5 objective adds stricter penalties for active-sector deviation, under-investment, turnover-budget breaches, covariance-tail volatility, and single-name concentration. It is the default portfolio recommendation engine.
+- Turnover budgets are Top 10: 45%, Top 20: 35%, Top 50: 28% one-way turnover per rebalance.
+- Active sector deviation limit is 12 percentage points from the same-date universe benchmark sector weight.
+- When turnover pressure is too high, v3/v4/v5 can leave more cash instead of forcing trades that violate the budget.
+
+Optimization v5 is still intentionally conservative. It is a deterministic multi-start projected-gradient optimizer over stored covariance snapshots, not an external global quadratic-programming solver. This gives a stronger covariance-aware optimizer while keeping the implementation inspectable and dependency-free. A future external QP solver can replace this layer after dependency and numerical behavior are validated.
+
+External QP solver review:
+
+- Candidate: `org.ojalgo:ojalgo`. The project describes ojAlgo as pure Java optimisation code with LP, QP, and MIP solvers and zero dependencies.
+- Candidate: HiGHS. It has convex QP support, but the primary implementation is native/C++ and would add packaging/runtime complexity for this Windows/Spring Boot app.
+- Maven Central metadata lists `org.ojalgo:ojalgo:57.0.0` as latest/release as of the 2026-06-27 review.
+- `pom.xml` includes `org.ojalgo:ojalgo:57.0.0`.
+- `OjAlgoPortfolioOptimizerRegressionTest` runs a first side-by-side regression: ojAlgo QP must produce feasible weights and an objective no worse than the local projected-gradient baseline on a bounded portfolio problem.
+- `/signals/portfolio` now runs an ojAlgo shadow solve for the primary Top 20 / 20D stored-covariance input. The result is not used for production weights; it is shown only in Optimizer Validation as objective gap, weight distance, beta, volatility, sector cap, position cap, and turnover checks.
+- `stock_optimizer_shadow_snapshot` materializes ojAlgo shadow rows by historical rebalance date. The one-off batch is:
+
+```powershell
+java "-Dspring.profiles.active=mariadb" -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.optimizer-shadow.enabled=true --app.batch.optimizer-shadow.exit-on-complete=true --app.batch.optimizer-shadow.index-code=SP500 --app.batch.optimizer-shadow.result-limit=100000 --app.batch.optimizer-shadow.date-limit=0
+```
+
+- `/signals/portfolio` reads the materialized rows and shows hard-constraint pass rate, objective-worse rate, weight drift, Sharpe delta, MDD delta, and excess-return delta. Hard constraints are beta, volatility, sector cap, position cap, and turnover. Objective gap and weight distance are promotion diagnostics, not hard constraints.
+- Current v1 validation result on the local SP500 dataset: 38 historical rows, 38 usable solves, 28 hard-constraint passes (73.68%), average objective gap +23.2989, average weight distance 21.06%, beta breaches 5, turnover breaches 6, objective worse 38.
+- `OJALGO_QP_SHADOW_V2` is a second shadow candidate, not a production optimizer. It keeps the same budget, sector cap, and position cap constraints as v1, then adds soft quadratic penalties directly inside the ojAlgo objective for beta target deviation, turnover away from prior weights, active-sector deviation from benchmark sector weights, and single-name concentration. This makes the shadow QP closer to the production v5 objective while still remaining side-by-side validation only.
+- The optimizer-shadow batch writes both `OJALGO_QP_SHADOW_V1` and `OJALGO_QP_SHADOW_V2` rows for the same historical rebalance dates. `/signals/portfolio` reports the materialized diagnostics by candidate optimizer so v2 can only be promoted if its own hard-pass rate, objective gap, return path, and drift are better than v1 and not worse than v5.
+- Current v2 validation result on the local SP500 dataset: 38 historical rows, 38 usable solves, 31 hard-constraint passes (81.58%), average objective gap +3.0592, average weight distance 13.06%, beta breaches 0, turnover breaches 7, objective worse 14. Decision: keep `Optimized v5` as the production baseline for now, but v2 is a stronger shadow candidate than v1 and is eligible for broader return-path validation.
+- `/signals/portfolio` includes `Optimizer Shadow Path Review`, which compresses each shadow candidate into a promotion row: sample depth, hard-pass rate, average objective gap, weight drift, Sharpe delta, MDD delta, excess-return delta, beta breaches, turnover breaches, and promotion verdict. A candidate can show `V6 candidate` only when sample depth, constraints, objective quality, drift, and return path all pass the current conservative gate.
+- Acceptance gate before replacing v5: `mvn test/package` repeatability, same input producing stable weights, sector/position/turnover constraints never violated after rounding, and walk-forward Sharpe/MDD not worse than v5.
+
+Expected Return Model v8:
+
+- `stock_expected_return_snapshot` stores expected return, expected excess return, downside risk, and confidence by index, signal date, symbol, and horizon.
+- v2 adds 10% / 50% / 90% return quantiles so the optimizer and UI can show a range instead of only one average estimate.
+- v2 stores `calibrated_upside_probability_pct`, which shrinks raw hit-rate estimates toward the local base rate according to model confidence.
+- v3 stores factor exposure snapshots in `stock_factor_exposure_snapshot`.
+- v3 stores 20D factor-level alpha contribution in `stock_expected_return_factor_contribution`.
+- v3 starts from the v2 score/sector calibrated baseline, then applies walk-forward factor coefficients learned only from rows where `training.signal_date < target.signal_date`.
+- v3 caps expected excess return by horizon to avoid overconfident long-horizon outliers.
+- v4 adds market-regime conditioning. It blends global, sector, same-regime, and sector-within-regime factor coefficients so the same factor can carry different expected alpha in `RISK_ON`, `NEUTRAL`, and `RISK_OFF` regimes.
+- Historical v4 rows use `source = REGIME_FACTOR_EXPOSURE_WALK_FORWARD_V4`; current-day live rows use `source = LIVE_REGIME_FACTOR_EXPOSURE_EXPECTED_RETURN_V4`.
+- v5 adds conservative nonlinear factor interactions, such as `QUALITY_X_MOMENTUM`, `VALUE_X_QUALITY`, `GROWTH_X_MOMENTUM`, `RISK_X_MOMENTUM`, and `VALUE_X_RISK`.
+- Historical v5 rows use `source = REGIME_NONLINEAR_INTERACTION_WALK_FORWARD_V5`; current-day live rows use `source = LIVE_REGIME_NONLINEAR_INTERACTION_EXPECTED_RETURN_V5`.
+- v5 remains capped and walk-forward trained. It is an interaction-adjusted rank model, not an unconstrained machine-learning forecast.
+- v6 starts from v5, then shrinks expected return, upside probability, and confidence using historical calibration-bucket error, sample depth, sector sample depth, and data quality.
+- Historical v6 rows use `source = CALIBRATION_STABILIZED_EXPECTED_RETURN_V6`; current-day live rows use `source = LIVE_CALIBRATION_STABILIZED_EXPECTED_RETURN_V6`.
+- v7 starts from v6, then applies horizon-specific decay and probability shrinkage so short, medium, and longer horizon opinions are independently conservative.
+- Historical v7 rows use `source = HORIZON_DECAY_STABILIZED_EXPECTED_RETURN_V7`; current-day live rows use `source = LIVE_HORIZON_DECAY_STABILIZED_EXPECTED_RETURN_V7`.
+- `stock_macro_feature_snapshot` stores daily FRED macro features derived from `stock_macro_vintage_snapshot`: 3-month rate, 10-year rate, yield spread, federal funds rate, CPI YoY/MoM, unemployment, VIX, and broad dollar index.
+- v8 starts from v7, then applies a conservative macro adjustment based on FRED macro feature score, yield-curve inversion, VIX stress, and dollar strength.
+- Historical v8 rows use `source = FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8`; current-day live rows use `source = LIVE_FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8`.
+- v8 keeps v7's explainability baseline by copying factor contribution rows, then separately exposes macro adjustment through the model version/source and macro feature health rows.
+- `StockExpectedReturnBatchRunner` accepts either `app.batch.expected-return.index-code` or comma-separated `app.batch.expected-return.index-codes`. The default multi-index batch target is `SP500,NASDAQ100,DOW30`.
+- Regime Factor Diagnostics validates the v4/v5 idea after the fact by matching stored factor contributions to realized 20D excess returns inside each market regime.
+- Expected Return Calibration validates expected return probabilities by bucketing stored v8 upside probabilities and comparing each bucket with realized same-date universe outcomes.
+- `stock_expected_return_calibration` stores bucket-level predicted upside probability versus realized excess-return hit rate.
+- Calibration buckets with fewer than 200 samples are excluded because small buckets can create misleading error numbers.
+- `/signals/backtest` also shows monthly and quarterly Model Performance. For each historical signal date, it selects the top 10% of symbols by the production expected-return layer, measures realized 20D forward return, and compares it with the same-date universe average. This is a live-like validation layer for "would the model have picked better names in that period?"
+- Calibration quality is shown in `/signals/portfolio` through average absolute calibration error and Brier score.
+- The portfolio optimizer uses calibrated upside probability first, then falls back to raw upside probability only when calibration is missing.
+- Expected-return snapshots are validation inputs, not live trading commands.
+- V6/V7/V8 factor contribution rows are copied from the prior explainability baseline with SQL `INSERT ... SELECT` bulk paths. V7 deliberately stabilizes the forecast layer, and v8 adds macro adjustment while preserving the same factor explanation baseline, so repeated historical refreshes do not loop row-by-row through every contribution.
+
+### Quant Opinion v2
+
+`StockQuantOpinionService` builds the stock-detail Quant Opinion panel from stored data only. It does not call external APIs during page rendering.
+
+Inputs:
+
+- `stock_signal_latest`: integrated Signal score and factor scores.
+- `stock_data_quality_latest`: data quality guardrail score.
+- `stock_expected_return_snapshot`: latest `EXPECTED_RETURN_V9` rows for the symbol, falling back to v8, v7, v6, v5, v4, v3, and then v2 when newer models are missing, with 20D as the primary horizon.
+- `stock_expected_return_factor_contribution`: latest v6, v5, v4, or v3 20D factor contribution rows for explainability.
+- `stock_risk_snapshot`: latest beta, trailing volatility, and average dollar volume for portfolio-fit interpretation.
+- When a symbol belongs to multiple stored index universes, stock detail pages choose expected-return rows by universe priority: `SP500`, then `NASDAQ100`, then `DOW30`. This avoids mixing duplicate factor contributions for the same symbol/date/horizon.
+
+The opinion combines:
+
+- 20D expected excess return.
+- Calibrated upside probability.
+- Downside probability and drawdown risk.
+- Stored Signal score.
+- Data quality score.
+- Expected-return model confidence.
+- Snapshot freshness.
+
+Output labels are `Attractive`, `Neutral`, or `Caution`. The panel also shows return range, 5D/20D/60D horizon opinions, portfolio fit, factor contribution, conflict interpretation, and data quality or freshness warnings. Conflict interpretation explains cases such as high expected return with weak Signal, strong Signal with weak 20D alpha, elevated downside risk, low confidence, or Risk-off macro pressure.
+
+Current-day live inference:
+
+- The panel uses the latest stored `EXPECTED_RETURN_V9` snapshot per symbol, falling back to `EXPECTED_RETURN_V8`, `EXPECTED_RETURN_V7`, `EXPECTED_RETURN_V6`, `EXPECTED_RETURN_V5`, `EXPECTED_RETURN_V4`, `EXPECTED_RETURN_V3`, and then `EXPECTED_RETURN_V2` when needed. The 20D horizon is the primary opinion horizon.
+- Historical reconstructed v3 rows keep `source = FACTOR_EXPOSURE_WALK_FORWARD_V3`.
+- Current-day v3 prediction rows are generated from `stock_signal_latest` and stored with `source = LIVE_FACTOR_EXPOSURE_EXPECTED_RETURN_V3`.
+- Historical reconstructed v4 rows keep `source = REGIME_FACTOR_EXPOSURE_WALK_FORWARD_V4`.
+- Current-day v4 prediction rows are generated from `stock_signal_latest` and stored with `source = LIVE_REGIME_FACTOR_EXPOSURE_EXPECTED_RETURN_V4`.
+- Historical reconstructed v5 rows keep `source = REGIME_NONLINEAR_INTERACTION_WALK_FORWARD_V5`.
+- Current-day v5 prediction rows are generated from `stock_signal_latest` and stored with `source = LIVE_REGIME_NONLINEAR_INTERACTION_EXPECTED_RETURN_V5`.
+- Historical reconstructed v6 rows keep `source = CALIBRATION_STABILIZED_EXPECTED_RETURN_V6`.
+- Current-day v6 prediction rows are generated from current-day v5 rows and stored with `source = LIVE_CALIBRATION_STABILIZED_EXPECTED_RETURN_V6`.
+- Historical reconstructed v7 rows keep `source = HORIZON_DECAY_STABILIZED_EXPECTED_RETURN_V7`.
+- Current-day v7 prediction rows are generated from current-day v6 rows and stored with `source = LIVE_HORIZON_DECAY_STABILIZED_EXPECTED_RETURN_V7`.
+- Historical reconstructed v8 rows keep `source = FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8`.
+- Current-day v8 prediction rows are generated from current-day v7 rows and stored with `source = LIVE_FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8`.
+- Live rows do not update calibration buckets because they do not have realized forward returns yet. Calibration remains trained only from completed historical backtest results.
+- If no live row exists or the latest expected-return snapshot is old, the service lowers the opinion score and shows a freshness warning.
 
 Metrics:
 
@@ -200,10 +332,154 @@ Metrics:
 - Average trailing portfolio volatility
 - Average trailing dollar-volume liquidity
 
+Point-in-time market snapshot:
+
+- `stock_market_snapshot` stores daily `index_code + symbol + snapshot_date` rows.
+- It stores close price, volume, sector, exchange, market, currency, shares outstanding, market cap, and source labels.
+- True PIT shares from `stock_shares_outstanding_snapshot` are used first when available.
+- Toss `sharesOutstanding` is used after PIT shares.
+- Finnhub `share_outstanding` is used as a fallback and is converted from million shares to shares.
+- If shares are unavailable, current Finnhub market cap is the last fallback.
+- `market_cap_source` distinguishes PIT, Toss-current proxy, Finnhub-current proxy, and Finnhub current market-cap fallback rows.
+
+Point-in-time membership snapshot:
+
+- `stock_index_membership_snapshot` stores daily `index_code + symbol + snapshot_date` membership rows.
+- The current source is `CURRENT_MEMBERSHIP_PROXY`, generated from `index_constituent.current_member`.
+- This separates current-proxy membership from future true point-in-time membership data.
+- `stock_market_snapshot` now prefers true PIT membership rows over `index_constituent.current_member`, so former constituents can be included after true historical membership import.
+- Current-proxy membership rows are reconciled on each market snapshot refresh. Symbols no longer present in `index_constituent.current_member` are marked `CURRENT_MEMBERSHIP_PROXY_REMOVED` and removed from refreshed market snapshots.
+
+Point-in-time shares snapshot:
+
+- `stock_shares_outstanding_snapshot` stores daily `index_code + symbol + snapshot_date` shares rows.
+- SEC XBRL `dei.EntityCommonStockSharesOutstanding` rows are now used first when `filed_at <= snapshot_date`.
+- The SEC-derived source is `SEC_XBRL_DEI_ENTITY_COMMON_SHARES`.
+- `stock_symbol_data_alias` can map current trading symbols to data-provider symbols when a provider lags a ticker change. Example: current EchoStar trading ticker `ECHO` can read SEC/profile data stored under prior/provider symbol `SATS`.
+- Current-value fallback sources are `TOSS_CURRENT_PROXY`, `FINNHUB_CURRENT_PROXY`, or `MISSING_SHARES`.
+- This separates current-proxy shares from future true point-in-time shares outstanding data.
+- `stock_market_snapshot` prefers true PIT shares rows and falls back to current Toss/Finnhub proxy shares only when PIT shares are missing.
+- CSV-imported shares rows are intentionally preserved over automated proxy refreshes.
+
+PIT CSV import:
+
+- `StockPointInTimeImportBatchRunner` imports true or externally curated PIT membership and shares CSV files.
+- Membership CSV accepted columns: `index_code`, `symbol`, `snapshot_date` or `date` or `effective_date`, optional `start_date/end_date`, `sector`, `industry`, `exchange`, `is_member`, `source`.
+- Shares CSV accepted columns: `index_code`, `symbol`, `snapshot_date` or `date` or `effective_date`, optional `start_date/end_date`, `shares_outstanding` or `shares_outstanding_millions`, `source`.
+- Bounded `start_date/end_date` rows are expanded into daily snapshots. Invalid rows are skipped and counted in the batch output.
+- Open-ended `start_date` rows normally save only the start date. Set `--app.batch.pit-import.expand-open-ended-ranges=true` and optionally `--app.batch.pit-import.open-ended-to-date=YYYY-MM-DD` when the CSV means "valid from start date through today or a known cutoff".
+- `stock_index_membership_snapshot` and `stock_market_snapshot` store both sector and industry so later factor diagnostics can separate broad sector effects from narrower industry effects.
+- Imported rows should use sources such as `CSV_IMPORT_MEMBERSHIP_PIT` and `CSV_IMPORT_SHARES_PIT`, not the current-proxy source names.
+- Templates are available at `docs/templates/sp500_membership_pit.sample.csv` and `docs/templates/sp500_shares_pit.sample.csv`.
+- A public-source helper exists at `scripts/build_wikipedia_pit_membership.py`. It reads Wikipedia current-constituent and change tables for S&P 500, Nasdaq 100, and Dow 30, then writes a compact CSV for this importer.
+- Rows generated by that helper use `WIKIPEDIA_*_PIT` source names. They are useful for reducing current-membership look-ahead bias, but they are not official index-provider historical membership files.
+- Current known caveat: Dow 30 historical membership can include WBA for older dates, but WBA price candles are currently missing in the local database. Those dates correctly show lower market-snapshot coverage rather than fabricated WBA prices.
+- `/quant` displays PIT quality cards for membership and shares. The score is source-weighted: official provider rows score highest, curated CSV PIT rows are high, SEC-derived shares are strong, Wikipedia membership is a useful public proxy, and current/proxy/fallback rows are intentionally penalized.
+- Stock detail Quant Opinion also warns when the latest market snapshot uses current/proxy/fallback shares or market-cap inputs. This keeps expected-return confidence from looking official when the underlying point-in-time provenance is weaker.
+- Public Wikipedia PIT generation example:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+python scripts\build_wikipedia_pit_membership.py --from-date 2021-06-21 --to-date 2026-06-26 --output data\pit\wikipedia_index_membership_2021_2026.csv
+```
+
+- Public PIT import example:
+
+```powershell
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.pit-import.enabled=true --app.batch.pit-import.exit-on-complete=true --app.batch.pit-import.membership-csv-path=data\pit\wikipedia_index_membership_2021_2026.csv
+```
+- Example:
+
+```powershell
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.pit-import.enabled=true --app.batch.pit-import.exit-on-complete=true --app.batch.pit-import.index-code=SP500 --app.batch.pit-import.membership-csv-path=C:\data\sp500_membership_pit.csv --app.batch.pit-import.shares-csv-path=C:\data\sp500_shares_pit.csv
+```
+
+Benchmark return series:
+
+- `stock_benchmark_return_series` stores one row per `index_code + trade_date`.
+- Returns are computed from `stock_market_snapshot` by weighting each stock's daily return by the previous snapshot market cap.
+- The series is a reproducible market-cap weighted benchmark proxy for beta and portfolio validation.
+- It is not the official S&P 500 index level.
+
+Risk-free rate snapshot:
+
+- `stock_risk_free_rate_snapshot` stores point-in-time annualized risk-free rate rows by `index_code + series_code + rate_date`.
+- `/signals/portfolio` reads these rows with a floor-date lookup, so a rebalance date uses the latest rate known on or before that date.
+- Portfolio gross return now includes cash return: `cash weight * risk-free period return`.
+- Sharpe uses the average point-in-time annual risk-free rate across the strategy path. If no snapshot exists, it falls back to `quant.portfolio.risk-free-rate-pct`.
+- If FRED CSV is unavailable and `app.batch.risk-free-rate.fallback-on-failure=true`, the batch writes dated `CONFIG_FALLBACK` rows using `quant.portfolio.risk-free-rate-pct`. This avoids an empty table while keeping the UI marked as fallback rather than real FRED data.
+- The first supported series is `DGS3MO`, treated as a 3-month Treasury proxy.
+- This is not yet a full ALFRED vintage layer. It stores observed series values by date; later work should store vintage/release dates separately.
+
+Macro vintage snapshot:
+
+- A CSV template is available at `docs/templates/fred_macro_vintage.sample.csv`.
+
+- `stock_macro_vintage_snapshot` stores FRED/ALFRED-style vintage observations by `index_code + series_code + observation_date + realtime_start + realtime_end`.
+- The FRED API supports real-time periods and vintage dates on `fred/series/observations`, and `fred/series/vintagedates` lists historical release/revision dates.
+- `stock_macro_feature_snapshot` is built with strict as-of filtering: a macro vintage row is usable for a target date only when `observation_date <= target_date`, `realtime_start <= target_date`, and `target_date <= realtime_end`. This prevents a later revision from leaking into an older signal date.
+- Strict PIT macro features are marked with `source = FRED_MACRO_FEATURE_V2_PIT_STRICT`.
+- API fetch requires `FRED_API_KEY`. CSV import does not.
+- Default series candidates are `DGS3MO`, `FEDFUNDS`, `CPIAUCSL`, and `UNRATE`.
+- Example API run:
+
+```powershell
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.macro-vintage.enabled=true --app.batch.macro-vintage.exit-on-complete=true --app.batch.macro-vintage.fetch-fred-api=true --app.batch.macro-vintage.index-code=SP500 --app.batch.macro-vintage.series-codes=DGS3MO,FEDFUNDS,CPIAUCSL,UNRATE --app.batch.macro-vintage.years=5
+```
+
+- CSV accepted columns: `index_code`, `series_code` or `series_id`, `observation_date` or `date`, `realtime_start` or `vintage_date`, `realtime_end`, `value`, `source`.
+- Example CSV run:
+
+```powershell
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.macro-vintage.enabled=true --app.batch.macro-vintage.exit-on-complete=true --app.batch.macro-vintage.index-code=SP500 --app.batch.macro-vintage.csv-path=C:\data\fred_macro_vintage.csv
+```
+
+Macro / regime snapshot:
+
+- `stock_macro_regime_snapshot` stores one row per `index_code + snapshot_date`.
+- The v1 regime label is based on market-cap weighted benchmark trend, realized volatility, universe breadth, coverage, and optional proxy candles.
+- Proxy candles currently supported by the calculation are `^VIX` for volatility stress, `UUP` or `DX-Y.NYB` for dollar strength, and `TLT` / `IEF` / `SHY` for rate pressure.
+- The table stores component scores (`trend_score`, `volatility_score`, `breadth_score`, `liquidity_score`, `dollar_score`, `rate_score`) so later models can learn which regime dimensions actually matter.
+- `StockQuantOpinionService` uses the latest S&P 500 macro regime as a broad-market adjustment. Risk-off regimes make stock-level opinions more conservative; Risk-on regimes add a small tailwind.
+- `/dashboard` shows the latest regime for the selected index.
+
+Run market snapshot refresh:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.market-snapshot.enabled=true --app.batch.market-snapshot.exit-on-complete=true --app.batch.market-snapshot.index-codes=SP500,NASDAQ100,DOW30 --app.batch.market-snapshot.years=5
+```
+
+Run proxy candle refresh before macro refresh when external network access is available:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.yahoo-candle.enabled=true --app.batch.yahoo-candle.exit-on-complete=true --app.batch.yahoo-candle.symbols="^VIX,UUP,TLT,IEF,SHY,SPY,QQQ,DIA" --app.batch.yahoo-candle.years=5 --app.batch.yahoo-candle.delay-millis=100
+```
+
+Run macro regime refresh:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.macro-regime.enabled=true --app.batch.macro-regime.exit-on-complete=true --app.batch.macro-regime.index-code=SP500 --app.batch.macro-regime.date-limit=1500 --app.batch.macro-regime.lookback-days=126
+```
+
+Run risk-free rate refresh from FRED CSV when network access is available:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.risk-free-rate.enabled=true --app.batch.risk-free-rate.exit-on-complete=true --app.batch.risk-free-rate.fetch-fred=true --app.batch.risk-free-rate.index-code=SP500 --app.batch.risk-free-rate.series-code=DGS3MO --app.batch.risk-free-rate.years=5
+```
+
+Run fixed-rate fallback refresh when external network access is not available:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.risk-free-rate.enabled=true --app.batch.risk-free-rate.exit-on-complete=true --app.batch.risk-free-rate.index-code=SP500 --quant.portfolio.risk-free-rate-pct=0
+```
+
 Limitations:
 
-- Benchmark market cap uses current `company_profile.market_cap`, not point-in-time market cap.
-- Risk beta uses an equal-weight current-universe proxy because point-in-time S&P 500 index returns are not stored yet.
+- Market cap is point-in-time by price, but shares outstanding is still the latest available Toss/Finnhub value unless historical shares are collected.
+- Macro/regime v1 uses market-derived proxies. It is not a full macroeconomic vintage data layer yet.
+- Rate pressure is inferred from bond ETF/index proxy returns until FRED/ALFRED point-in-time rate series are added.
+- Risk-free rate uses FRED CSV or fixed configured values. It is point-in-time by observation date, not yet ALFRED vintage-aware by release timestamp.
+- Risk beta uses `stock_benchmark_return_series` and falls back to an equal-weight current-universe proxy only when benchmark coverage is missing.
 - Liquidity is a dollar-volume proxy, not an executable volume or spread model.
 - Transaction cost is still a proxy; it does not model bid/ask spread, intraday volume participation, market impact curves, borrow cost, or tax.
 - Rebalance dates are historical snapshot dates, currently monthly in the seed.
@@ -221,6 +497,8 @@ Limitations:
 - Top vs bottom: top 10% score group versus bottom 10%
 - Factor validation: high factor score versus low factor score
 - Factor diagnostics: sample count, average return, hit rate, IC, and High 70+ vs Low 40- spread for each factor
+- Regime factor diagnostics: Risk-on / Neutral / Risk-off factor contribution IC, directional hit rate, and high-low excess-return spread
+- Expected return calibration: v4 expected excess-return buckets versus realized average excess return, calibration error, and hit rate
 - Sector neutral check: factor spread by sector so a factor is not promoted only because one sector dominated the result
 - Year stability: factor spread by year so one good year does not drive the entire decision
 - Weight candidates: a non-binding weight action candidate based on 20D spread, 60D spread, 20D IC, and year stability
@@ -229,18 +507,186 @@ Limitations:
 - Weight Profile Items: shows factor weights saved for each profile
 - Sector bias: whether a result is concentrated in a sector
 
+The backtest page is a read-only view. It reads completed rows from `stock_signal_backtest_result`; it does not generate missing forward-return results during page rendering.
+
+Backtest view materialization:
+
+- `stock_backtest_view_snapshot` stores the fully rendered `/signals/backtest` research payload as JSON by `index_code + view_version`.
+- `/signals/backtest` reads in this order: in-memory view cache, DB materialized view, live calculation.
+- If the DB view is missing or incompatible with the current view schema, the page falls back to live calculation and writes a new `ON_DEMAND` snapshot.
+- This keeps the first request from recalculating factor diagnostics, profile comparisons, walk-forward tables, monthly/quarterly performance, and regime diagnostics after every browser open.
+- The one-off materialization batch can be run after expected-return, backtest, covariance, or macro-regime refreshes:
+
+```powershell
+java "-Dspring.profiles.active=mariadb" -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.backtest-view.enabled=true --app.batch.backtest-view.exit-on-complete=true --app.batch.backtest-view.index-code=SP500
+```
+
 ### /signals/portfolio
 
 `/signals/portfolio` shows:
 
 - Best strategy summary cards
 - Risk Model v1 constraint and input summary
-- Risk Impact Review for matching Base versus Risk-controlled strategy pairs
+- Risk Impact Review for matching Base versus Risk-controlled and Optimized strategy pairs
+- Optimized portfolio rows in Strategy Comparison and Risk Impact Review
 - Full Top N / horizon / weighting comparison table
 - Recent rebalance periods for the selected default strategy
 - Sector concentration table
 - Latest selected positions
 - Validation notes and current benchmark assumptions
+
+The portfolio page is also read-only. Portfolio simulation uses stored backtest rows and trailing candle-derived risk stats only. Result generation is handled by `StockSignalRefreshService`, historical seed jobs, or explicit batch/service calls before the page is opened.
+
+Because Portfolio Optimization v5 evaluates many historical rebalance paths and covariance-aware constraints, `/signals/portfolio` keeps a 10-minute in-memory view cache. The cache is invalidated when risk, market, covariance, or expected-return refresh services run. This keeps repeated UI inspection fast without treating the cached view as durable model output.
+
+The default portfolio page intentionally focuses expensive covariance optimizers on the primary Top 20 / 20D strategy. Wider Top 10/50 and 60D paths remain visible through Base and Risk controlled comparisons, while `Optimized v4` and `Optimized v5` are used for the primary recommendation path. This keeps the page usable without hiding the optimizer source code or the historical validation path.
+
+Portfolio view materialization:
+
+- `stock_portfolio_view_snapshot` stores the fully rendered `/signals/portfolio` view payload as JSON by `index_code + view_version`.
+- `/signals/portfolio` reads in this order: in-memory view cache, DB materialized view, live calculation.
+- If the DB view is missing, the page falls back to live calculation and writes a new `ON_DEMAND` snapshot.
+- `stock_dashboard_view_snapshot` stores the fully rendered `/quant` payload, including market rows, macro regime, and model health.
+- `/quant` reads in this order: in-memory view cache, DB materialized view, live calculation. `/dashboard` remains a compatibility route.
+- `stock_backtest_view_snapshot` stores the fully rendered `/signals/backtest` research payload.
+- `/signals/backtest` reads in this order: in-memory view cache, DB materialized view, live calculation.
+- Scheduled signal refresh calls `refreshBacktestViewSnapshot("SP500")`, `refreshPortfolioViewSnapshot("SP500")`, and refreshes `/quant` snapshots for `SP500`, `NASDAQ100`, and `DOW30` after refreshing live risk, covariance, and expected-return rows.
+- The one-off materialization batch can be run after any large model refresh:
+
+```powershell
+java "-Dspring.profiles.active=mariadb" -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.portfolio-view.enabled=true --app.batch.portfolio-view.exit-on-complete=true --app.batch.portfolio-view.index-code=SP500
+java "-Dspring.profiles.active=mariadb" -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.dashboard-view.enabled=true --app.batch.dashboard-view.exit-on-complete=true --app.batch.dashboard-view.index-codes=SP500,NASDAQ100,DOW30
+java "-Dspring.profiles.active=mariadb" -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.backtest-view.enabled=true --app.batch.backtest-view.exit-on-complete=true --app.batch.backtest-view.index-code=SP500
+```
+
+Risk snapshot refresh:
+
+- `stock_risk_snapshot` stores point-in-time beta, trailing volatility, trailing dollar volume, and observation count by `symbol + signal_date`.
+- `StockSignalRefreshService` refreshes risk snapshots after backtest results are updated.
+- Beta is calculated against `stock_benchmark_return_series` after market snapshot refresh.
+- One-off refresh can run with `--app.batch.risk-snapshot.enabled=true --app.batch.risk-snapshot.exit-on-complete=true --app.signal.refresh.run-on-startup=false`.
+- `/signals/portfolio` reads stored snapshots first and falls back to candle calculation only when a snapshot is missing.
+
+Covariance snapshot refresh:
+
+- `stock_correlation_snapshot` stores pairwise trailing daily-return correlation by `index_code + snapshot_date + symbol_a + symbol_b`.
+- `stock_covariance_snapshot` stores the matching annualized covariance, pair volatility, observation count, source, and lookback window.
+- `StockCovarianceSnapshotBatchRunner` builds these rows from `stock_candle_daily` for the highest ranked symbols on each historical signal date.
+- The batch accepts either `app.batch.covariance-snapshot.index-code` or comma-separated `app.batch.covariance-snapshot.index-codes`; the configured default is `SP500,NASDAQ100,DOW30`.
+- Full `candidate-limit=120` across all three universes can be slow. For interactive maintenance, run Nasdaq 100 and Dow 30 separately with `candidate-limit=80`, then run wider candidates off-hours.
+- `/signals/portfolio` loads stored covariance snapshots. `Optimized v2` reduces highly correlated weight crowding, `Optimized v3` uses the same covariance inputs inside an explicit constraint objective, `Optimized v4` adds a projected-gradient covariance objective, and `Optimized v5` adds multi-start search plus stricter constraint penalties.
+- One-off refresh can run with:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.covariance-snapshot.enabled=true --app.batch.covariance-snapshot.exit-on-complete=true --app.batch.covariance-snapshot.index-code=SP500 --app.batch.covariance-snapshot.date-limit=80 --app.batch.covariance-snapshot.candidate-limit=120 --app.batch.covariance-snapshot.lookback-days=126
+```
+
+Current v5 limitations:
+
+- The optimizer is still deterministic and local, not a global quadratic-programming solver.
+- Correlation crowding and covariance volatility are constrained inside a projected-gradient covariance objective; it still does not guarantee a global minimum-variance or maximum-Sharpe solution.
+- Covariance coverage is intentionally limited to high-ranked candidates to keep storage and batch time practical.
+- A dedicated numerical optimizer should only be added after v5 constraint behavior is stable in walk-forward validation and the chosen QP dependency is verified under local build constraints.
+
+Expected return snapshot refresh:
+
+- `stock_expected_return_snapshot` stores point-in-time expected return, expected excess return, upside probability, downside probability, drawdown risk, confidence, and sample counts by `index_code + signal_date + symbol + horizon_days + model_version`.
+- `EXPECTED_RETURN_V2` adds 10/50/90% return quantiles and calibrated upside probability.
+- `EXPECTED_RETURN_V3` adds factor exposure snapshots and 20D factor contribution rows.
+- `EXPECTED_RETURN_V4` adds macro/regime-conditioned factor coefficients using `stock_macro_regime_snapshot`.
+- `EXPECTED_RETURN_V5` adds conservative nonlinear factor interaction coefficients on top of v4.
+- `EXPECTED_RETURN_V6` stabilizes v5 with historical calibration error, sample depth, sector sample depth, and data-quality shrinkage.
+- `EXPECTED_RETURN_V7` adds horizon-specific decay and probability shrinkage, so 5D/20D/60D forecasts are shown as separate conservative opinions.
+- `EXPECTED_RETURN_V8` adds FRED macro feature adjustment.
+- `EXPECTED_RETURN_V9` is the current production expected-return input for Quant, Quant Opinion, and portfolio optimization. It starts from v8 and applies market-data provenance stabilization:
+  - rows without usable `stock_market_snapshot.market_cap_usd` are not written to v9;
+  - SEC XBRL shares are treated as the strongest point-in-time shares source;
+  - alias-backed and current-proxy shares shrink expected return, probability, and confidence;
+  - `source` records provenance tags such as `SEC_PIT`, `CURRENT_PROXY_SHARES`, or `ALIAS_SHARES`.
+- `FDXF` is kept in `index_constituent` as a current S&P 500 constituent and is mapped in `stock_sec_company` to CIK `0002082247`. SEC companyfacts currently exposes only issuer-specific `ffd` fee/offering concepts, not standard `dei` or `us-gaap` shares/financial concepts, so FDXF is excluded from market snapshot and v9 expected-return rows until a usable shares or market-cap source appears.
+- Historical refresh uses only rows where `training.signal_date < target.signal_date`.
+- The model calibrates each target row from three historical groups: nearby Signal score rows, same-sector nearby score rows, and nearest-score rows.
+- v3 additionally learns factor coefficients by comparing high-exposure and low-exposure historical groups, blended with same-sector evidence when enough rows exist.
+- v4 extends the same process by blending global, sector, same-regime, and sector-within-regime evidence. This makes factor alpha regime-aware while keeping point-in-time rules.
+- Upside probability means historical probability of outperforming the same-date universe proxy. Downside probability means forward return less than or equal to -5%.
+- Current-day live expected-return rows are generated from `stock_signal_latest` after signal refresh or when the expected-return batch runs with `app.batch.expected-return.live-enabled=true`.
+- Normal Signal refresh updates only the current-day live expected-return rows. Historical expected-return recalculation and calibration should run through the explicit expected-return batch, because it is much heavier and is not needed for ordinary page freshness.
+- `/signals/portfolio` reads stored expected return snapshots. `Optimized v2`, `Optimized v3`, `Optimized v4`, and `Optimized v5` use the production expected-return layer as part of their alpha input.
+- The page also shows a read-only `Live Quant Portfolio` panel. It uses current `stock_signal_latest`, current-day `EXPECTED_RETURN_V9`, trailing risk, benchmark-relative sector weights, and the latest available covariance snapshot at or before today. It does not place orders.
+- The live panel exposes optimizer constraint diagnostics: max position weight, max sector weight, active sector deviation, covariance volatility, and weighted correlation crowding. These are guardrails for interpreting whether a high-alpha portfolio is actually investable.
+- `/signals/portfolio` also shows a compact model-health strip. Warnings such as risk-free fallback, stale covariance, or missing expected-return rows are intentionally surfaced beside the portfolio recommendation, not only on `/dashboard`.
+- Normal Signal refresh now stores live risk and live covariance snapshots from `stock_signal_latest` as well as historical backtest snapshots. This keeps the live optimizer from relying on stale March 2026 covariance when current-day Signal rows already exist.
+- One-off refresh can run with:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.expected-return.enabled=true --app.batch.expected-return.exit-on-complete=true --app.batch.expected-return.index-code=SP500 --app.batch.expected-return.result-limit=100000 --app.batch.expected-return.date-limit=80 --app.batch.expected-return.min-training-rows=300
+```
+
+Live-only current-day refresh can run faster by skipping historical recalculation:
+
+```cmd
+java -Dspring.profiles.active=mariadb -jar target\codex-demo-0.0.1-SNAPSHOT.jar --spring.main.web-application-type=none --app.signal.refresh.run-on-startup=false --app.batch.expected-return.enabled=true --app.batch.expected-return.exit-on-complete=true --app.batch.expected-return.index-code=SP500 --app.batch.expected-return.result-limit=100000 --app.batch.expected-return.min-training-rows=300 --app.batch.expected-return.historical-enabled=false --app.batch.expected-return.live-enabled=true
+```
+
+Expected Return v9 limitations:
+
+- It is still a walk-forward statistical model, not an unconstrained nonlinear machine-learning model.
+- It uses stored monthly historical signal rows; weekly or daily forecast validation needs denser historical seed data.
+- Expected return now uses macro regime, factor-level historical contribution, conservative interaction terms, FRED macro feature rows, and market-data provenance shrinkage, but it does not yet use analyst revision changes or news sentiment embeddings.
+- `News` may be absent from factor contribution when high/low exposure samples are too sparse.
+- v8 intentionally keeps macro adjustment conservative. It can understate true upside in strong macro recoveries, but it reduces the larger operational risk of overconfident probabilities during tightening, inversion, high-VIX, or dollar-strength regimes.
+- v9 intentionally excludes symbols without usable point-in-time market cap, so newly added constituents can temporarily have no expected-return row until shares or market-cap data is available.
+- It is intentionally conservative and should be evaluated by walk-forward portfolio results before being trusted as a live opinion.
+
+## Quant Model Health
+
+`/quant` includes a `Model Health` panel. `/dashboard` remains a compatibility route. This is an operational validation layer, not a prediction model.
+
+It checks the stored DB layers that the Quant AI depends on:
+
+- index universe
+- `stock_signal_latest`
+- `stock_data_quality_latest`
+- `stock_market_snapshot`
+- point-in-time membership audit
+- point-in-time shares outstanding audit
+- `stock_benchmark_return_series`
+- `stock_risk_snapshot`
+- `stock_risk_free_rate_snapshot`
+- `stock_macro_regime_snapshot`
+- `stock_factor_exposure_snapshot`
+- `stock_macro_feature_snapshot`
+- `stock_expected_return_snapshot` for `EXPECTED_RETURN_V9`
+- `stock_expected_return_factor_contribution`
+- `stock_expected_return_calibration`
+- `stock_covariance_snapshot`
+- `stock_portfolio_view_snapshot`
+- `stock_backtest_view_snapshot`
+- `stock_dashboard_view_snapshot`
+
+The dashboard labels a layer as normal, delayed, stale, missing, or fallback based on row count, symbol coverage, date coverage, and latest available date. This is intentionally strict: a model layer can still be usable for historical validation while the dashboard warns that it is not fresh enough for live inference.
+
+The same panel also exposes operational health:
+
+- Latest `finnhub_batch_run`, `yahoo_candle_batch_run`, `toss_batch_run`, `sec_edgar_batch_run`, and `institution_13f_batch_run` rows.
+- Recent `api_call_log` failure count for the last 24 hours.
+- A compact alert list that surfaces missing model layers, stale/fallback inputs, long-running jobs, failed jobs, and recent API failures before the detailed layer list.
+
+This check is read-only. It does not call Finnhub, Toss, SEC, Yahoo, or FRED while rendering `/quant`.
+
+Materialized `/quant` payloads are schema-checked before reuse. If an old `stock_dashboard_view_snapshot.payload_json` is missing newer fields such as operation health or alert rows, the app ignores that snapshot, rebuilds the view from DB tables, and saves a fresh `ON_DEMAND` payload. This keeps UI changes from breaking the first request after a deploy.
+
+Known current status:
+
+- `EXPECTED_RETURN_V9` has current-day rows generated from current-day v8 rows after `stock_signal_latest` refresh and v8 macro adjustment.
+- `stock_risk_free_rate_snapshot` can be empty when FRED is unavailable. In that case portfolio testing falls back to the configured annual risk-free rate.
+- When `stock_risk_free_rate_snapshot.source` starts with `CONFIG_`, Model Health and the portfolio page still show the layer as fallback. A populated table is not treated as real risk-free market data unless the source is imported from FRED/CSV.
+- `Membership PIT audit` is intentionally warning status while the source is `CURRENT_MEMBERSHIP_PROXY`. The daily snapshot table exists, but true historical index membership by effective date is still needed.
+- `Shares PIT audit` is intentionally warning status while sources are `TOSS_CURRENT_PROXY` or `FINNHUB_CURRENT_PROXY`. The daily snapshot table exists, but true historical shares outstanding by effective date is still needed.
+- `stock_covariance_snapshot` is generated from historical signal dates, so it should be refreshed when more recent signal dates are added.
+- Portfolio Optimization v5 never uses future covariance rows. If an exact covariance date is missing, it uses the latest available covariance snapshot at or before the requested date.
+- The portfolio page reuses the same model-health checks as an execution guard. A live recommendation can still render with fallback data, but the warning remains visible next to the recommendation.
+- `refreshLatestRiskSnapshots` and `refreshLatestCovarianceSnapshot` generate current-day live rows from `stock_signal_latest`. The one-off risk/covariance batch runners also execute these live refreshes after their historical refresh path.
 
 ## Weight Tuning
 
@@ -249,6 +695,7 @@ Backtest v1 does not automatically change live Signal weights.
 The Factor Performance Diagnostics layer is a review gate before any automatic weighting:
 
 - `Factor diagnostics` measures whether each factor has positive forward-return behavior.
+- `Regime factor diagnostics` measures whether a factor works only in a specific market regime or should be reduced when the regime changes.
 - `Sector neutral check` measures whether the factor works across sectors instead of only reflecting a sector bet.
 - `Year stability` measures whether the factor is repeatable across years.
 - `Weight candidates` labels factors as increase candidate, observe/hold, or reduce/reverse candidate.
@@ -260,8 +707,9 @@ Weight Profile v1 adds a second review gate:
 - `DEFAULT` is kept as the live reference profile.
 - `BACKTEST_V1` is generated from diagnostics and saved to DB with `active=false`.
 - `BACKTEST_V2` starts from the v1 candidate, then applies sector/size neutral scoring and factor-correlation penalties. It is also saved with `active=false`.
-- `/signals/backtest` computes hypothetical `BACKTEST_V1` and `BACKTEST_V2` scores from stored factor scores.
-- The page compares `DEFAULT`, `BACKTEST_V1`, and `BACKTEST_V2` by 5D/20D/60D average return, hit rate, IC, and Top 10% vs Bottom 10% spread.
+- `REGIME_V1` starts from `BACKTEST_V2`, then changes factor weights by macro regime at scoring time. It is also saved with `active=false`.
+- `/signals/backtest` computes hypothetical `BACKTEST_V1`, `BACKTEST_V2`, and `REGIME_V1` scores from stored factor scores.
+- The page compares `DEFAULT`, `BACKTEST_V1`, `BACKTEST_V2`, and `REGIME_V1` by 5D/20D/60D average return, hit rate, IC, and Top 10% vs Bottom 10% spread.
 - This comparison still does not update `/stocks` or `/stocks/{symbol}` Signal.
 
 Walk-forward validation adds a third review gate:
@@ -286,29 +734,60 @@ Walk-forward validation adds a third review gate:
 - Highly correlated factor pairs are penalized on the weaker-evidence side, so the profile does not double-count the same style exposure.
 - Current `company_profile.market_cap` is used only as a practical size bucket for diagnostics. A stricter future version should store point-in-time market cap snapshots before relying on size-neutral backtests for promotion.
 
+`REGIME_V1` adds the first regime-aware layer:
+
+- It is an inactive diagnostic profile, not a live Signal profile.
+- It uses the macro regime label available at each `signal_date`.
+- Risk-on rows lean slightly toward Momentum/Growth.
+- Risk-off rows lean slightly toward Quality/Stability/Risk.
+- Regime factor diagnostics can add or reduce a factor only when the regime-specific IC, hit rate, and spread all agree.
+- Weak regime evidence is penalized lightly instead of being promoted.
+- The promotion gate and walk-forward table compare `REGIME_V1` against `DEFAULT` before any production use.
+- The `Regime-aware Weights` table shows the exact Risk-on, Neutral, and Risk-off factor weights used by `REGIME_V1`, so profile changes are visible before promotion.
+
 ## Current Limitations
 
 Historical seed v1 still has limits:
 
-- Historical index membership is not point-in-time yet; current `index_constituent` membership is used.
-- Historical shares outstanding is not available, so historical valuation uses close/EPS rather than market-cap based multiples.
+- Historical index membership is stored in `stock_index_membership_snapshot`, but current rows are still generated from the current membership proxy until true effective-date membership data is imported.
+- Historical shares outstanding is stored in `stock_shares_outstanding_snapshot`, but current rows are still generated from latest Toss/Finnhub proxy values until true effective-date shares data is imported.
 - News and Analyst history depends on what has already been collected in DB.
 - Historical Institution factor coverage depends on collected `stock_institution_flow_quarterly` rows.
 - Reconstructed snapshots are validation inputs, not values that were truly displayed to users on those past dates.
 
-Portfolio v1 still has limits:
+Portfolio/risk still has limits:
 
-- Benchmark market cap is current, not point-in-time.
+- Benchmark market cap is reproducible from `stock_market_snapshot`, but historical shares outstanding is still approximated.
 - Turnover assumes full rebalance on snapshot dates.
-- There is no cash position, risk-free asset, or stop-loss logic.
-- There is no portfolio-level beta, liquidity, or borrow-cost model yet.
+- Cash is modeled as uninvested weight that accrues the point-in-time risk-free rate when `stock_risk_free_rate_snapshot` is populated. If it is empty, portfolio testing falls back to the configured annual risk-free rate.
+- Beta, trailing volatility, and liquidity are persisted in `stock_risk_snapshot`; the page falls back to candle calculation only for missing rows.
+- Optimization v5 uses stored pairwise covariance and explicit beta, volatility, turnover, sector, active-sector, concentration, and position penalties through a multi-start projected-gradient objective, but it still does not solve a full quadratic programming problem with an external QP solver.
+- The live portfolio panel can use stale-but-point-in-time-safe covariance via floor-date lookup. Model Health should still be watched so stale covariance does not become invisible.
+- Expected Return v9 uses FRED macro feature rows and market-data provenance shrinkage, but it still does not use analyst revision-history changes, news sentiment embeddings, or an external nonlinear ML library.
+- There is no borrow-cost, shorting, stop-loss, or tax model yet.
 
 ## Intended Next Step
 
-The next durable Quant AI step is point-in-time risk modeling:
+Completed durable steps:
 
-1. Store point-in-time market cap and sector snapshots.
-2. Add beta, liquidity, and volatility risk model tables.
-3. Run portfolio backtest with sector caps and position caps.
-4. Compare unconstrained versus risk-constrained portfolios.
-5. Promote weight profiles only when they improve both stock-level diagnostics and portfolio-level outcomes.
+1. Store market snapshots, benchmark returns, risk snapshots, and correlation/covariance snapshots.
+2. Compare Base, Risk controlled, and Optimized v5 portfolios.
+3. Add Expected Return v2 with return quantiles and calibrated upside probability.
+4. Add Quant Opinion v1 on the stock detail page.
+5. Generate current-day live Expected Return rows from `stock_signal_latest`.
+6. Add Expected Return v3 with factor exposure snapshots and 20D factor contribution.
+7. Add Expected Return v4 with macro/regime-conditioned factor coefficients.
+8. Add Expected Return v5 with conservative nonlinear factor interactions.
+9. Add Expected Return v6 with calibration-stabilized expected return, upside probability, and confidence.
+10. Add Expected Return v7 with horizon-specific decay, conservative probability shrinkage, and live v7 rows.
+11. Add monthly and quarterly live-like Expected Return v7 performance review.
+12. Add Expected Return v8 with FRED macro feature adjustment and macro feature model-health coverage.
+13. Add Expected Return v9 with market-data provenance shrinkage and temporary exclusion of no-market-cap constituents.
+14. Add Quant Opinion v2 with 5D/20D/60D horizon opinions and portfolio-fit risk interpretation.
+13. Clean Model Health status text and expose operational warnings on `/quant`.
+
+The next durable Quant AI steps are:
+
+1. Strengthen point-in-time data for historical index membership, shares outstanding, sector/industry changes, and risk-free rates.
+2. Replace proxy-only macro inputs with FRED/ALFRED vintage macro series.
+3. Add richer nonlinear model experiments only after walk-forward diagnostics prove that Expected Return v9, `REGIME_V1`, and `Optimized v5` are stable.

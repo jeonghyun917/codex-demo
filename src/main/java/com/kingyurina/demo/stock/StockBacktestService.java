@@ -2,15 +2,24 @@ package com.kingyurina.demo.stock;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -18,37 +27,85 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import tools.jackson.databind.ObjectMapper;
+
 @Service
 public class StockBacktestService {
 
     private static final List<Integer> HORIZONS = List.of(5, 20, 60);
     private static final List<Integer> PROMOTION_HORIZONS = List.of(20, 60);
     private static final int VIEW_RESULT_LIMIT = 100_000;
+    private static final String EXPECTED_RETURN_MODEL_VERSION = "EXPECTED_RETURN_V9";
+    private static final String BACKTEST_VIEW_VERSION = "BACKTEST_RESEARCH_V1";
+    private static final Duration BACKTEST_VIEW_CACHE_TTL = Duration.ofMinutes(10);
+    private static final int REGIME_DIAGNOSTIC_HORIZON = 20;
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
     private final ObjectProvider<StockSignalWeightProfileMapper> weightProfileMapper;
+    private final ObjectMapper objectMapper;
+    private final Map<String, CachedBacktestView> backtestViewCache = new ConcurrentHashMap<>();
 
     public StockBacktestService(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
-            ObjectProvider<StockSignalWeightProfileMapper> weightProfileMapper) {
+            ObjectProvider<StockSignalWeightProfileMapper> weightProfileMapper,
+            ObjectMapper objectMapper) {
         this.stockBacktestMapper = stockBacktestMapper;
         this.weightProfileMapper = weightProfileMapper;
+        this.objectMapper = objectMapper;
     }
 
     public StockBacktestView build(String indexCode) {
+        String effectiveIndexCode = normalizeIndexCode(indexCode);
+        CachedBacktestView cached = backtestViewCache.get(effectiveIndexCode);
+        if (cached != null && cached.isFresh()) {
+            return cached.view();
+        }
+        StockBacktestMapper mapper = stockBacktestMapper.getIfAvailable();
+        if (mapper == null) {
+            return empty(effectiveIndexCode);
+        }
+        StockBacktestView materialized = readMaterializedBacktestView(mapper, effectiveIndexCode);
+        if (materialized != null) {
+            backtestViewCache.put(effectiveIndexCode, new CachedBacktestView(materialized, Instant.now()));
+            return materialized;
+        }
+        StockBacktestView view = buildUncached(effectiveIndexCode);
+        saveMaterializedBacktestView(mapper, effectiveIndexCode, view, "ON_DEMAND");
+        backtestViewCache.put(effectiveIndexCode, new CachedBacktestView(view, Instant.now()));
+        return view;
+    }
+
+    public BacktestViewSnapshotRefreshResult refreshBacktestViewSnapshot(String indexCode) {
+        String effectiveIndexCode = normalizeIndexCode(indexCode);
+        backtestViewCache.clear();
+        StockBacktestMapper mapper = stockBacktestMapper.getIfAvailable();
+        if (mapper == null) {
+            return new BacktestViewSnapshotRefreshResult(effectiveIndexCode, false, "mapper unavailable", 0);
+        }
+        long start = System.currentTimeMillis();
+        StockBacktestView view = buildUncached(effectiveIndexCode);
+        boolean saved = saveMaterializedBacktestView(mapper, effectiveIndexCode, view, "MATERIALIZED_BATCH");
+        if (saved) {
+            backtestViewCache.put(effectiveIndexCode, new CachedBacktestView(view, Instant.now()));
+        }
+        return new BacktestViewSnapshotRefreshResult(effectiveIndexCode, saved,
+                saved ? "saved" : "serialization failed", System.currentTimeMillis() - start);
+    }
+
+    private StockBacktestView buildUncached(String indexCode) {
         StockBacktestMapper mapper = stockBacktestMapper.getIfAvailable();
         if (mapper == null) {
             return empty(indexCode);
         }
-
-        refreshCompletedResults(5_000);
-
         List<StockBacktestCoverage> coverageRows = mapper.findCoverage(indexCode);
         StockBacktestView.CoverageSummary coverage = coverageSummary(coverageRows);
         StockBacktestView.ResultSummary result = resultSummary(mapper, indexCode);
         List<StockBacktestResult> results = mapper.findResults(indexCode, VIEW_RESULT_LIMIT);
         List<FactorMetric> factorMetrics = factorMetrics(results);
         List<YearStabilityMetric> yearStability = yearStabilityMetrics(results);
-        List<WeightProfileDefinition> weightProfiles = weightProfiles(results, factorMetrics, yearStability);
+        MacroRegimeLookup regimeLookup = macroRegimeLookup(mapper, indexCode, results);
+        List<RegimeFactorMetric> regimeMetrics = regimeFactorMetrics(mapper, indexCode, results, regimeLookup);
+        List<WeightProfileDefinition> weightProfiles = weightProfiles(results, factorMetrics, yearStability,
+                regimeMetrics);
 
         return new StockBacktestView(
                 indexCode,
@@ -63,13 +120,62 @@ public class StockBacktestService {
                 sectorNeutralDiagnostics(results),
                 yearStabilityDiagnostics(yearStability),
                 weightCandidates(factorMetrics, yearStability),
-                promotionGate(results, weightProfiles),
+                promotionGate(results, weightProfiles, regimeLookup),
                 profileDiagnostics(factorMetrics, yearStability, weightProfiles),
                 factorCorrelations(results),
-                profileComparisons(results, weightProfiles),
-                walkForwardProfiles(results),
+                regimeFactorDiagnostics(regimeMetrics),
+                expectedExcessCalibrations(mapper, indexCode, results),
+                monthlyModelPerformance(mapper, indexCode, results),
+                quarterlyModelPerformance(mapper, indexCode, results),
+                profileComparisons(results, weightProfiles, regimeLookup),
+                walkForwardProfiles(results, regimeLookup),
                 weightProfileItems(weightProfiles),
+                regimeWeightItems(weightProfiles),
                 sectors(results));
+    }
+
+    private StockBacktestView readMaterializedBacktestView(StockBacktestMapper mapper, String indexCode) {
+        if (mapper == null) {
+            return null;
+        }
+        try {
+            StockBacktestViewSnapshot snapshot = mapper.findLatestBacktestViewSnapshot(indexCode, BACKTEST_VIEW_VERSION);
+            if (snapshot == null || snapshot.getPayloadJson() == null || snapshot.getPayloadJson().isBlank()) {
+                return null;
+            }
+            StockBacktestView view = objectMapper.readValue(snapshot.getPayloadJson(), StockBacktestView.class);
+            return isCompatible(view) ? view : null;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private boolean saveMaterializedBacktestView(StockBacktestMapper mapper, String indexCode,
+            StockBacktestView view, String source) {
+        if (mapper == null || view == null) {
+            return false;
+        }
+        try {
+            StockBacktestViewSnapshot snapshot = new StockBacktestViewSnapshot();
+            snapshot.setIndexCode(indexCode);
+            snapshot.setViewVersion(BACKTEST_VIEW_VERSION);
+            snapshot.setGeneratedAt(LocalDateTime.now());
+            snapshot.setSource(source);
+            snapshot.setPayloadJson(objectMapper.writeValueAsString(view));
+            mapper.upsertBacktestViewSnapshot(snapshot);
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private static boolean isCompatible(StockBacktestView view) {
+        return view != null
+                && view.coverage() != null
+                && view.result() != null
+                && view.monthlyModelPerformance() != null
+                && view.quarterlyModelPerformance() != null
+                && view.regimeFactorDiagnostics() != null;
     }
 
     public int refreshCompletedResults(int limit) {
@@ -609,6 +715,540 @@ public class StockBacktestService {
                 .toList();
     }
 
+    private static MacroRegimeLookup macroRegimeLookup(StockBacktestMapper mapper, String indexCode,
+            List<StockBacktestResult> results) {
+        List<StockBacktestResult> dated = results.stream()
+                .filter(result -> result.getSignalDate() != null)
+                .toList();
+        if (dated.isEmpty()) {
+            return MacroRegimeLookup.empty();
+        }
+        LocalDate fromDate = dated.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate toDate = dated.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (fromDate == null || toDate == null) {
+            return MacroRegimeLookup.empty();
+        }
+        try {
+            return MacroRegimeLookup.from(mapper.findMacroRegimeSnapshots(indexCode, fromDate.minusDays(90), toDate));
+        } catch (RuntimeException ex) {
+            return MacroRegimeLookup.empty();
+        }
+    }
+
+    private static List<RegimeFactorMetric> regimeFactorMetrics(
+            StockBacktestMapper mapper,
+            String indexCode,
+            List<StockBacktestResult> results,
+            MacroRegimeLookup regimeLookup) {
+        List<StockBacktestResult> sample = byHorizon(results, REGIME_DIAGNOSTIC_HORIZON).stream()
+                .filter(result -> result.getSignalDate() != null)
+                .filter(result -> result.getSymbol() != null)
+                .filter(result -> result.getForwardReturnPct() != null)
+                .toList();
+        if (sample.size() < 100) {
+            return List.of();
+        }
+
+        LocalDate fromDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate toDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (fromDate == null || toDate == null) {
+            return List.of();
+        }
+
+        List<StockExpectedReturnFactorContribution> contributions;
+        try {
+            contributions = mapper.findExpectedReturnFactorContributions(
+                    indexCode, EXPECTED_RETURN_MODEL_VERSION, REGIME_DIAGNOSTIC_HORIZON, fromDate, toDate);
+        } catch (RuntimeException ex) {
+            return List.of();
+        }
+        if (contributions.isEmpty()) {
+            return List.of();
+        }
+
+        Map<ResultKey, StockBacktestResult> byKey = sample.stream()
+                .collect(Collectors.toMap(
+                        result -> new ResultKey(result.getSignalDate(), symbolKey(result.getSymbol()),
+                                result.getHorizonDays()),
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<LocalDate, Double> dateAverageReturn = sample.stream()
+                .collect(Collectors.groupingBy(
+                        StockBacktestResult::getSignalDate,
+                        LinkedHashMap::new,
+                        Collectors.averagingDouble(result -> result.getForwardReturnPct().doubleValue())));
+        Map<RegimeFactorKey, RegimeFactorAccumulator> grouped = new LinkedHashMap<>();
+
+        for (StockExpectedReturnFactorContribution contribution : contributions) {
+            if (contribution.getSignalDate() == null
+                    || contribution.getSymbol() == null
+                    || contribution.getHorizonDays() == null
+                    || contribution.getFactor() == null
+                    || contribution.getExposureScore() == null
+                    || contribution.getContributionPct() == null) {
+                continue;
+            }
+            ResultKey key = new ResultKey(contribution.getSignalDate(), symbolKey(contribution.getSymbol()),
+                    contribution.getHorizonDays());
+            StockBacktestResult result = byKey.get(key);
+            if (result == null || result.getForwardReturnPct() == null) {
+                continue;
+            }
+            Double averageReturn = dateAverageReturn.get(result.getSignalDate());
+            if (averageReturn == null) {
+                continue;
+            }
+            String regime = normalizeRegime(regimeLookup.regimeLabel(result.getSignalDate()));
+            RegimeFactorKey groupKey = new RegimeFactorKey(regime, contribution.getFactor());
+            RegimeFactorAccumulator accumulator = grouped.computeIfAbsent(groupKey,
+                    ignored -> new RegimeFactorAccumulator(regime, contribution.getFactor()));
+            accumulator.add(
+                    contribution.getExposureScore().doubleValue(),
+                    contribution.getContributionPct().doubleValue(),
+                    result.getForwardReturnPct().doubleValue() - averageReturn);
+        }
+
+        return grouped.values().stream()
+                .map(RegimeFactorAccumulator::toMetric)
+                .filter(metric -> metric.sampleCount() >= 30)
+                .toList();
+    }
+
+    private static List<StockBacktestView.RegimeFactorDiagnosticRow> regimeFactorDiagnostics(
+            List<RegimeFactorMetric> metrics) {
+        return metrics.stream()
+                .sorted(Comparator
+                        .comparingInt((RegimeFactorMetric metric) -> regimeOrder(metric.regime()))
+                        .thenComparing((RegimeFactorMetric metric) -> -Math.abs(metric.icOrZero()))
+                        .thenComparing(RegimeFactorMetric::factor))
+                .limit(36)
+                .map(StockBacktestService::regimeFactorDiagnosticRow)
+                .toList();
+    }
+
+    private static StockBacktestView.RegimeFactorDiagnosticRow regimeFactorDiagnosticRow(
+            RegimeFactorMetric metric) {
+        RegimeFactorDecision decision = regimeFactorDecision(metric);
+        return new StockBacktestView.RegimeFactorDiagnosticRow(
+                metric.regime(),
+                metric.factor(),
+                integer(metric.sampleCount()),
+                percent(metric.averageContribution()),
+                metric.hitRate() == null ? "-" : percent(metric.hitRate()),
+                metric.ic() == null ? "-" : decimal(metric.ic()),
+                integer(metric.highCount()),
+                metric.highCount() == 0 ? "-" : percent(metric.highAverageExcess()),
+                integer(metric.lowCount()),
+                metric.lowCount() == 0 ? "-" : percent(metric.lowAverageExcess()),
+                metric.spread() == null ? "-" : percent(metric.spread()),
+                decision.label(),
+                decision.tone());
+    }
+
+    private static RegimeFactorDecision regimeFactorDecision(RegimeFactorMetric metric) {
+        if (metric.sampleCount() < 100 || metric.ic() == null) {
+            return new RegimeFactorDecision("표본 부족", "neutral");
+        }
+        double spread = metric.spread() == null ? 0.0d : metric.spread();
+        double hitRate = metric.hitRate() == null ? 50.0d : metric.hitRate();
+        if (metric.ic() >= 0.035d && spread >= 0.25d && hitRate >= 52.0d) {
+            return new RegimeFactorDecision("국면 강화 후보", "positive");
+        }
+        if (metric.ic() <= -0.035d && spread <= -0.25d && hitRate <= 48.0d) {
+            return new RegimeFactorDecision("반전/감점 후보", "negative");
+        }
+        if (Math.abs(metric.ic()) < 0.015d && Math.abs(spread) < 0.20d) {
+            return new RegimeFactorDecision("보조 지표", "neutral");
+        }
+        return new RegimeFactorDecision("유지/관찰", "caution");
+    }
+
+    private static List<StockBacktestView.ExpectedExcessCalibrationRow> expectedExcessCalibrations(
+            StockBacktestMapper mapper,
+            String indexCode,
+            List<StockBacktestResult> results) {
+        List<StockBacktestResult> sample = results.stream()
+                .filter(result -> result.getSignalDate() != null)
+                .filter(result -> result.getSymbol() != null)
+                .filter(result -> result.getHorizonDays() != null)
+                .filter(result -> result.getForwardReturnPct() != null)
+                .toList();
+        if (sample.size() < 100) {
+            return List.of();
+        }
+        LocalDate fromDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate toDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (fromDate == null || toDate == null) {
+            return List.of();
+        }
+        List<StockExpectedReturnSnapshot> snapshots;
+        try {
+            snapshots = mapper.findExpectedReturnSnapshots(indexCode, fromDate, toDate).stream()
+                    .filter(snapshot -> EXPECTED_RETURN_MODEL_VERSION.equals(snapshot.getModelVersion()))
+                    .filter(snapshot -> snapshot.getExpectedExcessReturnPct() != null)
+                    .toList();
+        } catch (RuntimeException ex) {
+            return List.of();
+        }
+        if (snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        Map<ResultKey, StockBacktestResult> byKey = sample.stream()
+                .collect(Collectors.toMap(
+                        result -> new ResultKey(result.getSignalDate(), symbolKey(result.getSymbol()),
+                                result.getHorizonDays()),
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<ResultHorizonDateKey, Double> dateAverageReturn = sample.stream()
+                .collect(Collectors.groupingBy(
+                        result -> new ResultHorizonDateKey(result.getSignalDate(), result.getHorizonDays()),
+                        LinkedHashMap::new,
+                        Collectors.averagingDouble(result -> result.getForwardReturnPct().doubleValue())));
+        Map<ExpectedCalibrationKey, ExpectedCalibrationAccumulator> grouped = new LinkedHashMap<>();
+        for (StockExpectedReturnSnapshot snapshot : snapshots) {
+            if (snapshot.getSignalDate() == null
+                    || snapshot.getSymbol() == null
+                    || snapshot.getHorizonDays() == null
+                    || snapshot.getExpectedExcessReturnPct() == null) {
+                continue;
+            }
+            ResultKey key = new ResultKey(snapshot.getSignalDate(), symbolKey(snapshot.getSymbol()),
+                    snapshot.getHorizonDays());
+            StockBacktestResult result = byKey.get(key);
+            if (result == null || result.getForwardReturnPct() == null) {
+                continue;
+            }
+            Double dateAverage = dateAverageReturn.get(new ResultHorizonDateKey(
+                    result.getSignalDate(), result.getHorizonDays()));
+            if (dateAverage == null) {
+                continue;
+            }
+            double expectedExcess = snapshot.getExpectedExcessReturnPct().doubleValue();
+            double actualExcess = result.getForwardReturnPct().doubleValue() - dateAverage;
+            String bucket = expectedExcessBucket(expectedExcess);
+            ExpectedCalibrationKey groupKey = new ExpectedCalibrationKey(snapshot.getHorizonDays(), bucket);
+            ExpectedCalibrationAccumulator accumulator = grouped.computeIfAbsent(groupKey,
+                    ignored -> new ExpectedCalibrationAccumulator(snapshot.getHorizonDays(), bucket));
+            accumulator.add(expectedExcess, actualExcess);
+        }
+
+        return grouped.values().stream()
+                .map(ExpectedCalibrationAccumulator::toMetric)
+                .filter(metric -> metric.sampleCount() >= 30)
+                .sorted(Comparator
+                        .comparingInt(ExpectedCalibrationMetric::horizonDays)
+                        .thenComparingInt(metric -> expectedExcessBucketOrder(metric.bucket())))
+                .map(StockBacktestService::expectedExcessCalibrationRow)
+                .toList();
+    }
+
+    private static StockBacktestView.ExpectedExcessCalibrationRow expectedExcessCalibrationRow(
+            ExpectedCalibrationMetric metric) {
+        double error = metric.averageActualExcess() - metric.averageExpectedExcess();
+        String tone = Math.abs(error) <= 1.0d ? "positive" : Math.abs(error) <= 2.0d ? "neutral" : "caution";
+        return new StockBacktestView.ExpectedExcessCalibrationRow(
+                horizonLabel(metric.horizonDays()),
+                metric.bucket(),
+                integer(metric.sampleCount()),
+                percent(metric.averageExpectedExcess()),
+                percent(metric.averageActualExcess()),
+                percent(error),
+                percent(metric.hitRate()),
+                tone);
+    }
+
+    private static List<StockBacktestView.MonthlyModelPerformanceRow> monthlyModelPerformance(
+            StockBacktestMapper mapper,
+            String indexCode,
+            List<StockBacktestResult> results) {
+        List<StockBacktestResult> sample = results.stream()
+                .filter(result -> Objects.equals(result.getHorizonDays(), REGIME_DIAGNOSTIC_HORIZON))
+                .filter(result -> result.getSignalDate() != null)
+                .filter(result -> result.getSymbol() != null)
+                .filter(result -> result.getForwardReturnPct() != null)
+                .toList();
+        if (sample.size() < 100) {
+            return List.of();
+        }
+        LocalDate fromDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate toDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (fromDate == null || toDate == null) {
+            return List.of();
+        }
+        List<StockExpectedReturnSnapshot> snapshots;
+        try {
+            snapshots = mapper.findExpectedReturnSnapshots(indexCode, fromDate, toDate).stream()
+                    .filter(snapshot -> EXPECTED_RETURN_MODEL_VERSION.equals(snapshot.getModelVersion()))
+                    .filter(snapshot -> Objects.equals(snapshot.getHorizonDays(), REGIME_DIAGNOSTIC_HORIZON))
+                    .filter(snapshot -> snapshot.getExpectedExcessReturnPct() != null)
+                    .toList();
+        } catch (RuntimeException ex) {
+            return List.of();
+        }
+        if (snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        Map<ResultKey, StockBacktestResult> resultByKey = sample.stream()
+                .collect(Collectors.toMap(
+                        result -> new ResultKey(result.getSignalDate(), symbolKey(result.getSymbol()),
+                                result.getHorizonDays()),
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<LocalDate, Double> benchmarkByDate = sample.stream()
+                .collect(Collectors.groupingBy(
+                        StockBacktestResult::getSignalDate,
+                        LinkedHashMap::new,
+                        Collectors.averagingDouble(result -> result.getForwardReturnPct().doubleValue())));
+        Map<LocalDate, List<StockExpectedReturnSnapshot>> snapshotsByDate = snapshots.stream()
+                .filter(snapshot -> snapshot.getSignalDate() != null && snapshot.getSymbol() != null)
+                .collect(Collectors.groupingBy(StockExpectedReturnSnapshot::getSignalDate,
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<String, MonthlyModelPerformanceAccumulator> grouped = new LinkedHashMap<>();
+
+        for (Map.Entry<LocalDate, List<StockExpectedReturnSnapshot>> entry : snapshotsByDate.entrySet()) {
+            LocalDate signalDate = entry.getKey();
+            Double benchmarkReturn = benchmarkByDate.get(signalDate);
+            if (benchmarkReturn == null) {
+                continue;
+            }
+            List<StockExpectedReturnSnapshot> ranked = entry.getValue().stream()
+                    .sorted(Comparator
+                            .comparing((StockExpectedReturnSnapshot snapshot) ->
+                                    snapshot.getExpectedExcessReturnPct().doubleValue())
+                            .reversed())
+                    .toList();
+            int selectedSize = Math.min(50, Math.max(5, (int) Math.ceil(ranked.size() * 0.10d)));
+            String month = YearMonth.from(signalDate).toString();
+            MonthlyModelPerformanceAccumulator accumulator = grouped.computeIfAbsent(month,
+                    MonthlyModelPerformanceAccumulator::new);
+            for (StockExpectedReturnSnapshot snapshot : ranked.stream().limit(selectedSize).toList()) {
+                StockBacktestResult result = resultByKey.get(new ResultKey(snapshot.getSignalDate(),
+                        symbolKey(snapshot.getSymbol()), snapshot.getHorizonDays()));
+                if (result == null || result.getForwardReturnPct() == null) {
+                    continue;
+                }
+                accumulator.add(signalDate,
+                        result.getForwardReturnPct().doubleValue(),
+                        benchmarkReturn,
+                        snapshot.getExpectedExcessReturnPct().doubleValue(),
+                        snapshot.getConfidence() == null ? null : snapshot.getConfidence().doubleValue());
+            }
+        }
+
+        return grouped.values().stream()
+                .map(MonthlyModelPerformanceAccumulator::toMetric)
+                .filter(metric -> metric.selectedCount() >= 10)
+                .sorted(Comparator.comparing(MonthlyModelPerformanceMetric::period).reversed())
+                .limit(18)
+                .map(StockBacktestService::monthlyModelPerformanceRow)
+                .toList();
+    }
+
+    private static StockBacktestView.MonthlyModelPerformanceRow monthlyModelPerformanceRow(
+            MonthlyModelPerformanceMetric metric) {
+        String tone = tone(metric.excessReturn());
+        return new StockBacktestView.MonthlyModelPerformanceRow(
+                metric.period(),
+                integer(metric.signalDateCount()),
+                integer(metric.selectedCount()),
+                percent(metric.benchmarkReturn()),
+                percent(metric.modelReturn()),
+                percent(metric.excessReturn()),
+                weightPercent(metric.hitRate()),
+                percent(metric.averageExpectedExcess()),
+                weightPercent(metric.confidence()),
+                tone);
+    }
+
+    private static List<StockBacktestView.MonthlyModelPerformanceRow> quarterlyModelPerformance(
+            StockBacktestMapper mapper,
+            String indexCode,
+            List<StockBacktestResult> results) {
+        List<StockBacktestResult> sample = results.stream()
+                .filter(result -> Objects.equals(result.getHorizonDays(), REGIME_DIAGNOSTIC_HORIZON))
+                .filter(result -> result.getSignalDate() != null)
+                .filter(result -> result.getSymbol() != null)
+                .filter(result -> result.getForwardReturnPct() != null)
+                .toList();
+        if (sample.size() < 100) {
+            return List.of();
+        }
+        LocalDate fromDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate toDate = sample.stream()
+                .map(StockBacktestResult::getSignalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (fromDate == null || toDate == null) {
+            return List.of();
+        }
+        List<StockExpectedReturnSnapshot> snapshots;
+        try {
+            snapshots = mapper.findExpectedReturnSnapshots(indexCode, fromDate, toDate).stream()
+                    .filter(snapshot -> EXPECTED_RETURN_MODEL_VERSION.equals(snapshot.getModelVersion()))
+                    .filter(snapshot -> Objects.equals(snapshot.getHorizonDays(), REGIME_DIAGNOSTIC_HORIZON))
+                    .filter(snapshot -> snapshot.getExpectedExcessReturnPct() != null)
+                    .toList();
+        } catch (RuntimeException ex) {
+            return List.of();
+        }
+        if (snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        Map<ResultKey, StockBacktestResult> resultByKey = sample.stream()
+                .collect(Collectors.toMap(
+                        result -> new ResultKey(result.getSignalDate(), symbolKey(result.getSymbol()),
+                                result.getHorizonDays()),
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        Map<LocalDate, Double> benchmarkByDate = sample.stream()
+                .collect(Collectors.groupingBy(
+                        StockBacktestResult::getSignalDate,
+                        LinkedHashMap::new,
+                        Collectors.averagingDouble(result -> result.getForwardReturnPct().doubleValue())));
+        Map<LocalDate, List<StockExpectedReturnSnapshot>> snapshotsByDate = snapshots.stream()
+                .filter(snapshot -> snapshot.getSignalDate() != null && snapshot.getSymbol() != null)
+                .collect(Collectors.groupingBy(StockExpectedReturnSnapshot::getSignalDate,
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<String, MonthlyModelPerformanceAccumulator> grouped = new LinkedHashMap<>();
+
+        for (Map.Entry<LocalDate, List<StockExpectedReturnSnapshot>> entry : snapshotsByDate.entrySet()) {
+            LocalDate signalDate = entry.getKey();
+            Double benchmarkReturn = benchmarkByDate.get(signalDate);
+            if (benchmarkReturn == null) {
+                continue;
+            }
+            List<StockExpectedReturnSnapshot> ranked = entry.getValue().stream()
+                    .sorted(Comparator
+                            .comparing((StockExpectedReturnSnapshot snapshot) ->
+                                    snapshot.getExpectedExcessReturnPct().doubleValue())
+                            .reversed())
+                    .toList();
+            int selectedSize = Math.min(50, Math.max(5, (int) Math.ceil(ranked.size() * 0.10d)));
+            MonthlyModelPerformanceAccumulator accumulator = grouped.computeIfAbsent(quarterLabel(signalDate),
+                    MonthlyModelPerformanceAccumulator::new);
+            for (StockExpectedReturnSnapshot snapshot : ranked.stream().limit(selectedSize).toList()) {
+                StockBacktestResult result = resultByKey.get(new ResultKey(snapshot.getSignalDate(),
+                        symbolKey(snapshot.getSymbol()), snapshot.getHorizonDays()));
+                if (result == null || result.getForwardReturnPct() == null) {
+                    continue;
+                }
+                accumulator.add(signalDate,
+                        result.getForwardReturnPct().doubleValue(),
+                        benchmarkReturn,
+                        snapshot.getExpectedExcessReturnPct().doubleValue(),
+                        snapshot.getConfidence() == null ? null : snapshot.getConfidence().doubleValue());
+            }
+        }
+
+        return grouped.values().stream()
+                .map(MonthlyModelPerformanceAccumulator::toMetric)
+                .filter(metric -> metric.selectedCount() >= 20)
+                .sorted(Comparator.comparing(MonthlyModelPerformanceMetric::period).reversed())
+                .limit(12)
+                .map(StockBacktestService::monthlyModelPerformanceRow)
+                .toList();
+    }
+
+    private static String quarterLabel(LocalDate date) {
+        int quarter = (date.getMonthValue() - 1) / 3 + 1;
+        return date.getYear() + "-Q" + quarter;
+    }
+
+    private static String expectedExcessBucket(double value) {
+        if (value <= -3.0d) {
+            return "<= -3%";
+        }
+        if (value <= -1.0d) {
+            return "-3% ~ -1%";
+        }
+        if (value <= 0.0d) {
+            return "-1% ~ 0%";
+        }
+        if (value <= 1.0d) {
+            return "0% ~ +1%";
+        }
+        if (value <= 3.0d) {
+            return "+1% ~ +3%";
+        }
+        return ">= +3%";
+    }
+
+    private static int expectedExcessBucketOrder(String bucket) {
+        return switch (bucket) {
+            case "<= -3%" -> 1;
+            case "-3% ~ -1%" -> 2;
+            case "-1% ~ 0%" -> 3;
+            case "0% ~ +1%" -> 4;
+            case "+1% ~ +3%" -> 5;
+            case ">= +3%" -> 6;
+            default -> 9;
+        };
+    }
+
+    private static String symbolKey(String symbol) {
+        return symbol == null ? "" : symbol.trim().toUpperCase(Locale.US);
+    }
+
+    private static String normalizeRegime(String regime) {
+        if (regime == null || regime.isBlank()) {
+            return "Neutral";
+        }
+        String normalized = regime.trim();
+        if (normalized.equalsIgnoreCase("risk_on") || normalized.equalsIgnoreCase("risk-on")) {
+            return "Risk-on";
+        }
+        if (normalized.equalsIgnoreCase("risk_off") || normalized.equalsIgnoreCase("risk-off")) {
+            return "Risk-off";
+        }
+        if (normalized.equalsIgnoreCase("neutral")) {
+            return "Neutral";
+        }
+        return normalized;
+    }
+
+    private static int regimeOrder(String regime) {
+        return switch (normalizeRegime(regime)) {
+            case "Risk-off" -> 1;
+            case "Neutral" -> 2;
+            case "Risk-on" -> 3;
+            default -> 9;
+        };
+    }
+
     private static FactorCorrelation factorCorrelation(List<StockBacktestResult> results, Factor left, Factor right) {
         List<FactorPairScore> pairs = results.stream()
                 .map(result -> new FactorPairScore(left.score(result), right.score(result)))
@@ -664,23 +1304,25 @@ public class StockBacktestService {
     }
 
     private List<WeightProfileDefinition> weightProfiles(List<StockBacktestResult> results, List<FactorMetric> factorMetrics,
-            List<YearStabilityMetric> yearMetrics) {
+            List<YearStabilityMetric> yearMetrics, List<RegimeFactorMetric> regimeMetrics) {
         WeightProfileDefinition defaultProfile = defaultWeightProfile();
         WeightProfileDefinition backtestProfile = backtestWeightProfile(factorMetrics, yearMetrics);
         WeightProfileDefinition orthogonalProfile = backtestV2WeightProfile(results, factorMetrics, yearMetrics);
+        WeightProfileDefinition regimeProfile = regimeAwareWeightProfile(orthogonalProfile, regimeMetrics);
         StockSignalWeightProfileMapper mapper = weightProfileMapper.getIfAvailable();
         if (mapper == null) {
-            return List.of(defaultProfile, backtestProfile, orthogonalProfile);
+            return List.of(defaultProfile, backtestProfile, orthogonalProfile, regimeProfile);
         }
         try {
             persistWeightProfile(mapper, defaultProfile);
             persistWeightProfile(mapper, backtestProfile);
             persistWeightProfile(mapper, orthogonalProfile);
+            persistWeightProfile(mapper, regimeProfile);
             List<WeightProfileDefinition> loaded = loadWeightProfiles(mapper, List.of(
-                    defaultProfile, backtestProfile, orthogonalProfile));
-            return loaded.isEmpty() ? List.of(defaultProfile, backtestProfile, orthogonalProfile) : loaded;
+                    defaultProfile, backtestProfile, orthogonalProfile, regimeProfile));
+            return loaded.isEmpty() ? List.of(defaultProfile, backtestProfile, orthogonalProfile, regimeProfile) : loaded;
         } catch (RuntimeException ex) {
-            return List.of(defaultProfile, backtestProfile, orthogonalProfile);
+            return List.of(defaultProfile, backtestProfile, orthogonalProfile, regimeProfile);
         }
     }
 
@@ -759,6 +1401,94 @@ public class StockBacktestService {
                 "BACKTEST_ORTHOGONAL",
                 normalizeWeights(weights),
                 reasons);
+    }
+
+    private static WeightProfileDefinition regimeAwareWeightProfile(WeightProfileDefinition base,
+            List<RegimeFactorMetric> regimeMetrics) {
+        Map<String, String> reasons = new LinkedHashMap<>(base.reasons());
+        Map<String, Double> baseWeights = new LinkedHashMap<>(base.weights());
+        Map<String, Map<String, Double>> regimeWeights = new LinkedHashMap<>();
+        List<String> regimes = List.of("Risk-on", "Neutral", "Risk-off");
+        for (String regime : regimes) {
+            Map<String, Double> weights = new LinkedHashMap<>(baseWeights);
+            applyRegimePrior(regime, weights, reasons);
+            applyRegimeEvidence(regime, regimeMetrics, weights, reasons);
+            regimeWeights.put(regime, normalizeWeights(weights));
+        }
+        return new WeightProfileDefinition(
+                "REGIME_V1",
+                "Regime-aware v1 Candidate",
+                "Inactive candidate that changes factor weights by macro regime at scoring time. "
+                        + "Risk-on leans slightly toward momentum/growth; Risk-off leans toward quality/stability/risk.",
+                false,
+                "REGIME_DIAGNOSTIC",
+                baseWeights,
+                reasons,
+                regimeWeights);
+    }
+
+    private static void applyRegimePrior(String regime, Map<String, Double> weights, Map<String, String> reasons) {
+        if ("Risk-on".equals(regime)) {
+            multiplyWeight(weights, "Momentum", 1.04d);
+            multiplyWeight(weights, "Growth", 1.03d);
+            multiplyWeight(weights, "Risk", 0.98d);
+            appendReason(reasons, "Momentum", "Risk-on prior +4%");
+            appendReason(reasons, "Growth", "Risk-on prior +3%");
+            appendReason(reasons, "Risk", "Risk-on prior -2%");
+            return;
+        }
+        if ("Risk-off".equals(regime)) {
+            multiplyWeight(weights, "Quality", 1.04d);
+            multiplyWeight(weights, "Stability", 1.04d);
+            multiplyWeight(weights, "Risk", 1.04d);
+            multiplyWeight(weights, "Momentum", 0.97d);
+            multiplyWeight(weights, "Growth", 0.98d);
+            appendReason(reasons, "Quality", "Risk-off prior +4%");
+            appendReason(reasons, "Stability", "Risk-off prior +4%");
+            appendReason(reasons, "Risk", "Risk-off prior +4%");
+            appendReason(reasons, "Momentum", "Risk-off prior -3%");
+            appendReason(reasons, "Growth", "Risk-off prior -2%");
+        }
+    }
+
+    private static void applyRegimeEvidence(String regime, List<RegimeFactorMetric> regimeMetrics,
+            Map<String, Double> weights, Map<String, String> reasons) {
+        Map<String, RegimeFactorMetric> metrics = regimeMetrics.stream()
+                .filter(metric -> Objects.equals(normalizeRegime(metric.regime()), regime))
+                .collect(Collectors.toMap(RegimeFactorMetric::factor, Function.identity(),
+                        (left, right) -> left, LinkedHashMap::new));
+        for (Factor factor : factorDefinitions()) {
+            RegimeFactorMetric metric = metrics.get(factor.label());
+            if (metric == null || metric.sampleCount() < 100 || metric.ic() == null) {
+                continue;
+            }
+            double spread = metric.spread() == null ? 0.0d : metric.spread();
+            double hitRate = metric.hitRate() == null ? 50.0d : metric.hitRate();
+            double multiplier = 1.0d;
+            String note = null;
+            if (metric.ic() >= 0.035d && spread >= 0.25d && hitRate >= 52.0d) {
+                multiplier = 1.08d;
+                note = regime + " evidence +8%";
+            } else if (metric.ic() <= -0.035d && spread <= -0.25d && hitRate <= 48.0d) {
+                multiplier = 0.90d;
+                note = regime + " evidence -10%";
+            } else if (Math.abs(metric.ic()) < 0.015d && Math.abs(spread) < 0.20d) {
+                multiplier = 0.97d;
+                note = regime + " weak evidence -3%";
+            }
+            if (note != null) {
+                multiplyWeight(weights, factor.label(), multiplier);
+                appendReason(reasons, factor.label(), note + " (IC " + decimal(metric.ic())
+                        + ", spread " + percent(spread) + ")");
+            }
+        }
+    }
+
+    private static void multiplyWeight(Map<String, Double> weights, String factor, double multiplier) {
+        double current = weights.getOrDefault(factor, 0.0d);
+        if (current > 0) {
+            weights.put(factor, Math.max(1.0d, current * multiplier));
+        }
     }
 
     private static void applySectorBreadthPenalty(List<StockBacktestResult> results,
@@ -947,6 +1677,9 @@ public class StockBacktestService {
                 weights.putAll(fallbackProfile.weights());
                 reasons.putAll(fallbackProfile.reasons());
             }
+            Map<String, Map<String, Double>> regimeWeights = fallbackProfile == null
+                    ? Map.of()
+                    : fallbackProfile.regimeWeights();
             profiles.add(new WeightProfileDefinition(
                     profile.getCode(),
                     fallback(profile.getName()),
@@ -954,14 +1687,16 @@ public class StockBacktestService {
                     Boolean.TRUE.equals(profile.getActive()),
                     fallback(profile.getSource()),
                     normalizeWeights(weights),
-                    reasons));
+                    reasons,
+                    regimeWeights));
         }
         return profiles;
     }
 
     private static List<StockBacktestView.ProfileComparisonRow> profileComparisons(
             List<StockBacktestResult> results,
-            List<WeightProfileDefinition> profiles) {
+            List<WeightProfileDefinition> profiles,
+            MacroRegimeLookup regimeLookup) {
         List<StockBacktestView.ProfileComparisonRow> rows = new ArrayList<>();
         for (WeightProfileDefinition profile : profiles) {
             for (int horizon : HORIZONS) {
@@ -971,7 +1706,7 @@ public class StockBacktestService {
                 if (horizonResults.isEmpty()) {
                     continue;
                 }
-                List<ScoredForwardReturn> scored = scoredForwardReturns(horizonResults, profile);
+                List<ScoredForwardReturn> scored = scoredForwardReturns(horizonResults, profile, regimeLookup);
                 ProfileSpread spread = profileSpread(scored);
                 Double ic = informationCoefficientScored(scored);
                 rows.add(new StockBacktestView.ProfileComparisonRow(
@@ -993,7 +1728,8 @@ public class StockBacktestService {
 
     private static List<StockBacktestView.PromotionGateRow> promotionGate(
             List<StockBacktestResult> results,
-            List<WeightProfileDefinition> profiles) {
+            List<WeightProfileDefinition> profiles,
+            MacroRegimeLookup regimeLookup) {
         WeightProfileDefinition defaultProfile = profiles.stream()
                 .filter(profile -> "DEFAULT".equals(profile.code()))
                 .findFirst()
@@ -1008,14 +1744,14 @@ public class StockBacktestService {
             StockBacktestView.PromotionGateRow profileGate = promotionGateRow(
                     "Profile A/B",
                     candidateProfile.code(),
-                    evaluateProfile(promotionSample, defaultProfile),
-                    evaluateProfile(promotionSample, candidateProfile));
+                    evaluateProfile(promotionSample, defaultProfile, regimeLookup),
+                    evaluateProfile(promotionSample, candidateProfile, regimeLookup));
             if (profileGate != null) {
                 rows.add(profileGate);
             }
         }
 
-        rows.addAll(walkForwardPromotionGates(results, defaultProfile));
+        rows.addAll(walkForwardPromotionGates(results, defaultProfile, regimeLookup));
         return rows;
     }
 
@@ -1029,7 +1765,8 @@ public class StockBacktestService {
 
     private static List<StockBacktestView.PromotionGateRow> walkForwardPromotionGates(
             List<StockBacktestResult> results,
-            WeightProfileDefinition defaultProfile) {
+            WeightProfileDefinition defaultProfile,
+            MacroRegimeLookup regimeLookup) {
         List<Integer> years = results.stream()
                 .map(StockBacktestResult::getSignalDate)
                 .filter(Objects::nonNull)
@@ -1045,6 +1782,8 @@ public class StockBacktestService {
         List<ScoredForwardReturn> candidateV1Scores = new ArrayList<>();
         List<ScoredForwardReturn> defaultV2Scores = new ArrayList<>();
         List<ScoredForwardReturn> candidateV2Scores = new ArrayList<>();
+        List<ScoredForwardReturn> defaultRegimeScores = new ArrayList<>();
+        List<ScoredForwardReturn> candidateRegimeScores = new ArrayList<>();
         for (int testYear : years) {
             List<StockBacktestResult> trainResults = results.stream()
                     .filter(result -> result.getSignalDate() != null)
@@ -1065,10 +1804,13 @@ public class StockBacktestService {
 
             WeightProfileDefinition trainedV1Profile = walkForwardWeightProfile(trainResults, false);
             WeightProfileDefinition trainedV2Profile = walkForwardWeightProfile(trainResults, true);
-            defaultV1Scores.addAll(scoredForwardReturns(testResults, defaultProfile));
-            candidateV1Scores.addAll(scoredForwardReturns(testResults, trainedV1Profile));
-            defaultV2Scores.addAll(scoredForwardReturns(testResults, defaultProfile));
-            candidateV2Scores.addAll(scoredForwardReturns(testResults, trainedV2Profile));
+            WeightProfileDefinition trainedRegimeProfile = regimeAwareWeightProfile(trainedV2Profile, List.of());
+            defaultV1Scores.addAll(scoredForwardReturns(testResults, defaultProfile, regimeLookup));
+            candidateV1Scores.addAll(scoredForwardReturns(testResults, trainedV1Profile, regimeLookup));
+            defaultV2Scores.addAll(scoredForwardReturns(testResults, defaultProfile, regimeLookup));
+            candidateV2Scores.addAll(scoredForwardReturns(testResults, trainedV2Profile, regimeLookup));
+            defaultRegimeScores.addAll(scoredForwardReturns(testResults, defaultProfile, regimeLookup));
+            candidateRegimeScores.addAll(scoredForwardReturns(testResults, trainedRegimeProfile, regimeLookup));
         }
         List<StockBacktestView.PromotionGateRow> rows = new ArrayList<>();
         StockBacktestView.PromotionGateRow v1 = promotionGateRow(
@@ -1086,6 +1828,14 @@ public class StockBacktestService {
                 evaluateScored(candidateV2Scores));
         if (v2 != null) {
             rows.add(v2);
+        }
+        StockBacktestView.PromotionGateRow regime = promotionGateRow(
+                "Walk-forward",
+                "REGIME_V1",
+                evaluateScored(defaultRegimeScores),
+                evaluateScored(candidateRegimeScores));
+        if (regime != null) {
+            rows.add(regime);
         }
         return rows;
     }
@@ -1156,13 +1906,27 @@ public class StockBacktestService {
     private static ProfileEvaluation evaluateProfile(
             List<StockBacktestResult> results,
             WeightProfileDefinition profile) {
-        return evaluateScored(scoredForwardReturns(results, profile));
+        return evaluateProfile(results, profile, MacroRegimeLookup.empty());
+    }
+
+    private static ProfileEvaluation evaluateProfile(
+            List<StockBacktestResult> results,
+            WeightProfileDefinition profile,
+            MacroRegimeLookup regimeLookup) {
+        return evaluateScored(scoredForwardReturns(results, profile, regimeLookup));
     }
 
     private static List<ScoredForwardReturn> scoredForwardReturns(
             List<StockBacktestResult> results,
             WeightProfileDefinition profile) {
-        ProfileScoreContext context = profileScoreContext(results, profile);
+        return scoredForwardReturns(results, profile, MacroRegimeLookup.empty());
+    }
+
+    private static List<ScoredForwardReturn> scoredForwardReturns(
+            List<StockBacktestResult> results,
+            WeightProfileDefinition profile,
+            MacroRegimeLookup regimeLookup) {
+        ProfileScoreContext context = profileScoreContext(results, profile, regimeLookup);
         return results.stream()
                 .map(result -> new ScoredForwardReturn(
                         scoreForProfile(result, profile, context),
@@ -1248,7 +2012,8 @@ public class StockBacktestService {
     }
 
     private static List<StockBacktestView.WalkForwardProfileRow> walkForwardProfiles(
-            List<StockBacktestResult> results) {
+            List<StockBacktestResult> results,
+            MacroRegimeLookup regimeLookup) {
         List<Integer> years = results.stream()
                 .map(StockBacktestResult::getSignalDate)
                 .filter(Objects::nonNull)
@@ -1273,6 +2038,7 @@ public class StockBacktestService {
             }
             WeightProfileDefinition trainedV1Profile = walkForwardWeightProfile(trainResults, false);
             WeightProfileDefinition trainedV2Profile = walkForwardWeightProfile(trainResults, true);
+            WeightProfileDefinition trainedRegimeProfile = regimeAwareWeightProfile(trainedV2Profile, List.of());
             String trainWindow = trainWindow(years, testYear);
             String testWindow = Integer.toString(testYear);
 
@@ -1289,19 +2055,24 @@ public class StockBacktestService {
                     continue;
                 }
                 StockBacktestView.WalkForwardProfileRow defaultRow = walkForwardProfileRow(
-                        trainWindow, testWindow, defaultProfile, horizon, testHorizon);
+                        trainWindow, testWindow, defaultProfile, horizon, testHorizon, regimeLookup);
                 if (defaultRow != null) {
                     rows.add(defaultRow);
                 }
                 StockBacktestView.WalkForwardProfileRow trainedRow = walkForwardProfileRow(
-                        trainWindow, testWindow, trainedV1Profile, horizon, testHorizon);
+                        trainWindow, testWindow, trainedV1Profile, horizon, testHorizon, regimeLookup);
                 if (trainedRow != null) {
                     rows.add(trainedRow);
                 }
                 StockBacktestView.WalkForwardProfileRow trainedV2Row = walkForwardProfileRow(
-                        trainWindow, testWindow, trainedV2Profile, horizon, testHorizon);
+                        trainWindow, testWindow, trainedV2Profile, horizon, testHorizon, regimeLookup);
                 if (trainedV2Row != null) {
                     rows.add(trainedV2Row);
+                }
+                StockBacktestView.WalkForwardProfileRow trainedRegimeRow = walkForwardProfileRow(
+                        trainWindow, testWindow, trainedRegimeProfile, horizon, testHorizon, regimeLookup);
+                if (trainedRegimeRow != null) {
+                    rows.add(trainedRegimeRow);
                 }
             }
         }
@@ -1342,8 +2113,9 @@ public class StockBacktestService {
             String testWindow,
             WeightProfileDefinition profile,
             int horizon,
-            List<StockBacktestResult> testResults) {
-        List<ScoredForwardReturn> scored = scoredForwardReturns(testResults, profile);
+            List<StockBacktestResult> testResults,
+            MacroRegimeLookup regimeLookup) {
+        List<ScoredForwardReturn> scored = scoredForwardReturns(testResults, profile, regimeLookup);
         if (scored.isEmpty()) {
             return null;
         }
@@ -1402,9 +2174,53 @@ public class StockBacktestService {
         return rows;
     }
 
+    private static List<StockBacktestView.RegimeWeightItemRow> regimeWeightItems(
+            List<WeightProfileDefinition> profiles) {
+        WeightProfileDefinition profile = profiles.stream()
+                .filter(WeightProfileDefinition::regimeAware)
+                .filter(candidate -> "REGIME_V1".equals(candidate.code()))
+                .findFirst()
+                .orElse(null);
+        if (profile == null) {
+            return List.of();
+        }
+        List<StockBacktestView.RegimeWeightItemRow> rows = new ArrayList<>();
+        for (String regime : List.of("Risk-on", "Neutral", "Risk-off")) {
+            for (Factor factor : factorDefinitions()) {
+                String label = factor.label();
+                double baseWeight = profile.weight(label);
+                double regimeWeight = profile.weight(label, regime);
+                double delta = regimeWeight - baseWeight;
+                WeightState state = regimeDeltaState(delta);
+                rows.add(new StockBacktestView.RegimeWeightItemRow(
+                        regime,
+                        label,
+                        weightPercent(baseWeight),
+                        weightPercent(regimeWeight),
+                        signedPercent(delta),
+                        state.label(),
+                        state.tone()));
+            }
+        }
+        return rows;
+    }
+
+    private static WeightState regimeDeltaState(double delta) {
+        if (delta > 0.3d) {
+            return new WeightState("상향", "positive");
+        }
+        if (delta < -0.3d) {
+            return new WeightState("하향", "negative");
+        }
+        return new WeightState("유지", "neutral");
+    }
+
     private static WeightState weightState(WeightProfileDefinition profile, double delta) {
         if ("DEFAULT".equals(profile.code())) {
             return new WeightState("baseline", "neutral");
+        }
+        if (profile.regimeAware()) {
+            return new WeightState("regime-aware", "caution");
         }
         if (delta > 0.4d) {
             return new WeightState("상향", "positive");
@@ -1423,7 +2239,7 @@ public class StockBacktestService {
         if ("DEFAULT".equals(profile.code())) {
             return result.getIntegratedScore();
         }
-        Integer rawScore = rawScoreForProfile(result, profile);
+        Integer rawScore = rawScoreForProfile(result, profile, context);
         if (rawScore == null) {
             return null;
         }
@@ -1441,11 +2257,16 @@ public class StockBacktestService {
     }
 
     private static Integer rawScoreForProfile(StockBacktestResult result, WeightProfileDefinition profile) {
+        return rawScoreForProfile(result, profile, ProfileScoreContext.empty());
+    }
+
+    private static Integer rawScoreForProfile(StockBacktestResult result, WeightProfileDefinition profile,
+            ProfileScoreContext context) {
         double weightedScore = 0;
         double totalWeight = 0;
         for (Factor factor : factorDefinitions()) {
             Integer score = factor.score(result);
-            double weight = profile.weight(factor.label());
+            double weight = profile.weight(factor.label(), context.regimeLabel(result));
             if (score == null || weight <= 0) {
                 continue;
             }
@@ -1459,16 +2280,21 @@ public class StockBacktestService {
     }
 
     private static ProfileScoreContext profileScoreContext(List<StockBacktestResult> results,
-            WeightProfileDefinition profile) {
+            WeightProfileDefinition profile,
+            MacroRegimeLookup regimeLookup) {
+        MacroRegimeLookup effectiveRegimeLookup = profile.regimeAware()
+                ? regimeLookup
+                : MacroRegimeLookup.empty();
+        ProfileScoreContext baseContext = ProfileScoreContext.withRegime(effectiveRegimeLookup);
         if (!profile.orthogonalized()) {
-            return ProfileScoreContext.empty();
+            return baseContext;
         }
         List<RawProfileScore> rawScores = results.stream()
-                .map(result -> new RawProfileScore(result, rawScoreForProfile(result, profile)))
+                .map(result -> new RawProfileScore(result, rawScoreForProfile(result, profile, baseContext)))
                 .filter(row -> row.score() != null)
                 .toList();
         if (rawScores.size() < 100) {
-            return ProfileScoreContext.empty();
+            return baseContext;
         }
         Map<String, ScoreStats> sectorSizeStats = rawScores.stream()
                 .collect(Collectors.groupingBy(row -> neutralGroup(row.result()), LinkedHashMap::new,
@@ -1484,7 +2310,7 @@ public class StockBacktestService {
                 .stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> scoreStats(entry.getValue()),
                         (left, right) -> left, LinkedHashMap::new));
-        return new ProfileScoreContext(true, sectorSizeStats, sectorStats);
+        return new ProfileScoreContext(true, sectorSizeStats, sectorStats, effectiveRegimeLookup);
     }
 
     private static String neutralGroup(StockBacktestResult result) {
@@ -1637,7 +2463,9 @@ public class StockBacktestService {
                 "0", "0", "0", "0", "0", false);
         return new StockBacktestView(indexCode, coverage, result, cards(coverage, result, List.of()),
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(),
+                List.of());
     }
 
     private static Double hitRate(List<StockBacktestResult> results) {
@@ -1887,6 +2715,255 @@ public class StockBacktestService {
     private record CorrelationRisk(String label, String note, String tone) {
     }
 
+    private record ResultKey(LocalDate signalDate, String symbol, Integer horizonDays) {
+    }
+
+    private record ResultHorizonDateKey(LocalDate signalDate, Integer horizonDays) {
+    }
+
+    private record ExpectedCalibrationKey(Integer horizonDays, String bucket) {
+    }
+
+    private record ExpectedCalibrationMetric(
+            int horizonDays,
+            String bucket,
+            int sampleCount,
+            double averageExpectedExcess,
+            double averageActualExcess,
+            double hitRate) {
+    }
+
+    private static final class ExpectedCalibrationAccumulator {
+
+        private final int horizonDays;
+        private final String bucket;
+        private int sampleCount;
+        private double expectedExcessSum;
+        private double actualExcessSum;
+        private int hitCount;
+
+        private ExpectedCalibrationAccumulator(Integer horizonDays, String bucket) {
+            this.horizonDays = horizonDays == null ? 0 : horizonDays;
+            this.bucket = bucket;
+        }
+
+        private void add(double expectedExcess, double actualExcess) {
+            if (!Double.isFinite(expectedExcess) || !Double.isFinite(actualExcess)) {
+                return;
+            }
+            sampleCount++;
+            expectedExcessSum += expectedExcess;
+            actualExcessSum += actualExcess;
+            if (actualExcess > 0) {
+                hitCount++;
+            }
+        }
+
+        private ExpectedCalibrationMetric toMetric() {
+            double expectedAverage = sampleCount == 0 ? 0.0d : expectedExcessSum / sampleCount;
+            double actualAverage = sampleCount == 0 ? 0.0d : actualExcessSum / sampleCount;
+            double hitRate = sampleCount == 0 ? 0.0d : hitCount * 100.0d / sampleCount;
+            return new ExpectedCalibrationMetric(horizonDays, bucket, sampleCount, expectedAverage,
+                    actualAverage, hitRate);
+        }
+    }
+
+    private record MonthlyModelPerformanceMetric(
+            String period,
+            int signalDateCount,
+            int selectedCount,
+            double benchmarkReturn,
+            double modelReturn,
+            double excessReturn,
+            double hitRate,
+            double averageExpectedExcess,
+            double confidence) {
+    }
+
+    private static final class MonthlyModelPerformanceAccumulator {
+
+        private final String period;
+        private final Set<LocalDate> signalDates = new HashSet<>();
+        private int selectedCount;
+        private int hitCount;
+        private double benchmarkReturnSum;
+        private double modelReturnSum;
+        private double expectedExcessSum;
+        private double confidenceSum;
+        private int confidenceCount;
+
+        private MonthlyModelPerformanceAccumulator(String period) {
+            this.period = period;
+        }
+
+        private void add(LocalDate signalDate, double modelReturn, double benchmarkReturn,
+                double expectedExcess, Double confidence) {
+            if (signalDate == null || !Double.isFinite(modelReturn) || !Double.isFinite(benchmarkReturn)
+                    || !Double.isFinite(expectedExcess)) {
+                return;
+            }
+            signalDates.add(signalDate);
+            selectedCount++;
+            modelReturnSum += modelReturn;
+            benchmarkReturnSum += benchmarkReturn;
+            expectedExcessSum += expectedExcess;
+            if (modelReturn > benchmarkReturn) {
+                hitCount++;
+            }
+            if (confidence != null && Double.isFinite(confidence)) {
+                confidenceSum += confidence;
+                confidenceCount++;
+            }
+        }
+
+        private MonthlyModelPerformanceMetric toMetric() {
+            double benchmarkAverage = selectedCount == 0 ? 0.0d : benchmarkReturnSum / selectedCount;
+            double modelAverage = selectedCount == 0 ? 0.0d : modelReturnSum / selectedCount;
+            double expectedAverage = selectedCount == 0 ? 0.0d : expectedExcessSum / selectedCount;
+            double hitRate = selectedCount == 0 ? 0.0d : hitCount * 100.0d / selectedCount;
+            double confidence = confidenceCount == 0 ? 0.0d : confidenceSum / confidenceCount;
+            return new MonthlyModelPerformanceMetric(period, signalDates.size(), selectedCount,
+                    benchmarkAverage, modelAverage, modelAverage - benchmarkAverage, hitRate,
+                    expectedAverage, confidence);
+        }
+    }
+
+    private record RegimeFactorKey(String regime, String factor) {
+    }
+
+    private record RegimeFactorDecision(String label, String tone) {
+    }
+
+    private record RegimeFactorMetric(
+            String regime,
+            String factor,
+            int sampleCount,
+            double averageContribution,
+            Double hitRate,
+            Double ic,
+            int highCount,
+            double highAverageExcess,
+            int lowCount,
+            double lowAverageExcess,
+            Double spread) {
+
+        private double icOrZero() {
+            return ic == null ? 0.0d : ic;
+        }
+    }
+
+    private static final class RegimeFactorAccumulator {
+
+        private final String regime;
+        private final String factor;
+        private final List<Double> exposures = new ArrayList<>();
+        private final List<Double> contributions = new ArrayList<>();
+        private final List<Double> excessReturns = new ArrayList<>();
+        private int directionalSampleCount;
+        private int directionalHitCount;
+        private int highCount;
+        private double highExcessSum;
+        private int lowCount;
+        private double lowExcessSum;
+
+        private RegimeFactorAccumulator(String regime, String factor) {
+            this.regime = regime;
+            this.factor = factor;
+        }
+
+        private void add(double exposure, double contribution, double excessReturn) {
+            if (!Double.isFinite(exposure) || !Double.isFinite(contribution) || !Double.isFinite(excessReturn)) {
+                return;
+            }
+            exposures.add(exposure);
+            contributions.add(contribution);
+            excessReturns.add(excessReturn);
+            if (Math.abs(contribution) > 0.00001d && Math.abs(excessReturn) > 0.00001d) {
+                directionalSampleCount++;
+                if (Math.signum(contribution) == Math.signum(excessReturn)) {
+                    directionalHitCount++;
+                }
+            }
+            if (exposure >= 0.35d) {
+                highCount++;
+                highExcessSum += excessReturn;
+            } else if (exposure <= -0.35d) {
+                lowCount++;
+                lowExcessSum += excessReturn;
+            }
+        }
+
+        private RegimeFactorMetric toMetric() {
+            int sampleCount = excessReturns.size();
+            double averageContribution = contributions.stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(0.0d);
+            Double hitRate = directionalSampleCount == 0
+                    ? null
+                    : directionalHitCount * 100.0d / directionalSampleCount;
+            Double ic = pearson(contributions, excessReturns);
+            double highAverage = highCount == 0 ? 0.0d : highExcessSum / highCount;
+            double lowAverage = lowCount == 0 ? 0.0d : lowExcessSum / lowCount;
+            Double spread = highCount < 10 || lowCount < 10 ? null : highAverage - lowAverage;
+            return new RegimeFactorMetric(regime, factor, sampleCount, averageContribution, hitRate, ic,
+                    highCount, highAverage, lowCount, lowAverage, spread);
+        }
+    }
+
+    private static Double pearson(List<Double> left, List<Double> right) {
+        if (left.size() != right.size() || left.size() < 10) {
+            return null;
+        }
+        double leftAverage = left.stream().mapToDouble(Double::doubleValue).average().orElse(0.0d);
+        double rightAverage = right.stream().mapToDouble(Double::doubleValue).average().orElse(0.0d);
+        double covariance = 0.0d;
+        double leftVariance = 0.0d;
+        double rightVariance = 0.0d;
+        for (int index = 0; index < left.size(); index++) {
+            double leftDelta = left.get(index) - leftAverage;
+            double rightDelta = right.get(index) - rightAverage;
+            covariance += leftDelta * rightDelta;
+            leftVariance += leftDelta * leftDelta;
+            rightVariance += rightDelta * rightDelta;
+        }
+        if (leftVariance == 0.0d || rightVariance == 0.0d) {
+            return null;
+        }
+        return covariance / Math.sqrt(leftVariance * rightVariance);
+    }
+
+    private static final class MacroRegimeLookup {
+
+        private final NavigableMap<LocalDate, String> byDate;
+
+        private MacroRegimeLookup(NavigableMap<LocalDate, String> byDate) {
+            this.byDate = byDate;
+        }
+
+        private static MacroRegimeLookup empty() {
+            return new MacroRegimeLookup(new TreeMap<>());
+        }
+
+        private static MacroRegimeLookup from(List<StockMacroRegimeSnapshot> snapshots) {
+            NavigableMap<LocalDate, String> mapped = new TreeMap<>();
+            for (StockMacroRegimeSnapshot snapshot : snapshots) {
+                if (snapshot.getSnapshotDate() != null) {
+                    mapped.put(snapshot.getSnapshotDate(), normalizeRegime(snapshot.getRegimeLabel()));
+                }
+            }
+            return new MacroRegimeLookup(mapped);
+        }
+
+        private String regimeLabel(LocalDate date) {
+            if (date == null || byDate.isEmpty()) {
+                return "Neutral";
+            }
+            Map.Entry<LocalDate, String> entry = byDate.floorEntry(date);
+            return entry == null ? "Neutral" : entry.getValue();
+        }
+    }
+
     private record PromotionDecision(String label, String tone) {
     }
 
@@ -1900,18 +2977,42 @@ public class StockBacktestService {
             boolean active,
             String source,
             Map<String, Double> weights,
-            Map<String, String> reasons) {
+            Map<String, String> reasons,
+            Map<String, Map<String, Double>> regimeWeights) {
+
+        private WeightProfileDefinition(
+                String code,
+                String name,
+                String description,
+                boolean active,
+                String source,
+                Map<String, Double> weights,
+                Map<String, String> reasons) {
+            this(code, name, description, active, source, weights, reasons, Map.of());
+        }
 
         private double weight(String factor) {
             return weights.getOrDefault(factor, 0.0d);
+        }
+
+        private double weight(String factor, String regime) {
+            Map<String, Double> weightsForRegime = regimeWeights.get(normalizeRegime(regime));
+            if (weightsForRegime == null || weightsForRegime.isEmpty()) {
+                return weight(factor);
+            }
+            return weightsForRegime.getOrDefault(factor, weight(factor));
         }
 
         private String reason(String factor) {
             return reasons.getOrDefault(factor, "-");
         }
 
+        private boolean regimeAware() {
+            return regimeWeights != null && !regimeWeights.isEmpty();
+        }
+
         private boolean orthogonalized() {
-            return code != null && code.endsWith("_V2");
+            return code != null && (code.endsWith("_V2") || regimeAware());
         }
     }
 
@@ -1927,10 +3028,15 @@ public class StockBacktestService {
     private record ProfileScoreContext(
             boolean enabled,
             Map<String, ScoreStats> sectorSizeStats,
-            Map<String, ScoreStats> sectorStats) {
+            Map<String, ScoreStats> sectorStats,
+            MacroRegimeLookup regimeLookup) {
 
         private static ProfileScoreContext empty() {
-            return new ProfileScoreContext(false, Map.of(), Map.of());
+            return withRegime(MacroRegimeLookup.empty());
+        }
+
+        private static ProfileScoreContext withRegime(MacroRegimeLookup regimeLookup) {
+            return new ProfileScoreContext(false, Map.of(), Map.of(), regimeLookup);
         }
 
         private ScoreStats stats(StockBacktestResult result) {
@@ -1940,12 +3046,43 @@ public class StockBacktestService {
             }
             return sectorStats.get(fallback(result.getSector()));
         }
+
+        private String regimeLabel(StockBacktestResult result) {
+            return regimeLookup == null ? "Neutral" : regimeLookup.regimeLabel(result.getSignalDate());
+        }
     }
 
     private record ScoredForwardReturn(Integer score, BigDecimal forwardReturnPct) {
     }
 
     private record WeightState(String label, String tone) {
+    }
+
+    public record BacktestViewSnapshotRefreshResult(
+            String indexCode,
+            boolean saved,
+            String message,
+            long elapsedMillis) {
+    }
+
+    private record CachedBacktestView(StockBacktestView view, Instant cachedAt) {
+        boolean isFresh() {
+            return cachedAt != null && Instant.now().minus(BACKTEST_VIEW_CACHE_TTL).isBefore(cachedAt);
+        }
+    }
+
+    private static String normalizeIndexCode(String value) {
+        if (value == null || value.isBlank()) {
+            return "SP500";
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT).replace("-", "").replace("_", "");
+        if ("NASDAQ100".equals(normalized) || "NDX".equals(normalized)) {
+            return "NASDAQ100";
+        }
+        if ("DOW30".equals(normalized) || "DOWJONES30".equals(normalized) || "DJI".equals(normalized)) {
+            return "DOW30";
+        }
+        return "SP500";
     }
 }
 

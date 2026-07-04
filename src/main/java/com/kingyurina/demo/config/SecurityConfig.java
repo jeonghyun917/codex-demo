@@ -18,6 +18,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 pathPattern("/"),
+                                pathPattern("/quant"),
                                 pathPattern("/dashboard"),
                                 pathPattern("/atelier"),
                                 pathPattern("/stocks"),

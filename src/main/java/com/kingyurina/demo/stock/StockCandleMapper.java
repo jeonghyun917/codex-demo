@@ -17,5 +17,7 @@ public interface StockCandleMapper {
 
     List<StockCandleDaily> findRecentBySymbol(@Param("symbol") String symbol, @Param("limit") int limit);
 
+    void upsertSourceBatch(@Param("items") List<StockCandleDaily> items);
+
     void upsertBatch(@Param("items") List<StockCandleDaily> items);
 }

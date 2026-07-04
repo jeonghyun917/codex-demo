@@ -165,8 +165,22 @@ public class StockCacheService {
     public void saveCandles(List<StockCandleDaily> candles) {
         StockCandleMapper mapper = candleMapper.getIfAvailable();
         if (mapper != null && !candles.isEmpty()) {
-            mapper.upsertBatch(candles);
+            mapper.upsertSourceBatch(candles);
+            List<StockCandleDaily> canonicalCandles = candles.stream()
+                    .filter(StockCacheService::isCanonicalCandleSource)
+                    .toList();
+            if (!canonicalCandles.isEmpty()) {
+                mapper.upsertBatch(canonicalCandles);
+            }
         }
+    }
+
+    private static boolean isCanonicalCandleSource(StockCandleDaily candle) {
+        if (candle == null || candle.getSource() == null) {
+            return false;
+        }
+        return "yahoo-chart".equalsIgnoreCase(candle.getSource())
+                || "stooq".equalsIgnoreCase(candle.getSource());
     }
 
     public StockSignalLatest findLatestSignal(String symbol) {

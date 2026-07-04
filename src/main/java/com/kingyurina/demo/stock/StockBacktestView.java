@@ -18,9 +18,14 @@ public record StockBacktestView(
         List<PromotionGateRow> promotionGate,
         List<ProfileDiagnosticRow> profileDiagnostics,
         List<FactorCorrelationRow> factorCorrelations,
+        List<RegimeFactorDiagnosticRow> regimeFactorDiagnostics,
+        List<ExpectedExcessCalibrationRow> expectedExcessCalibrations,
+        List<MonthlyModelPerformanceRow> monthlyModelPerformance,
+        List<MonthlyModelPerformanceRow> quarterlyModelPerformance,
         List<ProfileComparisonRow> profileComparisons,
         List<WalkForwardProfileRow> walkForwardProfiles,
         List<WeightProfileItemRow> weightProfileItems,
+        List<RegimeWeightItemRow> regimeWeightItems,
         List<SectorRow> sectors) {
 
     public record CoverageSummary(
@@ -158,6 +163,46 @@ public record StockBacktestView(
             String tone) {
     }
 
+    public record RegimeFactorDiagnosticRow(
+            String regime,
+            String factor,
+            String sampleCount,
+            String avgContribution,
+            String hitRate,
+            String ic,
+            String highCount,
+            String highExcessReturn,
+            String lowCount,
+            String lowExcessReturn,
+            String spread,
+            String decision,
+            String tone) {
+    }
+
+    public record ExpectedExcessCalibrationRow(
+            String horizon,
+            String bucket,
+            String sampleCount,
+            String averageExpectedExcess,
+            String averageActualExcess,
+            String error,
+            String hitRate,
+            String tone) {
+    }
+
+    public record MonthlyModelPerformanceRow(
+            String month,
+            String signalDates,
+            String selectedCount,
+            String benchmarkReturn,
+            String modelReturn,
+            String excessReturn,
+            String hitRate,
+            String averageExpectedExcess,
+            String confidence,
+            String tone) {
+    }
+
     public record ProfileComparisonRow(
             String profile,
             String status,
@@ -193,6 +238,16 @@ public record StockBacktestView(
             String weight,
             String state,
             String reason,
+            String tone) {
+    }
+
+    public record RegimeWeightItemRow(
+            String regime,
+            String factor,
+            String baseWeight,
+            String regimeWeight,
+            String delta,
+            String state,
             String tone) {
     }
 }

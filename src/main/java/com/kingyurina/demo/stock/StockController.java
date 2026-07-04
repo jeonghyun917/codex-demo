@@ -16,6 +16,7 @@ public class StockController {
     private final StockMarketViewService stockMarketViewService;
     private final StockHeatmapViewService stockHeatmapViewService;
     private final StockSignalService stockSignalService;
+    private final StockQuantOpinionService stockQuantOpinionService;
     private final StockBacktestService stockBacktestService;
     private final StockPortfolioBacktestService stockPortfolioBacktestService;
     private final StockSearchService stockSearchService;
@@ -23,7 +24,8 @@ public class StockController {
 
     public StockController(StockAnalysisService stockAnalysisService, StockInfoViewService stockInfoViewService,
             StockMarketViewService stockMarketViewService, StockHeatmapViewService stockHeatmapViewService,
-            StockSignalService stockSignalService, StockBacktestService stockBacktestService,
+            StockSignalService stockSignalService, StockQuantOpinionService stockQuantOpinionService,
+            StockBacktestService stockBacktestService,
             StockPortfolioBacktestService stockPortfolioBacktestService, StockSearchService stockSearchService,
             MenuService menuService) {
         this.stockAnalysisService = stockAnalysisService;
@@ -31,6 +33,7 @@ public class StockController {
         this.stockMarketViewService = stockMarketViewService;
         this.stockHeatmapViewService = stockHeatmapViewService;
         this.stockSignalService = stockSignalService;
+        this.stockQuantOpinionService = stockQuantOpinionService;
         this.stockBacktestService = stockBacktestService;
         this.stockPortfolioBacktestService = stockPortfolioBacktestService;
         this.stockSearchService = stockSearchService;
@@ -80,6 +83,7 @@ public class StockController {
         model.addAttribute("dashboard", dashboard);
         model.addAttribute("info", stockInfoViewService.build(dashboard));
         model.addAttribute("signal", stockSignalService.buildStored(dashboard.symbol()));
+        model.addAttribute("quantOpinion", stockQuantOpinionService.build(dashboard.symbol()));
         return "stocks";
     }
 

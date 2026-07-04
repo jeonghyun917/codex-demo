@@ -1,6 +1,7 @@
 package com.kingyurina.demo.stock;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class StockMarketRow {
@@ -27,6 +28,12 @@ public class StockMarketRow {
     private Integer analystBearish;
     private BigDecimal latestSurprisePercent;
     private Integer recentNewsCount;
+    private BigDecimal expectedExcessReturnPct;
+    private BigDecimal calibratedUpsideProbabilityPct;
+    private BigDecimal drawdownRiskPct;
+    private Integer expectedConfidence;
+    private String expectedModelVersion;
+    private LocalDate expectedSignalDate;
     private Integer signalScore;
     private String signalConfidence;
     private String signalTone;
@@ -219,6 +226,54 @@ public class StockMarketRow {
 
     public void setRecentNewsCount(Integer recentNewsCount) {
         this.recentNewsCount = recentNewsCount;
+    }
+
+    public BigDecimal getExpectedExcessReturnPct() {
+        return expectedExcessReturnPct;
+    }
+
+    public void setExpectedExcessReturnPct(BigDecimal expectedExcessReturnPct) {
+        this.expectedExcessReturnPct = expectedExcessReturnPct;
+    }
+
+    public BigDecimal getCalibratedUpsideProbabilityPct() {
+        return calibratedUpsideProbabilityPct;
+    }
+
+    public void setCalibratedUpsideProbabilityPct(BigDecimal calibratedUpsideProbabilityPct) {
+        this.calibratedUpsideProbabilityPct = calibratedUpsideProbabilityPct;
+    }
+
+    public BigDecimal getDrawdownRiskPct() {
+        return drawdownRiskPct;
+    }
+
+    public void setDrawdownRiskPct(BigDecimal drawdownRiskPct) {
+        this.drawdownRiskPct = drawdownRiskPct;
+    }
+
+    public Integer getExpectedConfidence() {
+        return expectedConfidence;
+    }
+
+    public void setExpectedConfidence(Integer expectedConfidence) {
+        this.expectedConfidence = expectedConfidence;
+    }
+
+    public String getExpectedModelVersion() {
+        return expectedModelVersion;
+    }
+
+    public void setExpectedModelVersion(String expectedModelVersion) {
+        this.expectedModelVersion = expectedModelVersion;
+    }
+
+    public LocalDate getExpectedSignalDate() {
+        return expectedSignalDate;
+    }
+
+    public void setExpectedSignalDate(LocalDate expectedSignalDate) {
+        this.expectedSignalDate = expectedSignalDate;
     }
 
     public Integer getSignalScore() {

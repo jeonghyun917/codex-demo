@@ -41,7 +41,7 @@ public class MenuService {
 
     private static List<MenuItem> fallbackMainMenus() {
         return List.of(
-                new MenuItem("Dashboard", "/dashboard"),
+                new MenuItem("Quant", "/quant"),
                 new MenuItem("Stocks", "/stocks"),
                 new MenuItem("Heatmap", "/stocks/heatmap"),
                 new MenuItem("ETF", "/etfs"),

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.TossMarketDataMapper">
+    <insert id="insertBatchRun" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO toss_batch_run (job_name, status, message)
+        VALUES (#{jobName}, #{status}, #{message})
+    </insert>
+
+    <update id="finishBatchRun">
+        UPDATE toss_batch_run
+        SET finished_at = #{finishedAt},
+            status = #{status},
+            requested_count = #{requestedCount},
+            success_count = #{successCount},
+            fail_count = #{failCount},
+            skipped_count = #{skippedCount},
+            saved_rows = #{savedRows},
+            message = #{message}
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insertPriceSnapshot">
+        INSERT INTO toss_market_price_snapshot (
+            symbol, price_time, last_price, currency, raw_json
+        )
+        VALUES (
+            #{symbol}, #{priceTime}, #{lastPrice}, #{currency}, #{rawJson}
+        )
+    </insert>
+
+    <insert id="upsertStockInfo">
+        INSERT INTO toss_stock_info (
+            symbol, name, english_name, isin_code, market, security_type, common_share, status,
+            currency, list_date, delist_date, shares_outstanding, leverage_factor, raw_json
+        )
+        VALUES (
+            #{symbol}, #{name}, #{englishName}, #{isinCode}, #{market}, #{securityType}, #{commonShare}, #{status},
+            #{currency}, #{listDate}, #{delistDate}, #{sharesOutstanding}, #{leverageFactor}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            english_name = VALUES(english_name),
+            isin_code = VALUES(isin_code),
+            market = VALUES(market),
+            security_type = VALUES(security_type),
+            common_share = VALUES(common_share),
+            status = VALUES(status),
+            currency = VALUES(currency),
+            list_date = VALUES(list_date),
+            delist_date = VALUES(delist_date),
+            shares_outstanding = VALUES(shares_outstanding),
+            leverage_factor = VALUES(leverage_factor),
+            raw_json = VALUES(raw_json),
+            fetched_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteWarnings">
+        DELETE FROM toss_stock_warning
+        WHERE symbol = #{symbol}
+    </delete>
+
+    <insert id="upsertWarning">
+        INSERT INTO toss_stock_warning (
+            symbol, warning_type, exchange, start_date, end_date, raw_json
+        )
+        VALUES (
+            #{symbol}, #{warningType}, #{exchange}, #{startDate}, #{endDate}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            exchange = VALUES(exchange),
+            end_date = VALUES(end_date),
+            raw_json = VALUES(raw_json),
+            fetched_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="upsertCandle">
+        INSERT INTO toss_candle (
+            symbol, interval_code, candle_time, trade_date, open_price, high_price, low_price,
+            close_price, volume, currency, adjusted, raw_json
+        )
+        VALUES (
+            #{symbol}, #{intervalCode}, #{candleTime}, #{tradeDate}, #{openPrice}, #{highPrice}, #{lowPrice},
+            #{closePrice}, #{volume}, #{currency}, #{adjusted}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            trade_date = VALUES(trade_date),
+            open_price = VALUES(open_price),
+            high_price = VALUES(high_price),
+            low_price = VALUES(low_price),
+            close_price = VALUES(close_price),
+            volume = VALUES(volume),
+            currency = VALUES(currency),
+            adjusted = VALUES(adjusted),
+            raw_json = VALUES(raw_json),
+            fetched_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="insertOrderbookSnapshot">
+        INSERT INTO toss_orderbook_snapshot (
+            symbol, orderbook_time, currency, best_ask_price, best_ask_volume,
+            best_bid_price, best_bid_volume, spread, spread_bps, raw_json
+        )
+        VALUES (
+            #{symbol}, #{orderbookTime}, #{currency}, #{bestAskPrice}, #{bestAskVolume},
+            #{bestBidPrice}, #{bestBidVolume}, #{spread}, #{spreadBps}, #{rawJson}
+        )
+    </insert>
+
+    <insert id="upsertTradePrint">
+        INSERT INTO toss_trade_print (
+            symbol, trade_time, price, volume, currency, raw_json
+        )
+        VALUES (
+            #{symbol}, #{tradeTime}, #{price}, #{volume}, #{currency}, #{rawJson}
+        )
+        ON DUPLICATE KEY UPDATE
+            currency = VALUES(currency),
+            raw_json = VALUES(raw_json),
+            fetched_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <insert id="insertPriceLimitSnapshot">
+        INSERT INTO toss_price_limit_snapshot (
+            symbol, limit_time, upper_limit_price, lower_limit_price, currency, raw_json
+        )
+        VALUES (
+            #{symbol}, #{limitTime}, #{upperLimitPrice}, #{lowerLimitPrice}, #{currency}, #{rawJson}
+        )
+    </insert>
+
+    <insert id="insertExchangeRateSnapshot">
+        INSERT INTO toss_exchange_rate_snapshot (
+            base_currency, quote_currency, rate, mid_rate, basis_point,
+            rate_change_type, valid_from, valid_until, raw_json
+        )
+        VALUES (
+            #{baseCurrency}, #{quoteCurrency}, #{rate}, #{midRate}, #{basisPoint},
+            #{rateChangeType}, #{validFrom}, #{validUntil}, #{rawJson}
+        )
+    </insert>
+
+    <insert id="insertCalendarSnapshot">
+        INSERT INTO toss_market_calendar_snapshot (
+            market_country, query_date, today_date, today_open,
+            previous_business_date, next_business_date, raw_json
+        )
+        VALUES (
+            #{marketCountry}, #{queryDate}, #{todayDate}, #{todayOpen},
+            #{previousBusinessDate}, #{nextBusinessDate}, #{rawJson}
+        )
+    </insert>
+</mapper>

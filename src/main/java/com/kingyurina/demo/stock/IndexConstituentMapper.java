@@ -1,6 +1,7 @@
 package com.kingyurina.demo.stock;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -24,6 +25,9 @@ public interface IndexConstituentMapper {
     int countTotal(@Param("indexCode") String indexCode);
 
     List<String> findCurrentSymbols(@Param("indexCode") String indexCode);
+
+    List<String> findMemberSymbolsOnDate(@Param("indexCode") String indexCode,
+            @Param("snapshotDate") LocalDate snapshotDate);
 
     List<String> findCurrentSymbolsByIndexCodes(@Param("indexCodes") List<String> indexCodes,
             @Param("limit") int limit);

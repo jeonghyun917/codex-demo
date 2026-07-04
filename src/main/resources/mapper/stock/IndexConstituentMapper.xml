@@ -65,6 +65,18 @@
         ORDER BY symbol
     </select>
 
+    <select id="findMemberSymbolsOnDate" resultType="string">
+        SELECT m.symbol
+        FROM stock_index_membership_snapshot m
+        WHERE m.index_code = #{indexCode}
+          AND m.snapshot_date = #{snapshotDate}
+          AND m.is_member = TRUE
+          AND m.symbol NOT IN ('TICKER', 'SECURITY')
+          AND UPPER(COALESCE(m.sector, '')) &lt;&gt; 'TICKER'
+        GROUP BY m.symbol
+        ORDER BY m.symbol
+    </select>
+
     <select id="findCurrentSymbolsByIndexCodes" resultType="string">
         SELECT i.symbol
         FROM index_constituent i
@@ -121,6 +133,13 @@
             sl.news_score AS newsScore,
             sl.momentum_score AS momentumScore,
             sl.risk_score AS riskScore
+            ,
+            er.expected_excess_return_pct AS expectedExcessReturnPct,
+            er.calibrated_upside_probability_pct AS calibratedUpsideProbabilityPct,
+            er.drawdown_risk_pct AS drawdownRiskPct,
+            er.confidence AS expectedConfidence,
+            er.model_version AS expectedModelVersion,
+            er.signal_date AS expectedSignalDate
         FROM index_constituent i
         LEFT JOIN company_profile p
             ON p.symbol = i.symbol
@@ -144,6 +163,19 @@
             ON sl.symbol = i.symbol
         LEFT JOIN stock_data_quality_latest dq
             ON dq.symbol = i.symbol
+        LEFT JOIN stock_expected_return_snapshot er
+            ON er.index_code = i.index_code
+            AND er.symbol = i.symbol
+            AND er.horizon_days = 20
+            AND er.model_version = 'EXPECTED_RETURN_V9'
+            AND er.signal_date = (
+                SELECT MAX(signal_date)
+                FROM stock_expected_return_snapshot
+                WHERE index_code = i.index_code
+                  AND symbol = i.symbol
+                  AND horizon_days = 20
+                  AND model_version = 'EXPECTED_RETURN_V9'
+            )
         WHERE i.index_code = #{indexCode}
           AND i.current_member = TRUE
           AND i.symbol NOT IN ('TICKER', 'SECURITY')

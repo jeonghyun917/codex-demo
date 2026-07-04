@@ -1,0 +1,4 @@
+index_code,symbol,start_date,end_date,sector,industry,exchange,is_member,source
+SP500,NVDA,2021-06-21,2026-06-21,Information Technology,Semiconductors,NASDAQ,true,CSV_IMPORT_MEMBERSHIP_PIT
+SP500,AAPL,2021-06-21,2026-06-21,Information Technology,Consumer Electronics,NASDAQ,true,CSV_IMPORT_MEMBERSHIP_PIT
+SP500,EXAMPLE_OLD,2021-06-21,2022-12-31,Industrials,Industrial Conglomerates,NYSE,true,CSV_IMPORT_MEMBERSHIP_PIT

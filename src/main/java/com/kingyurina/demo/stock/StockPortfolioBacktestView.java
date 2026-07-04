@@ -10,6 +10,11 @@ public record StockPortfolioBacktestView(
         List<StrategyRow> strategies,
         List<RiskModelRow> riskModels,
         List<RiskImpactRow> riskImpacts,
+        List<HealthAlert> healthAlerts,
+        List<OptimizerValidationRow> optimizerValidations,
+        List<OptimizerShadowPathRow> optimizerShadowPaths,
+        List<MetricCard> liveCards,
+        List<PositionRow> livePositions,
         List<PeriodRow> recentPeriods,
         List<SectorExposureRow> sectorExposures,
         List<PositionRow> latestPositions,
@@ -23,6 +28,7 @@ public record StockPortfolioBacktestView(
 
     public record RiskImpactRow(
             String strategy,
+            String riskModel,
             String horizon,
             String topCount,
             String weighting,
@@ -32,6 +38,36 @@ public record StockPortfolioBacktestView(
             String sectorDelta,
             String costDelta,
             String excessDelta,
+            String verdict,
+            String tone) {
+    }
+
+    public record HealthAlert(String layer, String status, String note, String tone) {
+    }
+
+    public record OptimizerValidationRow(
+            String strategy,
+            String horizon,
+            String topCount,
+            String objective,
+            String target,
+            String observed,
+            String gap,
+            String verdict,
+            String tone) {
+    }
+
+    public record OptimizerShadowPathRow(
+            String candidateOptimizer,
+            String sample,
+            String hardPassRate,
+            String objectiveGap,
+            String weightDistance,
+            String sharpeDelta,
+            String drawdownDelta,
+            String excessDelta,
+            String betaBreaches,
+            String turnoverBreaches,
             String verdict,
             String tone) {
     }
@@ -54,6 +90,7 @@ public record StockPortfolioBacktestView(
             String benchmarkBeatRate,
             String averageTurnover,
             String averageTransactionCost,
+            String averageInvestedWeight,
             String averageMaxSectorWeight,
             String averageMaxPositionWeight,
             String averageBeta,
@@ -73,6 +110,7 @@ public record StockPortfolioBacktestView(
             String excessReturn,
             String turnover,
             String transactionCost,
+            String cashWeight,
             String beta,
             String trailingVolatility,
             String liquidity,
@@ -97,6 +135,10 @@ public record StockPortfolioBacktestView(
             String sector,
             String score,
             String weight,
+            String expectedExcessReturn,
+            String expectedRange,
+            String upsideProbability,
+            String expectedConfidence,
             String forwardReturn,
             String beta,
             String trailingVolatility,

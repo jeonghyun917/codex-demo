@@ -1,239 +1,355 @@
-<!doctype html>
+﻿<!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Quant AI Dashboard | King Yurina</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <title>Quant | King Yurina</title>
     <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
 </head>
-<body>
-<div class="page-shell">
-    <header class="site-header" aria-label="Primary navigation">
-        <a class="brand-mark" href="/" aria-label="King Yurina home">KY</a>
-        <nav class="nav-links" aria-label="Main menu">
+<body class="market-body">
+<div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" th:href="@{/}" href="/">KY</a>
+        <nav class="market-nav" aria-label="Global menu">
             <a th:each="menu : ${mainMenus}"
                th:href="${menu.href}"
                th:text="${menu.label}"
-               href="/dashboard">Dashboard</a>
+               th:classappend="${menu.href == '/quant' || menu.href == '/dashboard'} ? ' active' : ''"
+               href="/quant">Quant</a>
         </nav>
-        <a class="header-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Portfolio Lab</a>
+        <form class="market-search" th:action="@{/stocks}" method="get">
+            <label for="symbol">Ticker</label>
+            <input id="symbol" name="symbol" placeholder="티커 검색" autocomplete="off" spellcheck="false">
+            <button type="submit">검색</button>
+        </form>
     </header>
 
-    <main class="hero quant-home">
-        <section class="hero-stage" aria-labelledby="dashboard-title">
-            <div class="hero-editorial">
-                <p class="eyebrow">Quant AI operating dashboard</p>
-                <h1 id="dashboard-title">quant ai</h1>
-                <p class="hero-copy">
-                    This dashboard documents the Quant AI stack: collected market data, Signal composition,
-                    validation layers, weight profiles, and the portfolio backtest path.
-                </p>
-                <div class="hero-actions" aria-label="Quant dashboard actions">
-                    <a class="primary-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Portfolio Lab</a>
-                    <a class="secondary-action" th:href="@{/signals/backtest}" href="/signals/backtest">Backtest Lab</a>
-                    <a class="secondary-action" th:href="@{/stocks}" href="/stocks">Stock List</a>
+    <main class="market-home quant-dashboard-home">
+        <section class="market-landing quant-dashboard-landing">
+            <div>
+                <p>Quant</p>
+                <h1>
+                    <strong th:text="${market.title}">S&amp;P 500</strong>
+                    <span th:text="${market.subtitle}">캐시된 시장 데이터와 Quant AI Signal 요약입니다.</span>
+                </h1>
+            </div>
+            <nav class="dashboard-index-tabs" aria-label="Quant index filter">
+                <a th:href="@{/quant(index='SP500')}"
+                   th:classappend="${activeIndex == 'SP500'} ? ' active' : ''"
+                   href="/quant?index=SP500">S&amp;P 500</a>
+                <a th:href="@{/quant(index='NASDAQ100')}"
+                   th:classappend="${activeIndex == 'NASDAQ100'} ? ' active' : ''"
+                   href="/quant?index=NASDAQ100">Nasdaq 100</a>
+                <a th:href="@{/quant(index='DOW30')}"
+                   th:classappend="${activeIndex == 'DOW30'} ? ' active' : ''"
+                   href="/quant?index=DOW30">Dow Jones 30</a>
+            </nav>
+        </section>
+
+        <section class="market-board quant-dashboard-board">
+            <div class="market-board-main">
+                <div class="board-toolbar">
+                    <div>
+                        <h2 th:text="${market.title + ' Quant AI'}">S&amp;P 500 Quant AI</h2>
+                        <p>
+                            구성종목 <b th:text="${market.totalMembers}">0</b>,
+                            quote 캐시 <b th:text="${market.cachedQuotes}">0</b>,
+                            Signal 평균 <b th:text="${market.indexCards[2].value}">-</b>,
+                            강한 Signal <b th:text="${market.indexCards[3].value}">0개</b>
+                        </p>
+                    </div>
+                    <div class="toolbar-pills">
+                        <a th:href="@{/stocks}" href="/stocks">Stocks</a>
+                        <a th:href="@{/stocks/heatmap(index=${activeIndex})}" href="/stocks/heatmap">Heatmap</a>
+                        <a th:href="@{/signals/portfolio}" href="/signals/portfolio">Portfolio</a>
+                    </div>
+                </div>
+
+                <div class="quant-dashboard-table" data-market-list data-visible-step="100">
+                    <div class="quant-dashboard-row quant-dashboard-head">
+                        <span class="dashboard-head-cell"><span>순위</span></span>
+                        <span class="dashboard-head-cell"><span>종목</span></span>
+                        <span class="dashboard-head-cell"><span>섹터</span></span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="price">현재가</button>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="marketCap">시가총액</button>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="signal">Signal</button>
+                            <span class="header-help" tabindex="0" aria-label="Signal 설명"
+                                  data-tip="10개 원천 factor와 동일 수집 대상 내 ranking을 합친 Quant AI 종합 신호입니다. 높을수록 현재 데이터 기준 매력도가 높습니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="quality">품질</button>
+                            <span class="header-help" tabindex="0" aria-label="데이터 품질 설명"
+                                  data-tip="데이터 커버리지, 최신성, 이상치, 원천 데이터 충돌 여부를 반영한 신뢰 점수입니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="expected">20D 기대</button>
+                            <span class="header-help" tabindex="0" aria-label="20D 기대 초과수익 설명"
+                                  data-tip="Expected Return v8이 계산한 20거래일 기대 초과수익입니다. FRED macro feature와 horizon별 decay/calibration을 함께 반영한 확률 의견입니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="upside">상승확률</button>
+                            <span class="header-help" tabindex="0" aria-label="상승확률 설명"
+                                  data-tip="보정된 상승확률입니다. calibration bucket을 통해 raw 확률을 보수적으로 조정합니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="confidence">모델신뢰</button>
+                            <span class="header-help" tabindex="0" aria-label="모델 신뢰도 설명"
+                                  data-tip="표본 수, 데이터 최신성, calibration, 모델 버전 한계를 반영한 Expected Return 모델 신뢰도입니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="valuation">Value</button>
+                            <span class="header-help" tabindex="0" aria-label="Value 설명"
+                                  data-tip="PER, PBR, PSR, 섹터 상대 밸류에이션을 기반으로 만든 가치 factor입니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="growth">Growth</button>
+                            <span class="header-help" tabindex="0" aria-label="Growth 설명"
+                                  data-tip="SEC 재무제표 기반 매출, 이익, 현금흐름 성장성과 최근 개선 흐름을 반영합니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="momentum">Momentum</button>
+                            <span class="header-help" tabindex="0" aria-label="Momentum 설명"
+                                  data-tip="일봉 기반 추세, 이동평균, RSI, 52주 위치, 단기 가격 흐름을 반영합니다.">i</span>
+                        </span>
+                        <span class="dashboard-head-cell">
+                            <button class="sp-sort" type="button" data-sort="risk">Risk</button>
+                            <span class="header-help" tabindex="0" aria-label="Risk 설명"
+                                  data-tip="변동성, beta, 유동성, drawdown, 포트폴리오 편입 리스크를 반영한 방어 점수입니다.">i</span>
+                        </span>
+                    </div>
+                    <a class="quant-dashboard-row"
+                       th:each="row, rowStat : ${market.rows}"
+                       th:classappend="${rowStat.index >= 100} ? ' is-collapsed' : ''"
+                       th:href="@{/stocks/{symbol}(symbol=${row.symbol})}">
+                        <span th:text="${row.rank}">1</span>
+                        <strong class="stock-identity dashboard-stock-copy">
+                            <span class="stock-logo">
+                                <img th:if="${row.logoUrl != null}" th:src="${row.logoUrl}" th:alt="${row.symbol + ' logo'}" loading="lazy" onerror="this.remove()">
+                                <span th:text="${row.logoInitial}">A</span>
+                            </span>
+                            <span class="stock-copy">
+                                <b th:text="${row.symbol}">AAPL</b>
+                                <small th:text="${row.name}">Apple Inc</small>
+                            </span>
+                        </strong>
+                        <span th:text="${row.sector}">Information Technology</span>
+                        <span th:text="${row.price}">0원</span>
+                        <span th:text="${row.marketCap}">0.0 조원</span>
+                        <span class="market-signal-score" th:classappend="${row.signalTone}" th:text="${row.signalScore}">-</span>
+                        <span class="market-signal-score compact" th:classappend="${row.dataQualityTone}" th:text="${row.dataQualityScore}">-</span>
+                        <span class="quant-factor-score" th:text="${row.expectedExcessReturn}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
+                        <span class="quant-factor-score" th:text="${row.calibratedUpsideProbability}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
+                        <span class="market-signal-score compact" th:text="${row.expectedConfidence}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
+                        <span class="quant-factor-score" th:text="${row.valuationScore != null ? row.valuationScore + ' / 100' : '-'}">-</span>
+                        <span class="quant-factor-score" th:text="${row.growthScore != null ? row.growthScore + ' / 100' : '-'}">-</span>
+                        <span class="quant-factor-score" th:text="${row.momentumScore != null ? row.momentumScore + ' / 100' : '-'}">-</span>
+                        <span class="quant-factor-score" th:text="${row.riskScore != null ? row.riskScore + ' / 100' : '-'}">-</span>
+                    </a>
+                </div>
+
+                <div class="sp-load-more" th:if="${#lists.size(market.rows) > 100}">
+                    <button type="button" data-market-load-more>더보기</button>
                 </div>
             </div>
-            <div class="hero-card" aria-label="Quant signal overview">
-                <span>Current engine</span>
-                <strong>Quant Signal v2</strong>
-                <p>9-factor scoring with data-quality guardrails, sector/size neutral diagnostics, and walk-forward validation.</p>
-                <dl>
-                    <div>
-                        <dt>Universe</dt>
-                        <dd>S&amp;P 500 / Nasdaq 100 / Dow 30</dd>
+
+            <aside class="market-board-side quant-dashboard-side">
+                <section>
+                    <h2>Quant AI 구성</h2>
+                    <div class="quant-side-note">
+                        <strong>Signal</strong>
+                        <p>Valuation, Quality, Growth, Stability, Earnings, Analyst, News, Momentum, Risk, Institution factor를 통합합니다.</p>
                     </div>
-                    <div>
-                        <dt>Signal</dt>
-                        <dd>9-factor score</dd>
+                    <div class="quant-side-note">
+                        <strong>Expected Return v8</strong>
+                        <p>시장 국면별 factor 효과와 nonlinear interaction을 walk-forward로 학습해 기대 초과수익, 상승확률, 하락 리스크를 계산합니다.</p>
                     </div>
-                    <div>
-                        <dt>Storage</dt>
-                        <dd>MariaDB snapshots</dd>
+                    <div class="quant-side-note">
+                        <strong>Risk Model</strong>
+                        <p>시가총액, beta, 변동성, 유동성, 상관/공분산 snapshot으로 실제 운용 가능성을 검증합니다.</p>
                     </div>
-                </dl>
-            </div>
-        </section>
+                    <div class="quant-side-note">
+                        <strong>Data Layer</strong>
+                        <p>Yahoo 일봉, SEC 재무제표, Finnhub 지표/뉴스, Toss 주식수 데이터를 DB에 저장해 검증에 사용합니다.</p>
+                    </div>
+                </section>
 
-        <section class="detail-strip quant-status-strip" aria-label="Quant AI summary">
-            <article>
-                <span>01</span>
-                <strong>Data Lake</strong>
-                <p>Finnhub, SEC EDGAR, Yahoo Chart, 13F, index constituents, and ETF seeds are stored in MariaDB.</p>
-            </article>
-            <article>
-                <span>02</span>
-                <strong>Signal Engine</strong>
-                <p>Valuation, Quality, Growth, Stability, Earnings, Analyst, News, Momentum/Risk, and Institution factors.</p>
-            </article>
-            <article>
-                <span>03</span>
-                <strong>Validation</strong>
-                <p>Forward returns, IC, hit rate, spread, walk-forward, and portfolio backtest checks.</p>
-            </article>
-        </section>
+                <section>
+                    <h2 th:text="${modelHealth.title}">Model Health</h2>
+                    <p class="quant-health-summary" th:text="${modelHealth.summary}">모델 상태 요약입니다.</p>
+                    <div class="quant-health-cards">
+                        <div class="quant-health-card" th:each="card : ${modelHealth.cards}" th:classappend="${card.tone}">
+                            <strong th:text="${card.value}">0</strong>
+                            <span th:text="${card.label}">정상 레이어</span>
+                            <small th:text="${card.note}">fresh</small>
+                        </div>
+                    </div>
+                    <div class="quant-alert-list" th:if="${modelHealth.alerts != null && !modelHealth.alerts.isEmpty()}">
+                        <div class="quant-alert-row" th:each="alert : ${modelHealth.alerts}" th:classappend="${alert.tone}">
+                            <strong th:text="${alert.title}">운영 상태 정상</strong>
+                            <small th:text="${alert.detail}">핵심 Quant 레이어가 현재 기준으로 사용할 수 있습니다.</small>
+                        </div>
+                    </div>
+                    <div class="quant-operation-list" th:if="${modelHealth.operations != null && !modelHealth.operations.isEmpty()}">
+                        <h3>Batch / API</h3>
+                        <div class="quant-operation-row" th:each="operation : ${modelHealth.operations}">
+                            <div>
+                                <strong th:text="${operation.operation}">Yahoo candle batch</strong>
+                                <small th:text="${operation.finishedAt}">-</small>
+                            </div>
+                            <span class="quant-health-status" th:classappend="${operation.tone}" th:text="${operation.status}">정상</span>
+                            <span th:text="${operation.successRate}">-</span>
+                            <small th:text="${'fail ' + operation.failures}" th:title="${operation.message}">fail 0</small>
+                        </div>
+                    </div>
+                    <div class="quant-health-list">
+                        <div class="quant-health-row" th:each="row : ${modelHealth.rows}">
+                            <div>
+                                <strong th:text="${row.layer}">Signal latest</strong>
+                                <small th:text="${row.coverage}">503 symbols</small>
+                            </div>
+                            <span class="quant-health-status" th:classappend="${row.tone}" th:text="${row.status}">정상</span>
+                            <span th:text="${row.rows}">0</span>
+                            <small th:text="${row.latest}">-</small>
+                        </div>
+                    </div>
+                </section>
 
-        <section class="quant-section" aria-labelledby="quant-data-title">
-            <div class="quant-section-head">
-                <span>Data foundation</span>
-                <h2 id="quant-data-title">Collected data and storage</h2>
-                <p>
-                    Pages read from cached analytical tables instead of calling external APIs on every request.
-                    This keeps rendering fast and makes historical validation reproducible.
-                </p>
-            </div>
-            <div class="quant-data-grid">
-                <article>
-                    <span>Finnhub</span>
-                    <strong>Profile, quote, metric, recommendations, EPS, news</strong>
-                    <p>Company profile, current quote, basic financials, recommendation trend, EPS surprise, and company news.</p>
-                </article>
-                <article>
-                    <span>SEC EDGAR</span>
-                    <strong>CIK mapping and source financial facts</strong>
-                    <p>Revenue, operating income, net income, EPS, assets, liabilities, equity, and cash-flow facts are standardized.</p>
-                </article>
-                <article>
-                    <span>Yahoo Chart</span>
-                    <strong>Stock and ETF daily candles</strong>
-                    <p>OHLCV candles support moving averages, RSI, volatility, drawdown, and forward-return calculations.</p>
-                </article>
-                <article>
-                    <span>Institution 13F</span>
-                    <strong>Institutional ownership flow</strong>
-                    <p>13F-based ownership changes are used as a supporting factor with a conservative availability lag.</p>
-                </article>
-                <article>
-                    <span>Index Universe</span>
-                    <strong>S&amp;P 500, Nasdaq 100, Dow 30</strong>
-                    <p>Index membership is managed separately so collection can use the exact union of target indices.</p>
-                </article>
-                <article>
-                    <span>ETF Seed</span>
-                    <strong>Major ETF watchlist</strong>
-                    <p>Representative ETF symbols are managed locally; daily prices and ETF-specific Signal can be expanded from there.</p>
-                </article>
-            </div>
-        </section>
+                <section>
+                    <h2>Macro / Regime</h2>
+                    <div class="quant-side-note">
+                        <strong th:text="${macroRegime.label}">Neutral</strong>
+                        <p>
+                            <b th:classappend="${macroRegime.tone}" th:text="${macroRegime.score}">-</b>
+                            <span th:text="${macroRegime.snapshotDate}">-</span>
+                        </p>
+                        <p th:text="${macroRegime.summary}">시장 국면 요약입니다.</p>
+                    </div>
+                    <div class="sector-row" th:each="metric : ${macroRegime.metrics}">
+                        <strong th:text="${metric.label}">20D benchmark</strong>
+                        <span th:classappend="${metric.tone}" th:text="${metric.value}">-</span>
+                        <small th:text="${metric.note}">note</small>
+                    </div>
+                </section>
 
-        <section id="systems" class="quant-section quant-pipeline-section" aria-labelledby="quant-pipeline-title">
-            <div class="quant-section-head">
-                <span>Signal pipeline</span>
-                <h2 id="quant-pipeline-title">Signal calculation flow</h2>
-                <p>
-                    Live pages read stock_signal_latest. Historical validation uses stock_signal_snapshot and backtest result tables.
-                </p>
-            </div>
-            <div class="quant-flow">
-                <article>
-                    <span>01</span>
-                    <strong>Collect source data</strong>
-                    <p>Quote, metric, SEC financials, candles, news, analyst data, and 13F flow are refreshed by batch jobs.</p>
-                </article>
-                <article>
-                    <span>02</span>
-                    <strong>Validate data quality</strong>
-                    <p>Outliers, stale values, unit issues, missing coverage, and source conflicts are flagged before scoring.</p>
-                </article>
-                <article>
-                    <span>03</span>
-                    <strong>Calculate factor scores</strong>
-                    <p>Each factor is normalized to 0-100 and stored with reasons, freshness, and data-quality context.</p>
-                </article>
-                <article>
-                    <span>04</span>
-                    <strong>Build integrated Signal</strong>
-                    <p>Weighted scoring plus guardrails prevents weak quality, earnings, or momentum from receiving excessive scores.</p>
-                </article>
-                <article>
-                    <span>05</span>
-                    <strong>Save snapshots</strong>
-                    <p>List and detail pages read persisted values, so failed batch runs do not erase the last valid Signal.</p>
-                </article>
-                <article>
-                    <span>06</span>
-                    <strong>Validate outcomes</strong>
-                    <p>5D/20D/60D returns, factor diagnostics, walk-forward, and portfolio backtest test the usefulness of the score.</p>
-                </article>
-            </div>
-        </section>
-
-        <section class="quant-section" aria-labelledby="quant-factor-title">
-            <div class="quant-section-head">
-                <span>9-factor model</span>
-                <h2 id="quant-factor-title">Current Signal composition</h2>
-                <p>
-                    Signal is not a guaranteed forecast. It is a normalized, reviewable investment signal built from factor evidence.
-                </p>
-            </div>
-            <div class="quant-factor-grid">
-                <article><span>Valuation</span><strong>Relative valuation</strong><p>PER, PBR, PSR, market cap, and sector comparison.</p></article>
-                <article><span>Quality</span><strong>Business quality</strong><p>ROE, EPS, net margin, profitability, and earnings defense.</p></article>
-                <article><span>Growth</span><strong>Financial growth</strong><p>SEC-standardized revenue and income growth with recent trend context.</p></article>
-                <article><span>Stability</span><strong>Financial stability</strong><p>Assets, liabilities, equity, leverage, and structural risk.</p></article>
-                <article><span>Earnings</span><strong>Earnings momentum</strong><p>EPS surprise and filed-at-aware financial availability.</p></article>
-                <article><span>Analyst</span><strong>Analyst trend</strong><p>Buy/hold/sell mix and recommendation trend changes.</p></article>
-                <article><span>News</span><strong>News attention</strong><p>Recent article count and rule-based positive/risk keyword checks.</p></article>
-                <article><span>Momentum/Risk</span><strong>Price trend and risk</strong><p>Daily candles, SMA, RSI, 52-week position, volatility, and drawdown.</p></article>
-                <article><span>Institution</span><strong>Institutional flow</strong><p>13F ownership changes and institutional buy/sell support.</p></article>
-            </div>
-        </section>
-
-        <section class="quant-section quant-validation-section" aria-labelledby="quant-validation-title">
-            <div class="quant-section-head">
-                <span>Validation layer</span>
-                <h2 id="quant-validation-title">Validation and weight profiles</h2>
-                <p>
-                    Candidate weight profiles are not applied to live Signal until backtest and walk-forward evidence justifies promotion.
-                </p>
-            </div>
-            <div class="quant-validation-grid">
-                <article>
-                    <strong>DEFAULT</strong>
-                    <p>The current production reference profile used by list and detail pages through stored Signal values.</p>
-                </article>
-                <article>
-                    <strong>BACKTEST_V1</strong>
-                    <p>A factor-diagnostics candidate using 20D/60D spread, IC, hit rate, and year stability.</p>
-                </article>
-                <article>
-                    <strong>BACKTEST_V2</strong>
-                    <p>A candidate with factor-correlation penalties and sector/size neutral scoring. It remains validation-only.</p>
-                </article>
-                <article>
-                    <strong>PORTFOLIO_V1</strong>
-                    <p>Tests Signal-ranked portfolios by cumulative return, MDD, Sharpe, turnover, costs, and sector concentration.</p>
-                </article>
-            </div>
-            <div class="quant-actions">
-                <a class="primary-action" th:href="@{/signals/portfolio}" href="/signals/portfolio">Open Portfolio Lab</a>
-                <a class="secondary-action" th:href="@{/signals/backtest}" href="/signals/backtest">Open Signal Lab</a>
-                <a class="secondary-action" th:href="@{/stocks/heatmap}" href="/stocks/heatmap">Heatmap</a>
-                <a class="secondary-action" th:href="@{/etfs}" href="/etfs">ETF List</a>
-            </div>
-        </section>
-
-        <section id="contact" class="quant-section quant-roadmap-section" aria-labelledby="quant-roadmap-title">
-            <div class="quant-section-head">
-                <span>Roadmap</span>
-                <h2 id="quant-roadmap-title">Next Quant AI work</h2>
-                <p>
-                    The next quality jump is stricter point-in-time data and a risk model. Portfolio validation should not rely on
-                    future-known data, and it must track concentration, volatility, liquidity, and transaction costs.
-                </p>
-            </div>
-            <div class="quant-roadmap">
-                <span>01 Portfolio Backtest v1</span>
-                <span>02 Point-in-time market cap snapshots</span>
-                <span>03 Risk model beta / volatility / liquidity</span>
-                <span>04 Explainable Signal contribution</span>
-                <span>05 ETF holdings plus stock Signal linkage</span>
-            </div>
+                <section>
+                    <h2>섹터 요약</h2>
+                    <div class="sector-row" th:each="sector : ${market.sectors}">
+                        <strong th:text="${sector.sector}">Technology</strong>
+                        <span th:text="${sector.count + '개'}">0개</span>
+                        <small th:text="${sector.marketCap}">0.0 조원</small>
+                    </div>
+                </section>
+            </aside>
         </section>
     </main>
+
+    <footer class="market-footer">
+        <span th:text="${market.title + ' Quant'}">Quant</span>
+        <span th:text="${market.aggregateMarketCap}">0.0 조원</span>
+    </footer>
 </div>
+<script>
+(() => {
+    const table = document.querySelector("[data-market-list]");
+    if (!table) {
+        return;
+    }
+
+    const button = document.querySelector("[data-market-load-more]");
+    const sortButtons = Array.from(table.querySelectorAll("[data-sort]"));
+    const step = Number(table.dataset.visibleStep || 100);
+    const columnIndex = {
+        price: 3,
+        marketCap: 4,
+        signal: 5,
+        quality: 6,
+        expected: 7,
+        upside: 8,
+        confidence: 9,
+        valuation: 10,
+        growth: 11,
+        momentum: 12,
+        risk: 13
+    };
+    let rows = Array.from(table.querySelectorAll(".quant-dashboard-row:not(.quant-dashboard-head)"));
+    let visibleCount = rows.filter((row) => !row.classList.contains("is-collapsed")).length;
+    const sortState = {
+        key: "",
+        direction: "desc"
+    };
+
+    const updateButton = () => {
+        if (button) {
+            button.hidden = visibleCount >= rows.length;
+        }
+    };
+
+    const applyVisibility = () => {
+        rows.forEach((row, index) => {
+            row.classList.toggle("is-collapsed", index >= visibleCount);
+        });
+        updateButton();
+    };
+
+    const parseNumber = (value) => {
+        const match = String(value || "").match(/[+-]?\d[\d,]*(?:\.\d+)?/);
+        return match ? Number(match[0].replace(/,/g, "")) : null;
+    };
+
+    const sortValue = (row, key) => {
+        const index = columnIndex[key];
+        if (index == null) {
+            return null;
+        }
+        return parseNumber(row.children[index]?.textContent);
+    };
+
+    button?.addEventListener("click", () => {
+        visibleCount = Math.min(visibleCount + step, rows.length);
+        applyVisibility();
+    });
+
+    sortButtons.forEach((sortButton) => {
+        sortButton.addEventListener("click", () => {
+            const key = sortButton.dataset.sort;
+            const direction = sortState.key === key && sortState.direction === "desc" ? "asc" : "desc";
+            sortState.key = key;
+            sortState.direction = direction;
+
+            rows = [...rows].sort((left, right) => {
+                const leftValue = sortValue(left, key);
+                const rightValue = sortValue(right, key);
+                if (leftValue == null && rightValue == null) {
+                    return 0;
+                }
+                if (leftValue == null) {
+                    return 1;
+                }
+                if (rightValue == null) {
+                    return -1;
+                }
+                return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
+            });
+
+            rows.forEach((row) => table.append(row));
+            sortButtons.forEach((buttonItem) => {
+                buttonItem.removeAttribute("data-direction");
+                buttonItem.removeAttribute("aria-sort");
+            });
+            sortButton.dataset.direction = direction;
+            sortButton.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+            visibleCount = Math.min(step, rows.length);
+            applyVisibility();
+        });
+    });
+
+    updateButton();
+})();
+</script>
 </body>
 </html>

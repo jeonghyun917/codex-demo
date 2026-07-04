@@ -11,7 +11,7 @@
     <header class="market-topbar">
         <a class="market-logo" th:href="@{/}" href="/">KY</a>
         <nav class="market-nav" aria-label="Global menu">
-            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/">Dashboard</a>
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}" href="/quant">Quant</a>
         </nav>
         <form class="market-search" th:action="@{/stocks}" method="get">
             <label for="symbol">Ticker</label>
@@ -119,6 +119,78 @@
                     </div>
                     <ul class="signal-reasons" th:if="${!signal.reasons.isEmpty()}">
                         <li th:each="reason : ${signal.reasons}" th:text="${reason}">근거</li>
+                    </ul>
+                </section>
+                <section class="quant-opinion-panel" th:if="${quantOpinion != null}" aria-label="Quant opinion">
+                    <div class="quant-opinion-overview" th:classappend="${quantOpinion.tone}">
+                        <span>Quant Opinion</span>
+                        <strong th:text="${quantOpinion.label}">중립</strong>
+                        <p th:text="${quantOpinion.summary}">Expected Return v8과 Signal을 합친 의견입니다.</p>
+                        <div>
+                            <b th:text="${quantOpinion.score}">50 / 100</b>
+                            <small th:text="${quantOpinion.modelVersion + ' · ' + quantOpinion.snapshotDate}">EXPECTED_RETURN_V8</small>
+                        </div>
+                    </div>
+                    <div class="quant-opinion-metrics">
+                        <article th:each="metric : ${quantOpinion.metrics}" th:classappend="${metric.tone}">
+                            <span th:text="${metric.label}">Expected</span>
+                            <strong th:text="${metric.value}">-</strong>
+                            <p th:text="${metric.note}">note</p>
+                        </article>
+                    </div>
+                    <div class="quant-horizon-block" th:if="${!quantOpinion.horizonOpinions.isEmpty()}">
+                        <h3>Horizon opinion</h3>
+                        <div class="quant-horizon-grid">
+                            <article th:each="horizon : ${quantOpinion.horizonOpinions}" th:classappend="${horizon.tone}">
+                                <span th:text="${horizon.horizon}">20D</span>
+                                <strong th:text="${horizon.label}">중립</strong>
+                                <p>
+                                    <b th:text="${horizon.expectedExcess}">+0.00%</b>
+                                    <small th:text="'Upside ' + ${horizon.upsideProbability} + ' · Conf ' + ${horizon.confidence}">
+                                        Upside 50.0% · Conf 50 / 100
+                                    </small>
+                                </p>
+                            </article>
+                        </div>
+                    </div>
+                    <div class="quant-portfolio-fit" th:if="${quantOpinion.portfolioFit != null}"
+                         th:classappend="${quantOpinion.portfolioFit.tone}">
+                        <div>
+                            <span>Portfolio fit</span>
+                            <strong th:text="${quantOpinion.portfolioFit.label}">제한 비중 후보</strong>
+                            <p th:text="${quantOpinion.portfolioFit.summary}">포트폴리오 편입 적합성을 평가합니다.</p>
+                        </div>
+                        <div class="quant-portfolio-fit-metrics">
+                            <article th:each="metric : ${quantOpinion.portfolioFit.metrics}" th:classappend="${metric.tone}">
+                                <span th:text="${metric.label}">Beta</span>
+                                <strong th:text="${metric.value}">-</strong>
+                                <p th:text="${metric.note}">note</p>
+                            </article>
+                        </div>
+                    </div>
+                    <div class="quant-opinion-interpretations" th:if="${!quantOpinion.interpretations.isEmpty()}">
+                        <h3>Interpretation</h3>
+                        <ul>
+                            <li th:each="item : ${quantOpinion.interpretations}" th:text="${item}">
+                                Signal과 기대수익의 충돌을 해석합니다.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="quant-factor-block" th:if="${!quantOpinion.factors.isEmpty()}">
+                        <h3>Factor contribution</h3>
+                        <div class="quant-factor-grid">
+                            <article th:each="factor : ${quantOpinion.factors}" th:classappend="${factor.tone}">
+                                <span th:text="${factor.label}">Quality</span>
+                                <strong th:text="${factor.score}">50 / 100</strong>
+                                <div class="quant-factor-bar" th:classappend="${factor.direction}">
+                                    <i th:style="${factor.barStyle}"></i>
+                                </div>
+                                <b th:text="${factor.contribution}">+0</b>
+                            </article>
+                        </div>
+                    </div>
+                    <ul class="signal-reasons quant-opinion-warnings" th:if="${!quantOpinion.warnings.isEmpty()}">
+                        <li th:each="warning : ${quantOpinion.warnings}" th:text="${warning}">warning</li>
                     </ul>
                 </section>
                 <div class="info-table">

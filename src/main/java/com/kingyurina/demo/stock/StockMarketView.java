@@ -23,6 +23,8 @@ public record StockMarketView(
             String price, String change, String marketCap, String institutionFlow, String per, String pbr, String roe,
             String signalScore, String signalConfidence, String signalTone, boolean positive, Integer signalValue,
             String dataQualityScore, String dataQualityTone, Integer dataQualityValue,
+            String expectedExcessReturn, String calibratedUpsideProbability, String expectedConfidence,
+            Integer expectedConfidenceValue, String expectedModelVersion, String expectedSignalDate,
             Integer valuationScore, Integer qualityScore, Integer growthScore, Integer stabilityScore,
             Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore) {
     }
