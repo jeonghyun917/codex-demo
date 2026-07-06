@@ -7,66 +7,156 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+    <link rel="stylesheet" th:href="@{/css/main.css(v='20260705-cleanup')}" href="../static/css/main.css?v=20260705-cleanup">
 </head>
 <body class="home-3d-body">
 <div class="page-shell">
-    <header class="site-header" aria-label="Primary navigation">
-        <a class="brand-mark" href="/" aria-label="King Yurina home">KY</a>
+    <header class="site-header home-3d-nav" aria-label="Primary navigation">
+        <a class="brand-mark home-3d-brand" href="/" aria-label="King Yurina home">
+            <span class="home-crown" aria-hidden="true">
+                <svg viewBox="0 0 32 32" focusable="false">
+                    <path d="M5 23h22l-2 4H7l-2-4Z"/>
+                    <path d="M7 20 10 9l6 8 6-8 3 11H7Z"/>
+                    <circle cx="10" cy="8" r="2"/>
+                    <circle cx="16" cy="6" r="2"/>
+                    <circle cx="22" cy="8" r="2"/>
+                </svg>
+            </span>
+            <strong>king yurina</strong>
+        </a>
         <nav class="nav-links" aria-label="Main menu">
             <a th:each="menu : ${mainMenus}"
                th:href="${menu.href}"
                th:text="${menu.label}"
                href="/quant">Quant</a>
         </nav>
-        <a class="header-action" th:href="@{/stocks}" href="/stocks">Stock Analysis</a>
+        <a class="header-action home-3d-dashboard" th:href="@{/quant}" href="/quant">
+            <span aria-hidden="true">::</span>
+            Dashboard
+        </a>
     </header>
 
     <main class="hero home-3d">
         <section class="hero-stage home-3d-stage" data-home-showcase-stage aria-labelledby="hero-title">
             <canvas class="home-3d-canvas" data-home-nature-3d aria-hidden="true"></canvas>
             <div class="home-3d-atmosphere" aria-hidden="true"></div>
+
+            <aside class="home-quant-stack home-quant-stack-left" aria-label="Quant signal snapshot">
+                <article class="home-metric-card">
+                    <span class="home-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" focusable="false">
+                            <path d="M4 17h5l3-8 6 16 4-11h6"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <span>Signal</span>
+                        <strong>79<small>/100</small></strong>
+                        <em>Strong</em>
+                    </div>
+                </article>
+                <article class="home-metric-card">
+                    <span class="home-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" focusable="false">
+                            <path d="M6 23 14 9l5 8 7-10"/>
+                            <path d="M20 7h6v6"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <span>20D Alpha</span>
+                        <strong>+2.4%</strong>
+                        <em>vs. benchmark</em>
+                    </div>
+                </article>
+                <article class="home-metric-card">
+                    <span class="home-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" focusable="false">
+                            <path d="M6 22h20"/>
+                            <path d="M9 20 16 9l7 11"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <span>Upside</span>
+                        <strong>58%</strong>
+                        <em>Probability</em>
+                    </div>
+                </article>
+                <article class="home-metric-card">
+                    <span class="home-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 32 32" focusable="false">
+                            <path d="M16 4 7 8v7c0 6 4 10 9 13 5-3 9-7 9-13V8l-9-4Z"/>
+                            <path d="M12 16l3 3 6-7"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <span>Risk</span>
+                        <strong>Medium</strong>
+                        <em>Controlled</em>
+                    </div>
+                </article>
+            </aside>
+
             <div class="hero-editorial home-3d-editorial">
-                <p class="eyebrow">Porcelain-grade quant intelligence</p>
-                <h1 id="hero-title">
-                    <span>king</span>
-                    <span>yurina</span>
-                </h1>
-                <p class="hero-copy">
-                    A quiet market atelier shaped like fine porcelain, where signal, expected return, risk, and portfolio conviction are set with precision.
-                </p>
-                <div class="hero-actions" aria-label="Featured actions">
-                    <a class="primary-action" th:href="@{/quant}" href="/quant">Quant</a>
-                    <a class="secondary-action" th:href="@{/stocks}" href="/stocks">Stocks</a>
-                    <a class="secondary-action" th:href="@{/stocks/heatmap}" href="/stocks/heatmap">Heatmap</a>
-                </div>
+                <span class="home-crest" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" focusable="false">
+                        <path d="M5 23h22l-2 4H7l-2-4Z"/>
+                        <path d="M7 20 10 9l6 8 6-8 3 11H7Z"/>
+                        <circle cx="10" cy="8" r="2"/>
+                        <circle cx="16" cy="6" r="2"/>
+                        <circle cx="22" cy="8" r="2"/>
+                    </svg>
+                </span>
+                <p class="eyebrow">Calibrated &middot; Intelligent &middot; Disciplined</p>
+                <h1 id="hero-title">king yurina</h1>
+                <p class="hero-copy">Quant AI for calibrated market decisions</p>
+                <a class="home-inline-action" th:href="@{/quant}" href="/quant">Explore the Intelligence</a>
             </div>
-            <div class="home-3d-panel" aria-label="System snapshot">
-                <div>
-                    <span>Ceramic Surface</span>
-                    <strong>Signal, expected return, risk</strong>
+
+            <aside class="home-market-card" aria-label="Market overview">
+                <div class="home-market-head">
+                    <strong>Market Overview</strong>
+                    <span>...</span>
                 </div>
+                <svg viewBox="0 0 300 116" role="img" aria-label="Market overview line chart">
+                    <defs>
+                        <linearGradient id="homeChartFill" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#2f7cff" stop-opacity="0.24"/>
+                            <stop offset="100%" stop-color="#2f7cff" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+                    <path class="home-chart-fill" d="M0 88 L18 76 L36 82 L54 56 L72 64 L90 47 L108 60 L126 42 L144 48 L162 30 L180 45 L198 26 L216 34 L234 20 L252 27 L270 14 L300 22 L300 116 L0 116 Z"/>
+                    <path class="home-chart-line" d="M0 88 L18 76 L36 82 L54 56 L72 64 L90 47 L108 60 L126 42 L144 48 L162 30 L180 45 L198 26 L216 34 L234 20 L252 27 L270 14 L300 22"/>
+                </svg>
+                <dl>
+                    <div><dt>SPX</dt><dd>5,437.91 <span>+0.65%</span></dd></div>
+                    <div><dt>NDX</dt><dd>19,123.58 <span>+0.72%</span></dd></div>
+                    <div><dt>VIX</dt><dd>12.85 <span class="down">-1.22%</span></dd></div>
+                </dl>
+                <p>As of 10:15 AM ET</p>
+            </aside>
+
+            <aside class="home-engine-status" aria-label="Quant engine status">
+                <span aria-hidden="true"></span>
                 <div>
-                    <span>Market Service</span>
-                    <strong>S&P 500 / Nasdaq 100 / Dow 30</strong>
+                    <strong>Quant Engine v5.2</strong>
+                    <em>Adaptive &middot; Regime-aware &middot; Calibrated</em>
                 </div>
-                <div>
-                    <span>Experience</span>
-                    <strong>Porcelain WebGL table setting</strong>
-                </div>
-            </div>
+            </aside>
+
+            <div class="home-reference-cleanup home-reference-cleanup-left" aria-hidden="true"></div>
+            <div class="home-reference-cleanup home-reference-cleanup-center" aria-hidden="true"></div>
+            <div class="home-reference-cleanup home-reference-cleanup-right" aria-hidden="true"></div>
         </section>
 
         <section class="detail-strip" aria-label="Brand details">
             <article id="studio">
                 <span>01</span>
-                <strong>Porcelain</strong>
-                <p>Bright ceramic, marble, and soft daylight replace the old decorative background.</p>
+                <strong>Engine</strong>
+                <p>Porcelain light, cobalt glass, and polished market signals frame the quant core.</p>
             </article>
             <article id="systems">
                 <span>02</span>
                 <strong>Signal</strong>
-                <p>Quant score, expected return, calibrated probability, and risk are arranged cleanly.</p>
+                <p>Signal, expected return, calibrated probability, and risk move as one system.</p>
             </article>
             <article id="signal">
                 <span>03</span>

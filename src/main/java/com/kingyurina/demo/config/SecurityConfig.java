@@ -28,6 +28,8 @@ public class SecurityConfig {
                                 pathPattern("/etfs/**"),
                                 pathPattern("/error"),
                                 pathPattern("/css/**"),
+                                pathPattern("/design-concepts/**"),
+                                pathPattern("/images/**"),
                                 pathPattern("/js/**"),
                                 pathPattern("/favicon.ico")).permitAll()
                         .anyRequest().authenticated()

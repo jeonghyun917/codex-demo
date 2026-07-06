@@ -1,0 +1,16 @@
+.git
+.agents
+.codex
+.chrome-headless
+.m2
+.settings
+.tools
+target
+logs
+config/application-secret.yml
+
+*.log
+*.cmd
+server*.log
+.server*.log
+.tmp-server*.log
