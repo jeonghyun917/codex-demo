@@ -50,7 +50,39 @@ SEC_EDGAR_USER_AGENT=king-yurina-stock-research/0.1 your-email@example.com
 
 If the MariaDB service has a different Railway service name, replace `mariadb.railway.internal` with `<service-name>.railway.internal`.
 
-Use `SQL_INIT_MODE=always` for the first deploy so Railway creates the schema and seed rows. After the first successful deploy, change it to `SQL_INIT_MODE=never` unless you intentionally want schema/data init to run on every app boot.
+Use `SQL_INIT_MODE=always` for the first deploy so Railway creates the schema and base seed rows. After the first successful deploy, change it to `SQL_INIT_MODE=never` unless you intentionally want schema/data init to run on every app boot.
+
+## Minimal Data Import Without Committing DB Rows
+
+Do not commit local research DB dumps to GitHub. For Trial/Hobby deployments, create a compact dump locally and import it directly into Railway MariaDB.
+
+The compact dump includes enough rows for the pages to render with real values:
+
+- current S&P 500, Nasdaq 100, and Dow 30 membership rows
+- company profile, quote, metric, signal, data-quality, expected-return rows
+- recent stock/ETF candles, news, recommendations, EPS surprise, institution flow, macro snapshots
+- no large raw JSON payloads and no full multi-year Quant history
+
+Create the local compact dump:
+
+```powershell
+.\scripts\export-railway-minimal-dump.ps1
+```
+
+The script creates `target\railway-minimal-seed.sql`. The file is intentionally generated under `target/` so it is not committed.
+
+After Railway MariaDB is running and the app has created the schema once, import the compact dump through the Railway MariaDB public host/port:
+
+```powershell
+.\scripts\import-railway-minimal-dump.ps1 `
+  -HostName "<railway-public-db-host>" `
+  -Port <railway-public-db-port> `
+  -Database "king_yurina" `
+  -User "king_yurina" `
+  -Password "<MARIADB_PASSWORD>"
+```
+
+If public networking is disabled on the MariaDB service, enable Railway TCP proxy/public networking temporarily, run the import, then disable it again.
 
 ## Deploy Steps
 
@@ -68,3 +100,4 @@ Use `SQL_INIT_MODE=always` for the first deploy so Railway creates the schema an
 - Startup signal refresh is disabled in the `railway` profile to keep web deploys fast and stable.
 - Run heavy data collection as separate one-off jobs, not on every web boot.
 - Keep the MariaDB volume mounted at `/var/lib/mysql`; without a volume, Railway redeploys can lose database files.
+- Do not use weak database passwords in production. Temporary Trial passwords should still be replaced before any public deployment.
