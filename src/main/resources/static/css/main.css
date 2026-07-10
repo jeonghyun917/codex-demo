@@ -3164,6 +3164,107 @@ html:has(body.home-3d-body) {
     line-height: 1.55;
 }
 
+.quant-api-source-list {
+    display: grid;
+    gap: 9px;
+    margin-top: 10px;
+}
+
+.quant-api-source {
+    display: grid;
+    gap: 7px;
+    border: 1px solid var(--market-line);
+    border-left: 3px solid #5f6472;
+    border-radius: 8px;
+    background: #181922;
+    padding: 10px;
+}
+
+.quant-api-source.positive {
+    border-left-color: #1db96f;
+}
+
+.quant-api-source.warning {
+    border-left-color: #ffb020;
+}
+
+.quant-api-source.negative {
+    border-left-color: #ff3e5b;
+}
+
+.quant-api-source-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.quant-api-source-head strong {
+    overflow: hidden;
+    color: #fff;
+    font-size: 0.76rem;
+    font-weight: 950;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quant-api-source p {
+    margin: 0;
+    color: var(--market-muted);
+    font-size: 0.66rem;
+    font-weight: 850;
+    line-height: 1.45;
+}
+
+.quant-api-source ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.quant-api-source li {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 3px 6px;
+    color: #dfe4f4;
+    font-size: 0.58rem;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+.quant-api-source-meta {
+    display: grid;
+    gap: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 7px;
+}
+
+.quant-api-source-meta small {
+    display: flex;
+    min-width: 0;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--market-muted);
+    font-size: 0.61rem;
+    font-weight: 850;
+    line-height: 1.35;
+}
+
+.quant-api-source-meta b,
+.quant-api-source-meta span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quant-api-source-meta b {
+    color: #aeb9d4;
+}
+
 .quant-health-summary {
     margin: 6px 0 12px;
     color: var(--market-muted);

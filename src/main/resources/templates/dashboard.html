@@ -174,7 +174,30 @@
                     </div>
                     <div class="quant-side-note">
                         <strong>Data Layer</strong>
-                        <p>Yahoo 일봉, SEC 재무제표, Finnhub 지표/뉴스, Toss 주식수 데이터를 DB에 저장해 검증에 사용합니다.</p>
+                        <p>외부 API와 내부 계산 레이어별 수집 데이터, 최신 업데이트, 저장 커버리지를 점검합니다.</p>
+                    </div>
+                    <div class="quant-api-source-list" th:if="${dataSources != null && !dataSources.isEmpty()}">
+                        <article class="quant-api-source" th:each="source : ${dataSources}" th:classappend="${source.tone}">
+                            <div class="quant-api-source-head">
+                                <strong th:text="${source.label}">Yahoo Chart</strong>
+                                <span class="quant-health-status" th:classappend="${source.tone}" th:text="${source.status}">최신</span>
+                            </div>
+                            <p th:text="${source.description}">데이터 설명입니다.</p>
+                            <ul>
+                                <li th:each="dataset : ${source.datasets}" th:text="${dataset}">주식 일봉</li>
+                            </ul>
+                            <div class="quant-api-source-meta">
+                                <small>
+                                    <b>최근 업데이트</b>
+                                    <span th:text="${source.latestUpdate}">-</span>
+                                </small>
+                                <small>
+                                    <b>최근 데이터</b>
+                                    <span th:text="${source.latestData}">-</span>
+                                </small>
+                                <small th:text="${source.coverage}">0 rows · 0 symbols · 0 dates</small>
+                            </div>
+                        </article>
                     </div>
                 </section>
 

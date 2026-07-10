@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class StockDashboardViewSnapshotService {
 
-    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_PIT_QUALITY_V1";
+    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_DATA_SOURCES_V2";
     private static final Duration DASHBOARD_VIEW_CACHE_TTL = Duration.ofMinutes(10);
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
@@ -23,18 +23,21 @@ public class StockDashboardViewSnapshotService {
     private final StockMarketViewService stockMarketViewService;
     private final StockMacroRegimeService stockMacroRegimeService;
     private final StockQuantModelHealthService stockQuantModelHealthService;
+    private final StockApiDataSourceService stockApiDataSourceService;
     private final Map<String, CachedDashboardView> dashboardViewCache = new ConcurrentHashMap<>();
 
     public StockDashboardViewSnapshotService(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
             ObjectMapper objectMapper,
             StockMarketViewService stockMarketViewService,
             StockMacroRegimeService stockMacroRegimeService,
-            StockQuantModelHealthService stockQuantModelHealthService) {
+            StockQuantModelHealthService stockQuantModelHealthService,
+            StockApiDataSourceService stockApiDataSourceService) {
         this.stockBacktestMapper = stockBacktestMapper;
         this.objectMapper = objectMapper;
         this.stockMarketViewService = stockMarketViewService;
         this.stockMacroRegimeService = stockMacroRegimeService;
         this.stockQuantModelHealthService = stockQuantModelHealthService;
+        this.stockApiDataSourceService = stockApiDataSourceService;
     }
 
     public StockDashboardViewPayload build(String indexCode) {
@@ -73,11 +76,15 @@ public class StockDashboardViewSnapshotService {
     }
 
     private StockDashboardViewPayload buildUncached(String indexCode) {
+        StockMarketView market = stockMarketViewService.build(indexCode);
+        StockMacroRegimeView macroRegime = stockMacroRegimeService.latestView(indexCode);
+        StockQuantModelHealthView modelHealth = stockQuantModelHealthService.build(indexCode);
         return new StockDashboardViewPayload(
                 indexCode,
-                stockMarketViewService.build(indexCode),
-                stockMacroRegimeService.latestView(indexCode),
-                stockQuantModelHealthService.build(indexCode));
+                market,
+                macroRegime,
+                modelHealth,
+                stockApiDataSourceService.build(indexCode, modelHealth));
     }
 
     private StockDashboardViewPayload readMaterializedDashboardView(StockBacktestMapper mapper, String indexCode) {
@@ -107,6 +114,7 @@ public class StockDashboardViewSnapshotService {
                 && payload.modelHealth() != null
                 && payload.modelHealth().alerts() != null
                 && payload.modelHealth().operations() != null
+                && payload.dataSources() != null
                 && hasModelHealthLayer(payload, "Backtest view snapshot");
     }
 
