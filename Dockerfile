@@ -12,7 +12,8 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-ENV SPRING_PROFILES_ACTIVE=railway
+ENV SPRING_PROFILES_ACTIVE=mariadb,railway
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 COPY --from=build /workspace/target/codex-demo-0.0.1-SNAPSHOT.jar /app/app.jar
 

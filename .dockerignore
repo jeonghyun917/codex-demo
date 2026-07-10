@@ -7,10 +7,16 @@
 .tools
 target
 logs
+output
+tmp
 config/application-secret.yml
 
 *.log
 *.cmd
+*.pdf
+*.docx
+*.xlsx
+*.pptx
 server*.log
 .server*.log
 .tmp-server*.log

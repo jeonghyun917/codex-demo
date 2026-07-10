@@ -5,6 +5,7 @@ This project deploys to Railway as a Dockerized Spring Boot web service.
 ## Why Docker
 
 The app uses Java 21 and MariaDB-specific schema DDL. The Dockerfile pins Java 21 and avoids ambiguity in Railway's automatic build detection.
+Railway detects a root `Dockerfile` automatically, and `railway.json` pins the service to the Dockerfile builder with a `/healthz` deployment healthcheck.
 
 ## Recommended Railway Services
 
@@ -36,7 +37,7 @@ MARIADB_PASSWORD=<strong-app-password>
 Set these variables on the Spring Boot app service:
 
 ```text
-SPRING_PROFILES_ACTIVE=railway
+SPRING_PROFILES_ACTIVE=mariadb,railway
 SQL_INIT_MODE=always
 DB_URL=jdbc:mariadb://mariadb.railway.internal:3306/king_yurina?useSsl=false&allowPublicKeyRetrieval=true
 DB_USERNAME=king_yurina
@@ -46,6 +47,17 @@ FRED_API_KEY=<optional>
 TOSS_API_KEY=<optional>
 TOSS_SECRET_KEY=<optional>
 SEC_EDGAR_USER_AGENT=king-yurina-stock-research/0.1 your-email@example.com
+```
+
+Keep the profile order as `mariadb,railway`. The `mariadb` profile enables the MyBatis mapper beans, and the later `railway` profile keeps Railway-specific datasource and startup settings in control.
+
+Optional DB pool overrides:
+
+```text
+DB_POOL_MAX_SIZE=5
+DB_POOL_MIN_IDLE=1
+DB_CONNECTION_TIMEOUT_MS=30000
+DB_INITIALIZATION_FAIL_TIMEOUT_MS=60000
 ```
 
 If the MariaDB service has a different Railway service name, replace `mariadb.railway.internal` with `<service-name>.railway.internal`.
@@ -90,13 +102,16 @@ If public networking is disabled on the MariaDB service, enable Railway TCP prox
 2. In Railway, choose **New Project**.
 3. Add the MariaDB Docker image service first.
 4. Add the GitHub repository service.
-5. Add the app service variables above.
-6. Deploy the app service.
-7. Open the generated Railway domain.
+5. Set the app service branch to `codex/railway-deploy`.
+6. Add the app service variables above.
+7. Deploy the app service.
+8. Confirm the deployment healthcheck passes at `/healthz`.
+9. Open the generated Railway domain.
 
 ## Notes
 
 - The web service uses Railway's `PORT` variable through `server.port=${PORT:8080}`.
+- The deployment healthcheck uses `/healthz`, which intentionally does not query MariaDB.
 - Startup signal refresh is disabled in the `railway` profile to keep web deploys fast and stable.
 - Run heavy data collection as separate one-off jobs, not on every web boot.
 - Keep the MariaDB volume mounted at `/var/lib/mysql`; without a volume, Railway redeploys can lose database files.
