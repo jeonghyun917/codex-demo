@@ -1479,7 +1479,7 @@
             ) AS note
         FROM stock_dashboard_view_snapshot
         WHERE index_code = #{indexCode}
-          AND view_version = 'DASHBOARD_QUANT_AI_V1'
+          AND view_version = 'DASHBOARD_QUANT_AI_DATA_SOURCES_V2'
         ORDER BY CASE metricKey
             WHEN 'UNIVERSE' THEN 1
             WHEN 'SIGNAL_LATEST' THEN 2
