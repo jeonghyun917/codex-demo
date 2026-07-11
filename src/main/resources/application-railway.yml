@@ -11,7 +11,7 @@ spring:
       initialization-fail-timeout: ${DB_INITIALIZATION_FAIL_TIMEOUT_MS:60000}
   sql:
     init:
-      mode: ${SQL_INIT_MODE:always}
+      mode: ${SQL_INIT_MODE:never}
       schema-locations: classpath:schema-mariadb.sql
       data-locations:
         - classpath:data-mariadb.sql
