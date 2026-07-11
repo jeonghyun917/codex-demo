@@ -93,7 +93,6 @@ try {
         --ssl=0 `
         --compress `
         --reconnect `
-        --binary-mode `
         "--user=$User" `
         --default-character-set=utf8mb4 `
         --max-allowed-packet=1G `
