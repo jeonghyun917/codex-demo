@@ -2284,10 +2284,11 @@
           AND r.signal_date BETWEEN #{fromDate} AND #{toDate}
           AND EXISTS (
               SELECT 1
-              FROM stock_index_membership_snapshot m
-              WHERE m.index_code = #{indexCode}
-                AND m.symbol = r.symbol
-                AND m.snapshot_date = r.signal_date
+              FROM stock_expected_return_snapshot e
+              WHERE e.index_code = #{indexCode}
+                AND e.symbol = r.symbol
+                AND e.signal_date = r.signal_date
+                AND e.horizon_days = r.horizon_days
           )
         ORDER BY r.signal_date, r.symbol
     </select>

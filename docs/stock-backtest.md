@@ -791,3 +791,37 @@ The next durable Quant AI steps are:
 1. Strengthen point-in-time data for historical index membership, shares outstanding, sector/industry changes, and risk-free rates.
 2. Replace proxy-only macro inputs with FRED/ALFRED vintage macro series.
 3. Add richer nonlinear model experiments only after walk-forward diagnostics prove that Expected Return v9, `REGIME_V1`, and `Optimized v5` are stable.
+
+## Expected Return v9 Walk-Forward Evaluation
+
+The first fixed prediction contract is `SP500_EXCESS_20D_V1`:
+
+- point-in-time S&P 500 universe
+- 20-trading-day stock return minus the same-period S&P 500 return
+- monthly expanding-window evaluation
+- three years of minimum training history and a 20-trading-day label embargo
+- `EXPECTED_RETURN_V9` as the frozen production baseline
+- prediction metrics: Rank IC, MAE, direction accuracy, Brier score, calibration error, P10-P90 coverage, and quintile spread
+- investment metrics: cost-adjusted return, annualized excess return, Sharpe, Sortino, maximum drawdown, turnover, benchmark beat rate, and tail loss
+
+The evaluation writes append-only results to:
+
+- `stock_expected_return_evaluation_run`
+- `stock_expected_return_evaluation_window`
+- `stock_expected_return_evaluation_exclusion_count`
+
+The baseline result is `BASELINE_QUALIFIED`, `BASELINE_UNSTABLE`, or `INSUFFICIENT_DATA`. A future candidate model is evaluated on the exact v9 intersection sample and can return `PROMOTE`, `HOLD`, `REJECT`, or `INSUFFICIENT_DATA`. Any PIT violation is a hard rejection.
+
+Run the MariaDB evaluation batch:
+
+```powershell
+.\run-expected-return-evaluation-batch.cmd
+```
+
+Override the evaluation date directly when reproducing a historical run:
+
+```powershell
+mvn.cmd "-Dmaven.repo.local=.m2/repository" spring-boot:run "-Dspring-boot.run.profiles=mariadb" "-Dspring-boot.run.arguments=--app.batch.expected-return-evaluation.enabled=true --app.batch.expected-return-evaluation.exit-on-complete=true --app.batch.expected-return-evaluation.index-code=SP500 --app.batch.expected-return-evaluation.as-of-date=2026-07-15 --app.signal.refresh.run-on-startup=false --spring.main.web-application-type=none"
+```
+
+The `/quant` page only reads the latest stored terminal run. It never starts evaluation or calls an external API during page rendering.
