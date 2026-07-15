@@ -7,6 +7,10 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.springframework.context.annotation.Profile;
 
+import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationExclusionCount;
+import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationRun;
+import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationWindowResult;
+
 @Mapper
 @Profile("mariadb")
 public interface StockBacktestMapper {
@@ -86,6 +90,13 @@ public interface StockBacktestMapper {
             @Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
 
     List<StockExpectedReturnSnapshot> findExpectedReturnSnapshots(@Param("indexCode") String indexCode,
+            @Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
+
+    List<StockBacktestResult> findResultsForEvaluation(@Param("indexCode") String indexCode,
+            @Param("horizonDays") int horizonDays, @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
+
+    List<StockIndexMembershipSnapshot> findIndexMembershipSnapshots(@Param("indexCode") String indexCode,
             @Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
 
     List<StockExpectedReturnCalibration> findExpectedReturnCalibrations(@Param("indexCode") String indexCode,
@@ -179,6 +190,17 @@ public interface StockBacktestMapper {
     void upsertBacktestViewSnapshot(StockBacktestViewSnapshot snapshot);
 
     void upsertOptimizerShadowSnapshot(StockOptimizerShadowSnapshot snapshot);
+
+    void insertExpectedReturnEvaluationRun(ExpectedReturnEvaluationRun run);
+
+    int completeExpectedReturnEvaluationRun(ExpectedReturnEvaluationRun run);
+
+    void insertExpectedReturnEvaluationWindow(ExpectedReturnEvaluationWindowResult window);
+
+    void insertExpectedReturnEvaluationExclusionCount(ExpectedReturnEvaluationExclusionCount count);
+
+    ExpectedReturnEvaluationRun findLatestExpectedReturnEvaluationRun(@Param("indexCode") String indexCode,
+            @Param("contractVersion") String contractVersion);
 
     List<StockBacktestResult> findResults(@Param("indexCode") String indexCode, @Param("limit") int limit);
 

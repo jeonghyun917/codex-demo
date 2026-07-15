@@ -693,6 +693,69 @@ CREATE TABLE IF NOT EXISTS stock_expected_return_calibration (
     KEY idx_stock_expected_return_calibration_error (index_code, model_version, calibration_error_pct)
 );
 
+CREATE TABLE IF NOT EXISTS stock_expected_return_evaluation_run (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    contract_version VARCHAR(80) NOT NULL,
+    index_code VARCHAR(40) NOT NULL,
+    baseline_model_version VARCHAR(40) NOT NULL,
+    candidate_model_version VARCHAR(40) NULL,
+    as_of_date DATE NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    decision VARCHAR(40) NULL,
+    valid_months INT NULL,
+    target_row_count INT NULL,
+    valid_row_count INT NULL,
+    coverage_pct DECIMAL(18, 8) NULL,
+    rank_ic DECIMAL(18, 10) NULL,
+    brier_score DECIMAL(18, 10) NULL,
+    annualized_excess_return_pct DECIMAL(18, 8) NULL,
+    checks_json LONGTEXT NULL,
+    error_code VARCHAR(80) NULL,
+    error_message VARCHAR(500) NULL,
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP NULL,
+    PRIMARY KEY (id),
+    KEY idx_expected_eval_latest (index_code, contract_version, status, finished_at)
+);
+
+CREATE TABLE IF NOT EXISTS stock_expected_return_evaluation_window (
+    run_id BIGINT NOT NULL,
+    window_id VARCHAR(20) NOT NULL,
+    test_from DATE NOT NULL,
+    test_to DATE NOT NULL,
+    model_version VARCHAR(40) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    train_row_count INT NOT NULL,
+    test_row_count INT NOT NULL,
+    rank_ic DECIMAL(18, 10) NULL,
+    positive_ic_date_pct DECIMAL(18, 8) NULL,
+    mae_pct DECIMAL(18, 8) NULL,
+    directional_accuracy_pct DECIMAL(18, 8) NULL,
+    brier_score DECIMAL(18, 10) NULL,
+    calibration_error_pct DECIMAL(18, 8) NULL,
+    interval_coverage_pct DECIMAL(18, 8) NULL,
+    quintile_spread_pct DECIMAL(18, 8) NULL,
+    net_return_pct DECIMAL(18, 8) NULL,
+    annualized_excess_return_pct DECIMAL(18, 8) NULL,
+    sharpe DECIMAL(18, 10) NULL,
+    maximum_drawdown_pct DECIMAL(18, 8) NULL,
+    turnover_pct DECIMAL(18, 8) NULL,
+    transaction_cost_pct DECIMAL(18, 8) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, window_id, model_version),
+    CONSTRAINT fk_expected_eval_window_run FOREIGN KEY (run_id)
+        REFERENCES stock_expected_return_evaluation_run(id)
+);
+
+CREATE TABLE IF NOT EXISTS stock_expected_return_evaluation_exclusion_count (
+    run_id BIGINT NOT NULL,
+    exclusion_code VARCHAR(80) NOT NULL,
+    row_count INT NOT NULL,
+    PRIMARY KEY (run_id, exclusion_code),
+    CONSTRAINT fk_expected_eval_exclusion_run FOREIGN KEY (run_id)
+        REFERENCES stock_expected_return_evaluation_run(id)
+);
+
 CREATE TABLE IF NOT EXISTS stock_factor_exposure_snapshot (
     index_code VARCHAR(40) NOT NULL,
     signal_date DATE NOT NULL,

@@ -2265,4 +2265,136 @@
         ORDER BY r.signal_date DESC, r.symbol, r.horizon_days
         LIMIT #{limit}
     </select>
+
+    <select id="findResultsForEvaluation" resultType="com.kingyurina.demo.stock.StockBacktestResult">
+        SELECT
+            r.snapshot_id AS snapshotId,
+            r.symbol,
+            r.signal_date AS signalDate,
+            r.horizon_days AS horizonDays,
+            r.entry_trade_date AS entryTradeDate,
+            r.entry_close AS entryClose,
+            r.exit_trade_date AS exitTradeDate,
+            r.exit_close AS exitClose,
+            r.forward_return_pct AS forwardReturnPct,
+            r.sector,
+            r.calculated_at AS calculatedAt
+        FROM stock_signal_backtest_result r
+        WHERE r.horizon_days = #{horizonDays}
+          AND r.signal_date BETWEEN #{fromDate} AND #{toDate}
+          AND EXISTS (
+              SELECT 1
+              FROM stock_index_membership_snapshot m
+              WHERE m.index_code = #{indexCode}
+                AND m.symbol = r.symbol
+                AND m.snapshot_date = r.signal_date
+          )
+        ORDER BY r.signal_date, r.symbol
+    </select>
+
+    <select id="findIndexMembershipSnapshots" resultType="com.kingyurina.demo.stock.StockIndexMembershipSnapshot">
+        SELECT
+            index_code AS indexCode,
+            symbol,
+            snapshot_date AS snapshotDate,
+            sector,
+            industry,
+            exchange,
+            is_member AS member,
+            source
+        FROM stock_index_membership_snapshot
+        WHERE index_code = #{indexCode}
+          AND snapshot_date BETWEEN #{fromDate} AND #{toDate}
+        ORDER BY snapshot_date, symbol
+    </select>
+
+    <insert id="insertExpectedReturnEvaluationRun"
+            parameterType="com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationRun"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_expected_return_evaluation_run (
+            contract_version, index_code, baseline_model_version, candidate_model_version,
+            as_of_date, status, started_at
+        ) VALUES (
+            #{contractVersion}, #{indexCode}, #{baselineModelVersion}, #{candidateModelVersion},
+            #{asOfDate}, #{status}, #{startedAt}
+        )
+    </insert>
+
+    <update id="completeExpectedReturnEvaluationRun"
+            parameterType="com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationRun">
+        UPDATE stock_expected_return_evaluation_run
+        SET status = #{status},
+            decision = #{decision},
+            valid_months = #{validMonths},
+            target_row_count = #{targetRowCount},
+            valid_row_count = #{validRowCount},
+            coverage_pct = #{coveragePct},
+            rank_ic = #{rankIc},
+            brier_score = #{brierScore},
+            annualized_excess_return_pct = #{annualizedExcessReturnPct},
+            checks_json = #{checksJson},
+            error_code = #{errorCode},
+            error_message = #{errorMessage},
+            finished_at = #{finishedAt}
+        WHERE id = #{id}
+          AND status = 'RUNNING'
+    </update>
+
+    <insert id="insertExpectedReturnEvaluationWindow"
+            parameterType="com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationWindowResult">
+        INSERT INTO stock_expected_return_evaluation_window (
+            run_id, window_id, test_from, test_to, model_version, status,
+            train_row_count, test_row_count, rank_ic, positive_ic_date_pct, mae_pct,
+            directional_accuracy_pct, brier_score, calibration_error_pct,
+            interval_coverage_pct, quintile_spread_pct, net_return_pct,
+            annualized_excess_return_pct, sharpe, maximum_drawdown_pct, turnover_pct,
+            transaction_cost_pct
+        ) VALUES (
+            #{runId}, #{windowId}, #{testFrom}, #{testTo}, #{modelVersion}, #{status},
+            #{trainRowCount}, #{testRowCount}, #{metrics.rankIc}, #{metrics.positiveIcDatePct},
+            #{metrics.maePct}, #{metrics.directionalAccuracyPct}, #{metrics.brierScore},
+            #{metrics.calibrationErrorPct}, #{metrics.intervalCoveragePct},
+            #{metrics.quintileSpreadPct}, #{portfolio.netReturnPct},
+            #{portfolio.annualizedExcessReturnPct}, #{portfolio.sharpe},
+            #{portfolio.maximumDrawdownPct}, #{portfolio.turnoverPct},
+            #{portfolio.transactionCostPct}
+        )
+    </insert>
+
+    <insert id="insertExpectedReturnEvaluationExclusionCount"
+            parameterType="com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationExclusionCount">
+        INSERT INTO stock_expected_return_evaluation_exclusion_count (run_id, exclusion_code, row_count)
+        VALUES (#{runId}, #{code}, #{rowCount})
+    </insert>
+
+    <select id="findLatestExpectedReturnEvaluationRun"
+            resultType="com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationRun">
+        SELECT
+            id,
+            contract_version AS contractVersion,
+            index_code AS indexCode,
+            baseline_model_version AS baselineModelVersion,
+            candidate_model_version AS candidateModelVersion,
+            as_of_date AS asOfDate,
+            status,
+            decision,
+            valid_months AS validMonths,
+            target_row_count AS targetRowCount,
+            valid_row_count AS validRowCount,
+            coverage_pct AS coveragePct,
+            rank_ic AS rankIc,
+            brier_score AS brierScore,
+            annualized_excess_return_pct AS annualizedExcessReturnPct,
+            checks_json AS checksJson,
+            error_code AS errorCode,
+            error_message AS errorMessage,
+            started_at AS startedAt,
+            finished_at AS finishedAt
+        FROM stock_expected_return_evaluation_run
+        WHERE index_code = #{indexCode}
+          AND contract_version = #{contractVersion}
+          AND status IN ('COMPLETED', 'INSUFFICIENT_DATA', 'FAILED')
+        ORDER BY finished_at DESC, id DESC
+        LIMIT 1
+    </select>
 </mapper>
