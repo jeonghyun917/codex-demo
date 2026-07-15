@@ -51,6 +51,11 @@ toss:
 
 app:
   batch:
+    expected-return-evaluation:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      as-of-date: ""
     toss:
       enabled: false
       exit-on-complete: false
