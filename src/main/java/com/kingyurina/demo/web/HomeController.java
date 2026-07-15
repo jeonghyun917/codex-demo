@@ -36,6 +36,7 @@ public class HomeController {
         model.addAttribute("macroRegime", dashboard.macroRegime());
         model.addAttribute("modelHealth", dashboard.modelHealth());
         model.addAttribute("dataSources", dashboard.dataSources());
+        model.addAttribute("expectedReturnEvaluation", dashboard.expectedReturnEvaluation());
         return "dashboard";
     }
 

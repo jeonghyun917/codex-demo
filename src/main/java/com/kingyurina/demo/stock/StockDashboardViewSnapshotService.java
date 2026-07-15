@@ -12,10 +12,12 @@ import org.springframework.stereotype.Service;
 
 import tools.jackson.databind.ObjectMapper;
 
+import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationSummaryService;
+
 @Service
 public class StockDashboardViewSnapshotService {
 
-    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_DATA_SOURCES_V2";
+    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_EVALUATION_V3";
     private static final Duration DASHBOARD_VIEW_CACHE_TTL = Duration.ofMinutes(10);
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
@@ -24,6 +26,7 @@ public class StockDashboardViewSnapshotService {
     private final StockMacroRegimeService stockMacroRegimeService;
     private final StockQuantModelHealthService stockQuantModelHealthService;
     private final StockApiDataSourceService stockApiDataSourceService;
+    private final ExpectedReturnEvaluationSummaryService expectedReturnEvaluationSummaryService;
     private final Map<String, CachedDashboardView> dashboardViewCache = new ConcurrentHashMap<>();
 
     public StockDashboardViewSnapshotService(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
@@ -31,13 +34,15 @@ public class StockDashboardViewSnapshotService {
             StockMarketViewService stockMarketViewService,
             StockMacroRegimeService stockMacroRegimeService,
             StockQuantModelHealthService stockQuantModelHealthService,
-            StockApiDataSourceService stockApiDataSourceService) {
+            StockApiDataSourceService stockApiDataSourceService,
+            ExpectedReturnEvaluationSummaryService expectedReturnEvaluationSummaryService) {
         this.stockBacktestMapper = stockBacktestMapper;
         this.objectMapper = objectMapper;
         this.stockMarketViewService = stockMarketViewService;
         this.stockMacroRegimeService = stockMacroRegimeService;
         this.stockQuantModelHealthService = stockQuantModelHealthService;
         this.stockApiDataSourceService = stockApiDataSourceService;
+        this.expectedReturnEvaluationSummaryService = expectedReturnEvaluationSummaryService;
     }
 
     public StockDashboardViewPayload build(String indexCode) {
@@ -84,7 +89,8 @@ public class StockDashboardViewSnapshotService {
                 market,
                 macroRegime,
                 modelHealth,
-                stockApiDataSourceService.build(indexCode, modelHealth));
+                stockApiDataSourceService.build(indexCode, modelHealth),
+                expectedReturnEvaluationSummaryService.build(indexCode));
     }
 
     private StockDashboardViewPayload readMaterializedDashboardView(StockBacktestMapper mapper, String indexCode) {
@@ -115,6 +121,7 @@ public class StockDashboardViewSnapshotService {
                 && payload.modelHealth().alerts() != null
                 && payload.modelHealth().operations() != null
                 && payload.dataSources() != null
+                && payload.expectedReturnEvaluation() != null
                 && hasModelHealthLayer(payload, "Backtest view snapshot");
     }
 

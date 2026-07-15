@@ -158,6 +158,30 @@
             </div>
 
             <aside class="market-board-side quant-dashboard-side">
+                <section class="quant-evaluation-panel" th:if="${expectedReturnEvaluation != null}">
+                    <div class="quant-evaluation-head">
+                        <div>
+                            <span class="market-kicker">20D Walk-forward</span>
+                            <h2>Expected Return Evaluation</h2>
+                        </div>
+                        <span class="quant-health-status"
+                              th:classappend="${expectedReturnEvaluation.tone}"
+                              th:text="${expectedReturnEvaluation.decision}">NOT_EVALUATED</span>
+                    </div>
+                    <p class="quant-health-summary"
+                       th:text="${expectedReturnEvaluation.contractVersion + ' · ' + expectedReturnEvaluation.modelVersion + ' · as of ' + expectedReturnEvaluation.asOfDate}">
+                        SP500_EXCESS_20D_V1
+                    </p>
+                    <div class="quant-evaluation-grid">
+                        <div><small>Samples</small><strong th:text="${expectedReturnEvaluation.samples}">0 / 0</strong></div>
+                        <div><small>Coverage</small><strong th:text="${expectedReturnEvaluation.coverage}">-</strong></div>
+                        <div><small>Rank IC</small><strong th:text="${expectedReturnEvaluation.rankIc}">-</strong></div>
+                        <div><small>Brier</small><strong th:text="${expectedReturnEvaluation.brierScore}">-</strong></div>
+                        <div><small>Annual excess</small><strong th:text="${expectedReturnEvaluation.annualizedExcessReturn}">-</strong></div>
+                    </div>
+                    <small th:text="${expectedReturnEvaluation.gateSummary}">Run the evaluation batch</small>
+                </section>
+
                 <section>
                     <h2>Quant AI 구성</h2>
                     <div class="quant-side-note">

@@ -5342,3 +5342,33 @@ html:has(body.home-3d-body) {
     }
 
 }
+.quant-evaluation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quant-evaluation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 1rem 0;
+}
+
+.quant-evaluation-grid div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(65, 84, 69, 0.14);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.quant-evaluation-grid small {
+  color: var(--muted);
+}
+
+.quant-evaluation-grid strong {
+  font-variant-numeric: tabular-nums;
+}
