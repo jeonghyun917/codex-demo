@@ -4,6 +4,8 @@ import { createQuantEngine } from "./home-cinematic-engine.js";
 import { createDataVortex } from "./home-cinematic-particles.js";
 
 const THREE_MODULE_URL = "/js/vendor/three.module.js";
+const CAMERA_START_Z = 14.2;
+const CAMERA_END_Z = 5.8;
 const root = document.querySelector("[data-cinematic-lab]");
 const canvas = document.querySelector("[data-cinematic-canvas]");
 
@@ -26,13 +28,14 @@ async function startCinematicLaboratory(stage, targetCanvas) {
     renderer.setClearColor(0x03050b, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    renderer.toneMappingExposure = 0.94;
     renderer.shadowMap.enabled = quality.shadows;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x03050b, 0.026);
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
+    scene.fog = new THREE.FogExp2(0x03050b, 0.024);
+    scene.environment = createStudioEnvironment(THREE, renderer);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80);
     const laboratory = createLaboratory(THREE, quality);
     const engine = createQuantEngine(THREE, quality);
     const vortex = createDataVortex(THREE, quality);
@@ -63,6 +66,7 @@ async function startCinematicLaboratory(stage, targetCanvas) {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio));
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
+        camera.fov = camera.aspect < 0.78 ? 46 : 40;
         camera.updateProjectionMatrix();
     };
 
@@ -120,16 +124,20 @@ async function startCinematicLaboratory(stage, targetCanvas) {
 }
 
 function updateCamera(camera, state, quality) {
-    const mobileOffset = quality.name === "low" ? 2.2 : 0;
+    const portrait = state.width / Math.max(1, state.height) < 0.78;
+    const startZ = portrait ? 16 : CAMERA_START_Z;
+    const endZ = portrait ? 8.2 : CAMERA_END_Z;
+    const performanceOffset = !portrait && quality.name === "low" ? 0.8 : 0;
+    const dollyProgress = smoothstep(0, 1, state.progress);
     camera.position.set(
-        state.pointerX * 0.18,
-        1.2 + state.pointerY * 0.08 - state.progress * 0.34,
-        13.8 + mobileOffset - state.progress * 10.7
+        state.pointerX * (0.14 - dollyProgress * 0.05),
+        lerp(1.22, 0.92, dollyProgress) + state.pointerY * 0.06,
+        lerp(startZ + performanceOffset, endZ + performanceOffset * 0.5, dollyProgress)
     );
     camera.lookAt(
-        state.pointerX * 0.08,
-        0.2 - state.progress * 0.2,
-        -2.4 - state.progress * 1.4
+        state.pointerX * 0.05,
+        lerp(0.18, -0.18, dollyProgress),
+        lerp(-2.2, -4.15, dollyProgress)
     );
 }
 
@@ -137,9 +145,9 @@ function updateOverlay(progress) {
     document.documentElement.style.setProperty("--scene-progress", progress.toFixed(4));
     document.querySelector(".cinematic-intro")?.classList.toggle("is-hidden", progress > 0.2);
     document.querySelectorAll("[data-metric]").forEach((metric, index) => {
-        metric.classList.toggle("is-visible", progress > 0.27 + index * 0.085 && progress < 0.9);
+        metric.classList.toggle("is-visible", progress > 0.27 + index * 0.085 && progress < 0.84);
     });
-    document.querySelector(".cinematic-handoff")?.classList.toggle("is-visible", progress > 0.82);
+    document.querySelector(".cinematic-handoff")?.classList.toggle("is-visible", progress > 0.86);
     document.querySelector(".cinematic-scroll-cue")?.classList.toggle("is-hidden", progress > 0.08);
 }
 
@@ -173,6 +181,45 @@ export function startCanvasFallback(targetCanvas) {
     window.addEventListener("resize", draw, { passive: true });
 }
 
+function createStudioEnvironment(THREE, renderer) {
+    const studio = new THREE.Scene();
+    studio.background = new THREE.Color(0x02040a);
+    const cardGeometry = new THREE.PlaneGeometry(8, 8);
+
+    [
+        { color: 0x8eb7ff, position: [-4, 3, 3], rotation: [0, 0.75, 0], scale: [0.5, 1.4] },
+        { color: 0x315fba, position: [4, 1, 1], rotation: [0, -0.9, 0], scale: [0.45, 1.1] },
+        { color: 0xff9b61, position: [-1, 4, -3], rotation: [1.25, 0, 0], scale: [0.7, 0.32] }
+    ].forEach((configuration) => {
+        const card = new THREE.Mesh(
+            cardGeometry,
+            new THREE.MeshBasicMaterial({
+                color: configuration.color,
+                side: THREE.DoubleSide,
+                toneMapped: false
+            })
+        );
+        card.position.set(...configuration.position);
+        card.rotation.set(...configuration.rotation);
+        card.scale.set(configuration.scale[0], configuration.scale[1], 1);
+        studio.add(card);
+    });
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const renderTarget = pmremGenerator.fromScene(studio, 0.04);
+    pmremGenerator.dispose();
+    return renderTarget.texture;
+}
+
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
+}
+
+function lerp(start, end, amount) {
+    return start + (end - start) * amount;
+}
+
+function smoothstep(edge0, edge1, value) {
+    const x = clamp((value - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
+    return x * x * (3 - 2 * x);
 }

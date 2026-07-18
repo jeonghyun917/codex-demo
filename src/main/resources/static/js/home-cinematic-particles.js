@@ -51,6 +51,7 @@ export function createDataVortex(THREE, quality) {
         group,
         update(time, progress, state) {
             const intake = smoothstep(0.55, 0.94, progress);
+            const reveal = 1 - smoothstep(0.78, 1, progress) * 0.64;
             const positionAttribute = geometry.attributes.position;
             for (let index = 0; index < count; index += 1) {
                 const offset = index * 3;
@@ -66,9 +67,9 @@ export function createDataVortex(THREE, quality) {
                 positions[offset + 2] = depth + intake * ((time * speed * 3 + phase) % 8 - 4);
             }
             positionAttribute.needsUpdate = true;
-            material.opacity = 0.26 + progress * 0.28 + intake * 0.28;
-            dataRings.update(time, progress, intake);
-            beams.update(time, intake);
+            material.opacity = (0.2 + progress * 0.14 + intake * 0.12) * reveal;
+            dataRings.update(time, progress, intake, reveal);
+            beams.update(time, intake, reveal);
         }
     };
 }
@@ -95,11 +96,11 @@ function createDataRings(THREE, quality) {
     }
     return {
         group,
-        update(time, progress, intake) {
+        update(time, progress, intake, reveal) {
             rings.forEach((ring, index) => {
                 ring.rotation.z = time * (0.08 + index * 0.004) * (index % 2 ? -1 : 1);
                 ring.scale.setScalar(1 - intake * 0.42 + Math.sin(time + ring.userData.phase) * 0.02);
-                ring.material.opacity = 0.05 + progress * 0.08 + intake * 0.22;
+                ring.material.opacity = (0.035 + progress * 0.045 + intake * 0.11) * reveal;
                 ring.position.z += intake * 0.004 * (index + 1);
                 if (ring.position.z > 3) {
                     ring.position.z = -9;
@@ -130,9 +131,11 @@ function createIntakeBeams(THREE) {
     }
     return {
         group,
-        update(time, intake) {
+        update(time, intake, reveal) {
             beams.forEach((beam) => {
-                beam.material.opacity = intake * (0.08 + Math.sin(time * 2 + beam.userData.phase) * 0.035);
+                beam.material.opacity = intake
+                    * (0.038 + Math.sin(time * 2 + beam.userData.phase) * 0.014)
+                    * reveal;
                 beam.scale.z = 0.5 + intake * 0.8;
             });
         }
