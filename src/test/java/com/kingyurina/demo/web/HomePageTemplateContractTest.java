@@ -14,6 +14,7 @@ class HomePageTemplateContractTest {
     @Test
     void homepageDeclaresAuroraCoreAndSemanticProductContent() throws IOException {
         String template = resource("templates/index.html");
+        String css = resource("static/css/home-aurora.css");
 
         assertTrue(template.contains("home-aurora.css"));
         assertTrue(template.contains("data-aurora-core"));
@@ -22,8 +23,9 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("data-aurora-metric"));
         assertTrue(template.contains("QUANT INTELLIGENCE / AURORA CORE ONLINE"));
         assertTrue(template.contains("See the signal beneath the noise."));
-        assertTrue(template.contains("Signal, alpha, upside and risk?봱esolved into one adaptive market view."));
+        assertTrue(template.contains("risk&mdash;resolved"));
         assertTrue(template.contains("Market intelligence, resolved."));
+        assertTrue(template.contains("Illustrative model outputs &middot; Not live market data"));
         assertTrue(template.contains("Enter Quant Intelligence"));
         assertTrue(template.contains("Scroll to resolve"));
         assertTrue(template.contains("Signal"));
@@ -35,6 +37,13 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("home-aurora.js"));
         assertTrue(new ClassPathResource("static/css/home-aurora.css").exists());
         assertTrue(new ClassPathResource("static/js/home-aurora.js").exists());
+        assertTrue(css.contains(".aurora-story { min-height: 280svh; }"));
+        assertTrue(css.contains("@media (max-width: 900px) {\n    .aurora-story { min-height: 220svh; }\n}"));
+        assertTrue(css.contains("@media (prefers-reduced-motion: reduce) {\n    .aurora-story { min-height: 100svh; }\n}"));
+        assertTrue(css.contains(".aurora-skip-link,\n.aurora-nav nav a,\n.aurora-dashboard,\n.aurora-primary-action {"));
+        assertTrue(css.contains("min-height: 44px;"));
+        assertTrue(css.contains(".aurora-skip-link:focus-visible,\n.aurora-nav nav a:focus-visible,\n.aurora-dashboard:focus-visible,\n.aurora-primary-action:focus-visible {"));
+        assertTrue(css.contains("outline: 2px solid #f7faff;"));
         assertFalse(template.contains("home-cinematic"));
         assertFalse(template.contains("cinematic-laboratory-bg.png"));
         assertFalse(template.contains("fonts.googleapis.com"));
