@@ -37,9 +37,9 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("home-aurora.js"));
         assertTrue(new ClassPathResource("static/css/home-aurora.css").exists());
         assertTrue(new ClassPathResource("static/js/home-aurora.js").exists());
-        assertTrue(css.contains("min-height: 280svh"));
+        assertTrue(css.contains(".aurora-story.is-ready { min-height: 280svh; }"));
         assertTrue(css.contains("@media (max-width: 900px)"));
-        assertTrue(css.contains("min-height: 220svh"));
+        assertTrue(css.contains(".aurora-story.is-ready { min-height: 220svh; }"));
         assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
         assertTrue(css.contains("min-height: 100svh"));
         assertTrue(css.contains(".aurora-skip-link {"));
@@ -184,6 +184,118 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(".aurora-home.is-webgl-fallback .aurora-metric-rail"));
         assertTrue(css.contains(".aurora-atmosphere::after"));
         assertFalse(css.contains("cinematic-laboratory-bg.png"));
+    }
+
+    @Test
+    void auroraStylesProgressivelyEnhanceFromAResolvedStaticBase() throws IOException {
+        String css = resource("static/css/home-aurora.css");
+
+        assertTrue(css.contains(
+            ".aurora-story { position: relative; min-height: 100svh; background: var(--aurora-void); }"
+        ));
+        assertTrue(css.contains(".aurora-story.is-ready { min-height: 280svh; }"));
+        assertFalse(css.contains(
+            ".aurora-story { position: relative; min-height: 280svh;"
+        ));
+        assertTrue(css.contains(
+            ".aurora-summary { opacity: 0; transform: translateY(-8px); }"
+        ));
+        assertTrue(css.contains(".aurora-resolved-copy { opacity: 1; transform: none; }"));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready:not(.is-resolved) .aurora-summary"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready:not(.is-resolved) .aurora-resolved-copy"
+        ));
+        assertTrue(css.contains(
+            "    opacity: 1;\n"
+                + "    transform: none;\n"
+                + "    transition: opacity 420ms"
+        ));
+        assertTrue(css.contains(
+            "    padding: 16px 20px;\n"
+                + "    opacity: 1;\n"
+                + "    transform: none;"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready .aurora-metric-rail { opacity: 0;"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready.has-metrics .aurora-metric-rail"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready .aurora-metric-rail li { opacity: 0;"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready .aurora-metric-rail li.is-visible"
+        ));
+        assertTrue(css.contains(".aurora-scroll-cue { display: none;"));
+        assertTrue(css.contains(".aurora-progress { display: none;"));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready .aurora-scroll-cue { display: grid; }"
+        ));
+        assertTrue(css.contains(
+            ".aurora-story.is-ready .aurora-progress { display: block; }"
+        ));
+        assertTrue(css.contains(
+            ".aurora-home.is-webgl-fallback .aurora-story { min-height: 100svh; }"
+        ));
+        assertTrue(css.contains(
+            ".aurora-home.is-webgl-fallback .aurora-scroll-cue,\n"
+                + ".aurora-home.is-webgl-fallback .aurora-progress { display: none; }"
+        ));
+    }
+
+    @Test
+    void auroraStylesAdaptGlassAndCompactShortDesktopLayouts() throws IOException {
+        String css = resource("static/css/home-aurora.css");
+
+        assertTrue(css.contains("-webkit-backdrop-filter: blur(22px)"));
+        assertTrue(css.contains(
+            "@supports not ((backdrop-filter: blur(1px)) or "
+                + "(-webkit-backdrop-filter: blur(1px)))"
+        ));
+        assertTrue(css.contains(
+            "@media (max-width: 900px) {\n"
+                + "    .aurora-story.is-ready { min-height: 220svh; }"
+        ));
+        assertTrue(css.contains(
+            ".aurora-nav,\n"
+                + "    .aurora-metric-rail {\n"
+                + "        -webkit-backdrop-filter: blur(10px);\n"
+                + "        backdrop-filter: blur(10px);"
+        ));
+        assertTrue(css.contains(
+            "        -webkit-backdrop-filter: blur(12px);\n"
+                + "        backdrop-filter: blur(12px);"
+        ));
+        assertTrue(css.contains(".aurora-atmosphere::after { opacity: .07; }"));
+        assertTrue(css.contains("min-width: 0;"));
+        assertTrue(css.contains("scroll-padding-inline: 8px;"));
+        assertTrue(css.contains(
+            "@media (min-width: 901px) and (max-height: 820px)"
+        ));
+        assertTrue(css.contains(".aurora-panel { padding: 28px 44px;"));
+        assertTrue(css.contains(".aurora-copy-stage { min-height: 48px;"));
+        assertTrue(css.contains(".aurora-metric-rail li { padding: 10px 18px; }"));
+    }
+
+    @Test
+    void auroraStylesKeepSmallTextReadableAndStopReducedMotionInteractions() throws IOException {
+        String css = resource("static/css/home-aurora.css");
+
+        assertTrue(css.contains("font-size: .72rem;"));
+        assertTrue(css.contains("font-size: .68rem;"));
+        assertFalse(css.contains("font-size: .57rem;"));
+        assertFalse(css.contains("font-size: .58rem;"));
+        assertTrue(css.contains(
+            ".aurora-nav nav a,\n"
+                + "    .aurora-dashboard,\n"
+                + "    .aurora-primary-action {\n"
+                + "        animation: none !important;\n"
+                + "        transition: none !important;\n"
+                + "        transform: none !important;"
+        ));
     }
 
     private static String resource(String path) throws IOException {
