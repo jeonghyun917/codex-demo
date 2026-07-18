@@ -86,6 +86,35 @@ class HomePageTemplateContractTest {
         assertFalse(field.contains("fetch("));
     }
 
+    @Test
+    void auroraLifecycleStaysLocalAdaptiveAndAllocationConscious() throws IOException {
+        String entry = resource("static/js/home-aurora.js");
+
+        assertTrue(entry.contains("/js/vendor/three.module.js"));
+        assertTrue(entry.contains("selectAuroraQuality"));
+        assertTrue(entry.contains("createAuroraField"));
+        assertTrue(entry.contains("createSpring"));
+        assertTrue(entry.contains("normalizedScrollProgress"));
+        assertTrue(entry.contains("requestAnimationFrame"));
+        assertTrue(entry.contains("IntersectionObserver"));
+        assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("pointermove"));
+        assertTrue(entry.contains("pointerleave"));
+        assertTrue(entry.contains("--aurora-progress"));
+        assertTrue(entry.contains("is-webgl-fallback"));
+        assertTrue(entry.contains("alpha: true"));
+        assertTrue(entry.contains("renderer.setClearColor(0x02040b, 0)"));
+        assertTrue(entry.contains("cancelAnimationFrame"));
+        assertTrue(entry.contains("state.intersecting"));
+        assertTrue(entry.contains("POINTER_ENERGY_SPRING"));
+        assertTrue(entry.contains("SCROLL_SPRING"));
+        assertTrue(entry.contains(
+            "const metrics = Array.from(root.querySelectorAll(\"[data-aurora-metric]\"))"
+        ));
+        assertFalse(entry.contains("https://"));
+        assertFalse(entry.contains("fetch("));
+    }
+
     private static String resource(String path) throws IOException {
         ClassPathResource resource = new ClassPathResource(path);
         return resource.exists() ? resource.getContentAsString(StandardCharsets.UTF_8) : "";
