@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
@@ -296,6 +298,67 @@ class HomePageTemplateContractTest {
                 + "        transition: none !important;\n"
                 + "        transform: none !important;"
         ));
+    }
+
+    @Test
+    void auroraCopySemanticsFollowResolvedStateTransitions() throws IOException {
+        String template = resource("templates/index.html");
+        String entry = resource("static/js/home-aurora.js");
+
+        assertTrue(template.contains(
+            "<div class=\"aurora-story is-resolved\" data-aurora-core>"
+        ));
+        assertTrue(template.contains(
+            "<p class=\"aurora-summary\" aria-hidden=\"true\">"
+        ));
+        assertTrue(template.contains(
+            "<p class=\"aurora-resolved-copy\">Market intelligence, resolved.</p>"
+        ));
+        assertFalse(template.contains(
+            "class=\"aurora-resolved-copy\" aria-hidden=\"true\""
+        ));
+        assertTrue(entry.contains(
+            "const summaryCopy = root.querySelector(\".aurora-summary\")"
+        ));
+        assertTrue(entry.contains(
+            "const resolvedCopy = root.querySelector(\".aurora-resolved-copy\")"
+        ));
+        assertTrue(entry.contains("let resolvedState = true;"));
+        assertTrue(entry.contains("const nextResolvedState = progress >= 0.74;"));
+        assertTrue(entry.contains("if (nextResolvedState !== resolvedState)"));
+        assertTrue(entry.contains(
+            "root.classList.toggle(\"is-resolved\", nextResolvedState)"
+        ));
+        assertTrue(entry.contains(
+            "summaryCopy.setAttribute(\"aria-hidden\", String(nextResolvedState))"
+        ));
+        assertTrue(entry.contains(
+            "resolvedCopy.setAttribute(\"aria-hidden\", String(!nextResolvedState))"
+        ));
+        assertTrue(entry.contains("resolvedState = nextResolvedState;"));
+        assertTrue(entry.contains(
+            "stage.classList.add(\"is-ready\", \"has-metrics\", \"is-resolved\")"
+        ));
+    }
+
+    @Test
+    void homepageNoLongerLoadsTheRejectedLaboratoryRuntime() throws IOException {
+        String template = resource("templates/index.html");
+        String entry = resource("static/js/home-aurora.js");
+
+        assertFalse(template.contains("home-cinematic.css"));
+        assertFalse(template.contains("home-cinematic-3d.js"));
+        assertFalse(entry.contains("createLaboratory"));
+        assertFalse(entry.contains("createQuantEngine"));
+        assertFalse(entry.contains("createDataVortex"));
+        assertFalse(entry.contains("cinematic-laboratory-bg.png"));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/css/home-cinematic.css")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/js/home-cinematic-3d.js")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/js/home-cinematic-engine.js")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/js/home-cinematic-lab.js")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/js/home-cinematic-particles.js")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/js/home-cinematic-quality.js")));
+        assertFalse(Files.exists(Path.of("src/main/resources/static/images/cinematic-laboratory-bg.png")));
     }
 
     private static String resource(String path) throws IOException {

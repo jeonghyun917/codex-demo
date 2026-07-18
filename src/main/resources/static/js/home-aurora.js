@@ -41,12 +41,15 @@ async function startAuroraCore(root, targetCanvas) {
 
     const metrics = Array.from(root.querySelectorAll("[data-aurora-metric]"));
     const progressBar = root.querySelector("[data-aurora-progress] span");
+    const summaryCopy = root.querySelector(".aurora-summary");
+    const resolvedCopy = root.querySelector(".aurora-resolved-copy");
     const pointerX = createSpring(0.5);
     const pointerY = createSpring(0.5);
     const pointerEnergy = createSpring(0);
     const initialProgress = quality.name === "reduced" ? 1 : 0;
     const scrollSpring = createSpring(initialProgress);
     let staticFrameRendered = false;
+    let resolvedState = true;
     const state = {
         width: 0,
         height: 0,
@@ -109,7 +112,17 @@ async function startAuroraCore(root, targetCanvas) {
         root.style.setProperty("--pointer-x", `${(pointerX.value * 100).toFixed(2)}%`);
         root.style.setProperty("--pointer-y", `${((1 - pointerY.value) * 100).toFixed(2)}%`);
         root.classList.toggle("has-metrics", progress >= 0.24);
-        root.classList.toggle("is-resolved", progress >= 0.74);
+        const nextResolvedState = progress >= 0.74;
+        if (nextResolvedState !== resolvedState) {
+            root.classList.toggle("is-resolved", nextResolvedState);
+            if (summaryCopy) {
+                summaryCopy.setAttribute("aria-hidden", String(nextResolvedState));
+            }
+            if (resolvedCopy) {
+                resolvedCopy.setAttribute("aria-hidden", String(!nextResolvedState));
+            }
+            resolvedState = nextResolvedState;
+        }
         for (let index = 0; index < metrics.length; index += 1) {
             const metric = metrics[index];
             metric.classList.toggle("is-visible", progress >= 0.28 + index * 0.08);
