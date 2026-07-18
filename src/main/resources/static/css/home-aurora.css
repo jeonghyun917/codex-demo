@@ -16,6 +16,7 @@ a { color: inherit; }
 .aurora-nav,
 .aurora-content { position: relative; z-index: 2; }
 .aurora-skip-link,
+.aurora-brand,
 .aurora-nav nav a,
 .aurora-dashboard,
 .aurora-primary-action {
@@ -24,6 +25,7 @@ a { color: inherit; }
     min-height: 44px;
 }
 .aurora-skip-link:focus-visible,
+.aurora-brand:focus-visible,
 .aurora-nav nav a:focus-visible,
 .aurora-dashboard:focus-visible,
 .aurora-primary-action:focus-visible {

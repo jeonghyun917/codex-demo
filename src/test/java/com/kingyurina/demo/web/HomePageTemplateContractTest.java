@@ -40,9 +40,9 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(".aurora-story { min-height: 280svh; }"));
         assertTrue(css.contains("@media (max-width: 900px) {\n    .aurora-story { min-height: 220svh; }\n}"));
         assertTrue(css.contains("@media (prefers-reduced-motion: reduce) {\n    .aurora-story { min-height: 100svh; }\n}"));
-        assertTrue(css.contains(".aurora-skip-link,\n.aurora-nav nav a,\n.aurora-dashboard,\n.aurora-primary-action {"));
+        assertTrue(css.contains(".aurora-skip-link,\n.aurora-brand,\n.aurora-nav nav a,\n.aurora-dashboard,\n.aurora-primary-action {"));
         assertTrue(css.contains("min-height: 44px;"));
-        assertTrue(css.contains(".aurora-skip-link:focus-visible,\n.aurora-nav nav a:focus-visible,\n.aurora-dashboard:focus-visible,\n.aurora-primary-action:focus-visible {"));
+        assertTrue(css.contains(".aurora-skip-link:focus-visible,\n.aurora-brand:focus-visible,\n.aurora-nav nav a:focus-visible,\n.aurora-dashboard:focus-visible,\n.aurora-primary-action:focus-visible {"));
         assertTrue(css.contains("outline: 2px solid #f7faff;"));
         assertFalse(template.contains("home-cinematic"));
         assertFalse(template.contains("cinematic-laboratory-bg.png"));
