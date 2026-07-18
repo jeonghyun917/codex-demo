@@ -62,9 +62,17 @@ export function createAuroraField(THREE, quality) {
                 return value;
             }
 
-            float auroraBand(vec2 point, float offset, float width, float frequency, float phase) {
+            float auroraBand(
+                vec2 point,
+                float offset,
+                float width,
+                float frequency,
+                float phase,
+                float motionAmplitude
+            ) {
                 float warp = fbm(vec2(point.x * frequency + phase, point.y * 0.7 - phase));
-                float center = offset + (warp - 0.5) * (0.42 + uScroll * 0.16);
+                float center = offset
+                    + (warp - 0.5) * motionAmplitude * (0.42 + uScroll * 0.16);
                 float distanceToBand = abs(point.y - center);
                 float core = exp(-distanceToBand * distanceToBand / max(0.001, width));
                 float strands = 0.72 + 0.28 * noise(vec2(point.x * 8.0 + phase, point.y * 3.0));
@@ -88,17 +96,38 @@ export function createAuroraField(THREE, quality) {
                 float widthLift = pointerGlow * uPointerEnergy * 0.028;
 
                 float convergence = smoothstep(0.74, 1.0, uScroll);
-                float time = uTime * mix(1.0, 0.35, convergence);
+                float time = uTime;
+                float motionAmplitude = mix(1.0, 0.35, convergence);
                 float depth = mix(0.86, 1.42, uScroll);
                 vec2 driftA = point * depth + vec2(time * 0.018, time * -0.012);
                 vec2 driftB = point * (depth * 1.32) + vec2(time * -0.012, time * 0.016);
                 vec2 driftC = point * (depth * 0.74) + vec2(time * 0.009, time * 0.011);
 
-                float violetBand = auroraBand(driftA, 0.05, 0.075 + widthLift, 1.65, time * 0.035);
-                float cobaltBand = auroraBand(driftB, -0.08, 0.052 + widthLift, 2.1, 4.7 - time * 0.028);
-                float cyanBand = auroraBand(driftC, 0.15, 0.062 + widthLift, 1.4, 8.3 + time * 0.022);
-                float emeraldBand = auroraBand(driftB * 0.88, -0.18, 0.045 + widthLift * 0.7, 1.8, 12.6);
-                float roseBand = auroraBand(driftA * 1.12, 0.24, 0.038 + widthLift * 0.45, 2.35, 16.2);
+                float violetBand = auroraBand(
+                    driftA, 0.05, 0.075 + widthLift, 1.65, time * 0.035, motionAmplitude
+                );
+                float cobaltBand = auroraBand(
+                    driftB, -0.08, 0.052 + widthLift, 2.1, 4.7 - time * 0.028, motionAmplitude
+                );
+                float cyanBand = auroraBand(
+                    driftC, 0.15, 0.062 + widthLift, 1.4, 8.3 + time * 0.022, motionAmplitude
+                );
+                float emeraldBand = auroraBand(
+                    driftB * 0.88,
+                    -0.18,
+                    0.045 + widthLift * 0.7,
+                    1.8,
+                    12.6,
+                    motionAmplitude
+                );
+                float roseBand = auroraBand(
+                    driftA * 1.12,
+                    0.24,
+                    0.038 + widthLift * 0.45,
+                    2.35,
+                    16.2,
+                    motionAmplitude
+                );
 
                 vec3 color = vec3(0.0078, 0.0157, 0.0431);
                 color = screenBlend(color, vec3(0.4667, 0.4196, 1.0) * violetBand * 0.54);
@@ -127,6 +156,7 @@ export function createAuroraField(THREE, quality) {
                 #include <colorspace_fragment>
             }
         `,
+        transparent: true,
         depthTest: false,
         depthWrite: false
     });

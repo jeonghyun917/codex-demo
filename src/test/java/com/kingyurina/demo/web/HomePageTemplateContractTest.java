@@ -57,6 +57,7 @@ class HomePageTemplateContractTest {
         assertTrue(field.contains("export function createAuroraField"));
         assertTrue(field.contains("new THREE.PlaneGeometry(2, 2)"));
         assertTrue(field.contains("new THREE.ShaderMaterial"));
+        assertTrue(field.contains("transparent: true"));
         assertTrue(field.contains("uTime"));
         assertTrue(field.contains("uResolution"));
         assertTrue(field.contains("uPointer"));
@@ -66,6 +67,10 @@ class HomePageTemplateContractTest {
         assertTrue(field.contains("fbm"));
         assertTrue(field.contains("auroraBand"));
         assertTrue(field.contains("grain"));
+        assertTrue(field.contains("float time = uTime;"));
+        assertTrue(field.contains("float motionAmplitude = mix(1.0, 0.35, convergence);"));
+        assertTrue(field.contains("(warp - 0.5) * motionAmplitude"));
+        assertFalse(field.contains("uTime * mix"));
         assertFalse(field.contains("TorusGeometry"));
         assertFalse(field.contains("PointsMaterial"));
         assertFalse(field.contains("https://"));
