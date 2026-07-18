@@ -71,6 +71,15 @@ class HomePageTemplateContractTest {
         assertTrue(field.contains("float motionAmplitude = mix(1.0, 0.35, convergence);"));
         assertTrue(field.contains("(warp - 0.5) * motionAmplitude"));
         assertFalse(field.contains("uTime * mix"));
+        assertTrue(field.contains("let phaseTime = 0;"));
+        assertTrue(field.contains("let lastElapsedTime = null;"));
+        assertTrue(field.contains("phaseTime = time;"));
+        assertTrue(field.contains("Math.min(Math.max(time - lastElapsedTime, 0), 0.1)"));
+        assertTrue(field.contains("const convergence = scrollPhase * scrollPhase * (3 - 2 * scrollPhase);"));
+        assertTrue(field.contains("const phaseSpeed = 1 - convergence * 0.65;"));
+        assertTrue(field.contains("phaseTime += deltaTime * phaseSpeed;"));
+        assertTrue(field.contains("uniforms.uTime.value = phaseTime;"));
+        assertFalse(field.contains("uniforms.uTime.value = time;"));
         assertFalse(field.contains("TorusGeometry"));
         assertFalse(field.contains("PointsMaterial"));
         assertFalse(field.contains("https://"));

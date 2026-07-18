@@ -164,6 +164,8 @@ export function createAuroraField(THREE, quality) {
     const geometry = new THREE.PlaneGeometry(2, 2);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
+    let phaseTime = 0;
+    let lastElapsedTime = null;
 
     return {
         mesh,
@@ -172,7 +174,17 @@ export function createAuroraField(THREE, quality) {
             uniforms.uResolution.value.set(width, height);
         },
         update(time, pointerX, pointerY, pointerEnergy, scroll) {
-            uniforms.uTime.value = time;
+            if (lastElapsedTime === null) {
+                phaseTime = time;
+            } else {
+                const deltaTime = Math.min(Math.max(time - lastElapsedTime, 0), 0.1);
+                const scrollPhase = Math.min(Math.max((scroll - 0.74) / 0.26, 0), 1);
+                const convergence = scrollPhase * scrollPhase * (3 - 2 * scrollPhase);
+                const phaseSpeed = 1 - convergence * 0.65;
+                phaseTime += deltaTime * phaseSpeed;
+            }
+            lastElapsedTime = time;
+            uniforms.uTime.value = phaseTime;
             uniforms.uPointer.value.set(pointerX, pointerY);
             uniforms.uPointerEnergy.value = pointerEnergy;
             uniforms.uScroll.value = scroll;
