@@ -301,6 +301,24 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void auroraNavigationDefinesPressedStatesAndReducedMotionSafety() throws IOException {
+        String css = resource("static/css/home-aurora.css");
+
+        assertTrue(css.contains(".aurora-brand:active {"));
+        assertTrue(css.contains(".aurora-nav nav a:active {"));
+        assertTrue(css.contains(".aurora-dashboard:active {"));
+        assertTrue(css.contains(
+            "    .aurora-brand,\n"
+                + "    .aurora-nav nav a,\n"
+                + "    .aurora-dashboard,\n"
+                + "    .aurora-primary-action {\n"
+                + "        animation: none !important;\n"
+                + "        transition: none !important;\n"
+                + "        transform: none !important;"
+        ));
+    }
+
+    @Test
     void auroraCopySemanticsFollowResolvedStateTransitions() throws IOException {
         String template = resource("templates/index.html");
         String entry = resource("static/js/home-aurora.js");

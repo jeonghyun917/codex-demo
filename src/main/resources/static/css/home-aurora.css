@@ -101,11 +101,27 @@ a { color: inherit; text-decoration: none; }
 .aurora-brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-family: Georgia, "Times New Roman", serif; }
 .aurora-brand span { color: #9bdfff; font: 600 .72rem/1 "Segoe UI", Arial, sans-serif; letter-spacing: .12em; }
 .aurora-nav nav { display: flex; justify-content: center; gap: clamp(12px, 2vw, 30px); color: var(--aurora-muted); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+.aurora-brand,
 .aurora-nav nav a,
-.aurora-dashboard { display: inline-flex; align-items: center; min-height: 44px; transition: color 220ms ease, border-color 220ms ease, background 220ms ease, transform 220ms var(--aurora-ease); }
+.aurora-dashboard { display: inline-flex; align-items: center; min-height: 44px; transition: color 220ms ease, border-color 220ms ease, background 220ms ease, opacity 160ms ease, transform 220ms var(--aurora-ease); }
 .aurora-nav nav a:hover { color: var(--aurora-text); }
 .aurora-dashboard { padding: 0 17px; border: 1px solid rgba(155,223,255,.28); border-radius: 999px; background: rgba(8,18,39,.34); }
 .aurora-dashboard:hover { border-color: rgba(155,223,255,.66); background: rgba(50,216,255,.1); transform: translateY(-1px); }
+.aurora-brand:active {
+    color: #b9eaff;
+    opacity: .78;
+    transform: translateY(1px) scale(.985);
+}
+.aurora-nav nav a:active {
+    color: var(--aurora-cyan);
+    opacity: .8;
+    transform: translateY(1px) scale(.97);
+}
+.aurora-dashboard:active {
+    border-color: rgba(155,223,255,.78);
+    background: rgba(50,216,255,.18);
+    transform: translateY(1px) scale(.97);
+}
 .aurora-content { min-height: 100svh; pointer-events: none; }
 .aurora-content a { pointer-events: auto; }
 .aurora-hero {
@@ -344,6 +360,7 @@ a { color: inherit; text-decoration: none; }
     .aurora-copy-stage > p,
     .aurora-metric-rail,
     .aurora-metric-rail li { animation: none !important; transition-duration: .01ms !important; }
+    .aurora-brand,
     .aurora-nav nav a,
     .aurora-dashboard,
     .aurora-primary-action {
