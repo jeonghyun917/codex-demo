@@ -37,13 +37,19 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("home-aurora.js"));
         assertTrue(new ClassPathResource("static/css/home-aurora.css").exists());
         assertTrue(new ClassPathResource("static/js/home-aurora.js").exists());
-        assertTrue(css.contains(".aurora-story { min-height: 280svh; }"));
-        assertTrue(css.contains("@media (max-width: 900px) {\n    .aurora-story { min-height: 220svh; }\n}"));
-        assertTrue(css.contains("@media (prefers-reduced-motion: reduce) {\n    .aurora-story { min-height: 100svh; }\n}"));
-        assertTrue(css.contains(".aurora-skip-link,\n.aurora-brand,\n.aurora-nav nav a,\n.aurora-dashboard,\n.aurora-primary-action {"));
+        assertTrue(css.contains("min-height: 280svh"));
+        assertTrue(css.contains("@media (max-width: 900px)"));
+        assertTrue(css.contains("min-height: 220svh"));
+        assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.contains("min-height: 100svh"));
+        assertTrue(css.contains(".aurora-skip-link {"));
+        assertTrue(css.contains(".aurora-brand {"));
+        assertTrue(css.contains(".aurora-nav nav a,\n.aurora-dashboard {"));
+        assertTrue(css.contains(".aurora-primary-action {"));
         assertTrue(css.contains("min-height: 44px;"));
-        assertTrue(css.contains(".aurora-skip-link:focus-visible,\n.aurora-brand:focus-visible,\n.aurora-nav nav a:focus-visible,\n.aurora-dashboard:focus-visible,\n.aurora-primary-action:focus-visible {"));
-        assertTrue(css.contains("outline: 2px solid #f7faff;"));
+        assertTrue(css.contains("min-height: 52px;"));
+        assertTrue(css.contains(".aurora-home :focus-visible"));
+        assertTrue(css.contains("outline: 2px solid #b9eaff;"));
         assertFalse(template.contains("home-cinematic"));
         assertFalse(template.contains("cinematic-laboratory-bg.png"));
         assertFalse(template.contains("fonts.googleapis.com"));
@@ -159,6 +165,25 @@ class HomePageTemplateContractTest {
                 + "            staticFrameRendered = true;\n"
                 + "            stopFrameLoop();"
         ));
+    }
+
+    @Test
+    void auroraStylesDefineResponsiveFallbackAndAccessibleMotionStates() throws IOException {
+        String css = resource("static/css/home-aurora.css");
+
+        assertTrue(css.contains("--aurora-void: #02040b"));
+        assertTrue(css.contains("min-height: 280svh"));
+        assertTrue(css.contains("min-height: 44px"));
+        assertTrue(css.contains(".aurora-home.is-webgl-fallback .aurora-canvas"));
+        assertTrue(css.contains("@media (max-width: 900px)"));
+        assertTrue(css.contains("min-height: 220svh"));
+        assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.contains("min-height: 100svh"));
+        assertTrue(css.contains(":focus-visible"));
+        assertTrue(css.contains("backdrop-filter: blur(22px)"));
+        assertTrue(css.contains(".aurora-home.is-webgl-fallback .aurora-metric-rail"));
+        assertTrue(css.contains(".aurora-atmosphere::after"));
+        assertFalse(css.contains("cinematic-laboratory-bg.png"));
     }
 
     private static String resource(String path) throws IOException {
