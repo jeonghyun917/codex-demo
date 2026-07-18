@@ -98,9 +98,12 @@ thick glowing borders, and exaggerated rounded corners are avoided.
 
 ### Typography
 
-- Display: Playfair Display, retained for editorial luxury and continuity.
-- UI and body: Inter.
+- Display: a local high-contrast serif stack led by Georgia.
+- UI and body: the local system sans stack led by Segoe UI.
 - Data labels and numeric annotations: the system monospace stack.
+
+No font is fetched at runtime. The hierarchy and editorial contrast come from
+the local type stacks, scale, spacing, and weight rather than a remote asset.
 
 The headline uses balanced line wrapping, a compact line height, and no
 gradient text. Data labels are uppercase with moderate tracking; long body copy
@@ -173,6 +176,7 @@ Primary copy:
 - Heading: `See the signal beneath the noise.`
 - Supporting copy:
   `Signal, alpha, upside and risk—resolved into one adaptive market view.`
+- Resolved-state copy: `Market intelligence, resolved.`
 - Primary action: `Enter Quant Intelligence`
 - Scroll cue: `Scroll to resolve`
 
