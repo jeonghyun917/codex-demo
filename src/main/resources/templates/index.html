@@ -3,23 +3,21 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#03050b">
+    <meta name="theme-color" content="#02040b">
     <title>King Yurina | Quant Intelligence</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/home-cinematic.css(v='20260718')}" href="../static/css/home-cinematic.css?v=20260718">
+    <link rel="stylesheet" th:href="@{/css/home-aurora.css(v='20260718')}" href="../static/css/home-aurora.css?v=20260718">
 </head>
-<body class="cinematic-home">
-<div class="cinematic-scroll" data-cinematic-lab>
-    <div class="cinematic-viewport">
-        <canvas class="cinematic-canvas" data-cinematic-canvas aria-hidden="true"></canvas>
-        <div class="cinematic-fallback" aria-hidden="true"></div>
-        <div class="cinematic-vignette" aria-hidden="true"></div>
+<body class="aurora-home">
+<a class="aurora-skip-link" href="#main-content">Skip to content</a>
+<div class="aurora-story" data-aurora-core>
+    <div class="aurora-viewport">
+        <canvas class="aurora-canvas" data-aurora-canvas aria-hidden="true"></canvas>
+        <div class="aurora-fallback" aria-hidden="true"></div>
+        <div class="aurora-atmosphere" aria-hidden="true"></div>
 
-        <header class="cinematic-nav" aria-label="Primary navigation">
-            <a class="cinematic-brand" href="/" aria-label="King Yurina home">
-                <span aria-hidden="true">♕</span>
+        <header class="aurora-nav" aria-label="Primary navigation">
+            <a class="aurora-brand" href="/" aria-label="King Yurina home">
+                <span aria-hidden="true">K/Y</span>
                 <strong>king yurina</strong>
             </a>
             <nav aria-label="Main menu">
@@ -28,38 +26,62 @@
                    th:text="${menu.label}"
                    href="/quant">Quant</a>
             </nav>
-            <a class="cinematic-dashboard" th:href="@{/quant}" href="/quant">Dashboard</a>
+            <a class="aurora-dashboard" th:href="@{/quant}" href="/quant">Dashboard</a>
         </header>
 
-        <main class="cinematic-content">
-            <section class="cinematic-intro" data-scene-phase="intro" aria-labelledby="hero-title">
-                <p>Calibrated · Intelligent · Disciplined</p>
-                <h1 id="hero-title">king yurina</h1>
-                <span>Quant AI engineered for calibrated market decisions</span>
+        <main id="main-content" class="aurora-content">
+            <section class="aurora-hero" aria-labelledby="hero-title">
+                <div class="aurora-panel" data-aurora-panel>
+                    <p class="aurora-status">
+                        <span aria-hidden="true"></span>
+                        QUANT INTELLIGENCE / AURORA CORE ONLINE
+                    </p>
+                    <h1 id="hero-title">See the signal beneath the noise.</h1>
+                    <div class="aurora-copy-stage">
+                        <p class="aurora-summary">Signal, alpha, upside and risk?봱esolved into one adaptive market view.</p>
+                        <p class="aurora-resolved-copy" aria-hidden="true">Market intelligence, resolved.</p>
+                    </div>
+                    <a class="aurora-primary-action" th:href="@{/quant}" href="/quant">
+                        <span>Enter Quant Intelligence</span>
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <path d="M5 12h13M14 7l5 5-5 5"/>
+                        </svg>
+                    </a>
+                </div>
+
+                <section id="systems" class="aurora-metric-stage" aria-labelledby="metrics-title">
+                    <h2 id="metrics-title" class="aurora-visually-hidden">Illustrative Quant metrics</h2>
+                    <ul class="aurora-metric-rail">
+                        <li data-aurora-metric style="--metric-index: 0">
+                            <span>Signal</span><strong>79 <small>/ 100</small></strong><em>Strong</em>
+                        </li>
+                        <li data-aurora-metric style="--metric-index: 1">
+                            <span>20D Alpha</span><strong>+2.4%</strong><em>vs. benchmark</em>
+                        </li>
+                        <li data-aurora-metric style="--metric-index: 2">
+                            <span>Upside</span><strong>58%</strong><em>Probability</em>
+                        </li>
+                        <li data-aurora-metric style="--metric-index: 3">
+                            <span>Risk</span><strong>Medium</strong><em>Controlled</em>
+                        </li>
+                    </ul>
+                </section>
             </section>
 
-            <aside class="cinematic-metrics" aria-label="Illustrative Quant metrics">
-                <article data-metric="signal"><span>Signal</span><strong>79<small>/100</small></strong><em>Strong</em></article>
-                <article data-metric="alpha"><span>20D Alpha</span><strong>+2.4%</strong><em>vs. benchmark</em></article>
-                <article data-metric="upside"><span>Upside</span><strong>58%</strong><em>Probability</em></article>
-                <article data-metric="risk"><span>Risk</span><strong>Medium</strong><em>Controlled</em></article>
-            </aside>
-
-            <section class="cinematic-handoff" data-scene-phase="handoff">
-                <p>Quant Engine · Online</p>
-                <h2>Enter the intelligence core.</h2>
-                <a th:href="@{/quant}" href="/quant">Explore the Intelligence</a>
-            </section>
-
-            <div class="cinematic-scroll-cue" aria-hidden="true">
-                <span></span>
-                <b>Scroll to enter</b>
+            <div class="aurora-scroll-cue" aria-hidden="true">
+                <span></span><b>Scroll to resolve</b>
             </div>
-            <div class="cinematic-progress" data-cinematic-progress aria-hidden="true"><span></span></div>
-            <p class="cinematic-disclosure">Illustrative model outputs · Not live market data</p>
+            <div class="aurora-progress" data-aurora-progress aria-hidden="true"><span></span></div>
+            <p id="contact" class="aurora-disclosure">Illustrative model outputs 쨌 Not live market data</p>
         </main>
     </div>
 </div>
-<script type="module" th:src="@{/js/home-cinematic-3d.js(v='20260718')}" src="../static/js/home-cinematic-3d.js?v=20260718"></script>
+<noscript>
+    <style>
+        .aurora-metric-rail,
+        .aurora-metric-rail li { opacity: 1 !important; transform: none !important; }
+    </style>
+</noscript>
+<script type="module" th:src="@{/js/home-aurora.js(v='20260718')}" src="../static/js/home-aurora.js?v=20260718"></script>
 </body>
 </html>
