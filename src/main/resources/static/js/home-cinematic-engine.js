@@ -163,11 +163,11 @@ function addChamber(THREE, group, quality, gunmetal, steel, glass, energy, energ
 }
 
 function addStruts(THREE, group, quality, gunmetal, steel) {
-    const strutGeometry = new THREE.BoxGeometry(0.18, 3.4, 0.28);
+    const strutGeometry = new THREE.BoxGeometry(0.13, 3.25, 0.2);
     for (let index = 0; index < 6; index += 1) {
         const angle = index / 6 * Math.PI * 2;
         const holder = new THREE.Group();
-        holder.position.set(Math.cos(angle) * 2.05, -0.05, Math.sin(angle) * 2.05);
+        holder.position.set(Math.cos(angle) * 1.92, -0.05, Math.sin(angle) * 1.92);
         holder.rotation.y = -angle;
 
         const strut = new THREE.Mesh(strutGeometry, gunmetal);
@@ -175,10 +175,10 @@ function addStruts(THREE, group, quality, gunmetal, steel) {
         strut.castShadow = quality.shadows;
         holder.add(strut);
 
-        const clampTop = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.46), steel);
-        clampTop.position.y = 1.58;
+        const clampTop = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.36), steel);
+        clampTop.position.y = 1.5;
         const clampBottom = clampTop.clone();
-        clampBottom.position.y = -1.58;
+        clampBottom.position.y = -1.5;
         holder.add(clampTop, clampBottom);
         group.add(holder);
     }

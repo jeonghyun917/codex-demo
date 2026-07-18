@@ -33,9 +33,11 @@ export function createDataVortex(THREE, quality) {
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     const material = new THREE.PointsMaterial({
         size: quality.name === "low" ? 0.035 : 0.045,
+        map: createParticleTexture(THREE),
         transparent: true,
         opacity: 0.58,
         vertexColors: true,
+        alphaTest: 0.02,
         depthWrite: false,
         blending: THREE.AdditiveBlending
     });
@@ -140,4 +142,21 @@ function createIntakeBeams(THREE) {
 function smoothstep(edge0, edge1, value) {
     const x = Math.min(1, Math.max(0, (value - edge0) / Math.max(0.0001, edge1 - edge0)));
     return x * x * (3 - 2 * x);
+}
+
+function createParticleTexture(THREE) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+    const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 30);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.25, "rgba(190,220,255,0.92)");
+    gradient.addColorStop(0.65, "rgba(90,150,255,0.28)");
+    gradient.addColorStop(1, "rgba(40,100,255,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 64, 64);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
 }

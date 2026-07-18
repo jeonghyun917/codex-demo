@@ -54,7 +54,7 @@ export function createLaboratory(THREE, quality) {
     addForegroundStructure(THREE, foreground, gunmetal, blackMetal);
     addFarWall(THREE, group, blackMetal, blueLightMaterial);
 
-    const ambient = new THREE.HemisphereLight(0x44699f, 0x010205, 0.58);
+    const ambient = new THREE.HemisphereLight(0x527bb8, 0x010205, 0.78);
     const engineKey = new THREE.SpotLight(0x78a8ff, 11, 32, Math.PI * 0.22, 0.62, 1.4);
     engineKey.position.set(-5.5, 7.2, 7.5);
     engineKey.target.position.set(0, -0.4, -5);
@@ -70,7 +70,7 @@ export function createLaboratory(THREE, quality) {
         [-4.4, 3.4, -11, 0xffa265, 9],
         [4.8, 4.0, -15, 0x5a8cff, 10]
     ].forEach((config) => {
-        const light = new THREE.PointLight(config[3], 0.35, config[4], 2);
+        const light = new THREE.PointLight(config[3], 0.7, config[4], 2);
         light.position.set(config[0], config[1], config[2]);
         practicalLights.push(light);
         group.add(light);
@@ -96,12 +96,12 @@ export function createLaboratory(THREE, quality) {
             foreground.rotation.y = state.pointerX * -0.008;
             practicalLights.forEach((light, index) => {
                 const activation = smoothstep(0.06 + index * 0.035, 0.48, progress);
-                light.intensity = 0.35 + activation * (2.4 + index * 0.28);
+                light.intensity = 0.7 + activation * (2.4 + index * 0.28);
             });
             lightStrips.forEach((strip, index) => {
                 strip.material.opacity = 0.34 + smoothstep(0.04 + index * 0.018, 0.42, progress) * 0.5;
             });
-            engineKey.intensity = 7 + smoothstep(0.1, 0.58, progress) * 10 + Math.sin(time * 0.42) * 0.35;
+            engineKey.intensity = 10 + smoothstep(0.1, 0.58, progress) * 10 + Math.sin(time * 0.42) * 0.35;
         }
     };
 }

@@ -19,18 +19,19 @@ async function startCinematicLaboratory(stage, targetCanvas) {
     const quality = selectQualityProfile(readEnvironment());
     const renderer = new THREE.WebGLRenderer({
         canvas: targetCanvas,
+        alpha: true,
         antialias: quality.name !== "low",
         powerPreference: "high-performance"
     });
+    renderer.setClearColor(0x03050b, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.88;
+    renderer.toneMappingExposure = 1.06;
     renderer.shadowMap.enabled = quality.shadows;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x03050b);
-    scene.fog = new THREE.FogExp2(0x03050b, 0.035);
+    scene.fog = new THREE.FogExp2(0x03050b, 0.026);
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
     const laboratory = createLaboratory(THREE, quality);
     const engine = createQuantEngine(THREE, quality);
@@ -123,7 +124,7 @@ function updateCamera(camera, state, quality) {
     camera.position.set(
         state.pointerX * 0.18,
         1.2 + state.pointerY * 0.08 - state.progress * 0.34,
-        15.5 + mobileOffset - state.progress * 14.2
+        13.8 + mobileOffset - state.progress * 10.7
     );
     camera.lookAt(
         state.pointerX * 0.08,

@@ -55,9 +55,12 @@ a {
 
 .cinematic-fallback {
     z-index: 0;
+    filter: brightness(1.12) saturate(0.92);
     background:
+        linear-gradient(180deg, rgba(2, 5, 12, 0.22), rgba(2, 5, 12, 0.08) 52%, rgba(2, 5, 12, 0.48)),
         linear-gradient(90deg, transparent 49.8%, rgba(76, 128, 220, 0.12) 50%, transparent 50.2%),
-        radial-gradient(circle at 50% 55%, #173b78 0, #09142b 22%, #03050b 58%);
+        url("/images/cinematic-laboratory-bg.png") center / cover no-repeat,
+        #03050b;
 }
 
 .cinematic-vignette {
@@ -106,9 +109,10 @@ a {
 .cinematic-nav nav {
     display: flex;
     justify-content: center;
-    gap: clamp(14px, 2.5vw, 34px);
+    gap: clamp(10px, 1.7vw, 24px);
+    min-width: 0;
     color: var(--lab-muted);
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     text-transform: uppercase;
 }
 
@@ -291,6 +295,11 @@ a {
     letter-spacing: 0.16em;
     text-transform: uppercase;
     transform: translateX(-50%);
+    transition: opacity 220ms ease;
+}
+
+.cinematic-scroll-cue.is-hidden {
+    opacity: 0;
 }
 
 .cinematic-scroll-cue span {
@@ -386,6 +395,16 @@ a {
     .cinematic-disclosure {
         right: 12px;
         bottom: 8px;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1120px) {
+    .cinematic-nav nav {
+        display: none;
+    }
+
+    .cinematic-nav {
+        grid-template-columns: 1fr auto;
     }
 }
 

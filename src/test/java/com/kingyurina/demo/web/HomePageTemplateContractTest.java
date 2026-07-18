@@ -37,6 +37,8 @@ class HomePageTemplateContractTest {
 
         assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
         assertTrue(css.contains(".cinematic-home.is-fallback"));
+        assertTrue(css.contains("cinematic-laboratory-bg.png"));
+        assertTrue(new ClassPathResource("static/images/cinematic-laboratory-bg.png").exists());
         assertTrue(entry.contains("/js/vendor/three.module.js"));
         assertTrue(entry.contains("startCanvasFallback"));
         assertTrue(entry.contains("visibilitychange"));
