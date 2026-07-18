@@ -381,6 +381,11 @@ class HomePageTemplateContractTest {
 
     private static String resource(String path) throws IOException {
         ClassPathResource resource = new ClassPathResource(path);
-        return resource.exists() ? resource.getContentAsString(StandardCharsets.UTF_8) : "";
+        if (!resource.exists()) {
+            return "";
+        }
+        return resource.getContentAsString(StandardCharsets.UTF_8)
+                .replace("\r\n", "\n")
+                .replace('\r', '\n');
     }
 }
