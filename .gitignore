@@ -4,3 +4,5 @@ target/
 config/application-secret.yml
 
 *.log
+.worktrees/
+.superpowers/
