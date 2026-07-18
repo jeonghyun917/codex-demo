@@ -115,6 +115,52 @@ class HomePageTemplateContractTest {
         assertFalse(entry.contains("fetch("));
     }
 
+    @Test
+    void auroraObserverUsesTheLatestTransitionForItsSingleRoot() throws IOException {
+        String entry = resource("static/js/home-aurora.js");
+
+        assertTrue(entry.contains("const latestEntry = entries[entries.length - 1]"));
+        assertTrue(entry.contains("if (!latestEntry)"));
+        assertTrue(entry.contains("state.intersecting = latestEntry.isIntersecting"));
+        assertFalse(entry.contains("entries.some("));
+    }
+
+    @Test
+    void auroraResizeRefreshesScrollBeforeSchedulingAFrame() throws IOException {
+        String entry = resource("static/js/home-aurora.js");
+
+        assertTrue(entry.contains(
+            "window.addEventListener(\"resize\", () => {\n"
+                + "        const resized = resize();\n"
+                + "        readScroll();"
+        ));
+        assertTrue(entry.contains(
+            "        }\n"
+                + "        ensureFrameLoop();\n"
+                + "    }, { passive: true });"
+        ));
+    }
+
+    @Test
+    void reducedMotionRendersOnceUntilARealResize() throws IOException {
+        String entry = resource("static/js/home-aurora.js");
+
+        assertTrue(entry.contains("let staticFrameRendered = false"));
+        assertTrue(entry.contains(
+            "quality.name === \"reduced\" && staticFrameRendered"
+        ));
+        assertTrue(entry.contains(
+            "if (resized && quality.name === \"reduced\") {\n"
+                + "            staticFrameRendered = false;\n"
+                + "        }"
+        ));
+        assertTrue(entry.contains(
+            "if (quality.name === \"reduced\") {\n"
+                + "            staticFrameRendered = true;\n"
+                + "            stopFrameLoop();"
+        ));
+    }
+
     private static String resource(String path) throws IOException {
         ClassPathResource resource = new ClassPathResource(path);
         return resource.exists() ? resource.getContentAsString(StandardCharsets.UTF_8) : "";

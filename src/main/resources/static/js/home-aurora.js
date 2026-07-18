@@ -46,6 +46,7 @@ async function startAuroraCore(root, targetCanvas) {
     const pointerEnergy = createSpring(0);
     const initialProgress = quality.name === "reduced" ? 1 : 0;
     const scrollSpring = createSpring(initialProgress);
+    let staticFrameRendered = false;
     const state = {
         width: 0,
         height: 0,
@@ -63,13 +64,14 @@ async function startAuroraCore(root, targetCanvas) {
         const width = Math.max(1, Math.round(rect.width));
         const height = Math.max(1, Math.round(rect.height));
         if (width === state.width && height === state.height) {
-            return;
+            return false;
         }
         state.width = width;
         state.height = height;
         renderer.setPixelRatio(quality.pixelRatio);
         renderer.setSize(width, height, false);
         field.resize(width * quality.pixelRatio, height * quality.pixelRatio);
+        return true;
     };
 
     const readScroll = () => {
@@ -126,7 +128,8 @@ async function startAuroraCore(root, targetCanvas) {
     };
 
     const ensureFrameLoop = () => {
-        if (state.running || !state.intersecting || document.hidden) {
+        if (state.running || !state.intersecting || document.hidden
+            || (quality.name === "reduced" && staticFrameRendered)) {
             return;
         }
         state.running = true;
@@ -168,6 +171,7 @@ async function startAuroraCore(root, targetCanvas) {
         renderer.render(scene, camera);
 
         if (quality.name === "reduced") {
+            staticFrameRendered = true;
             stopFrameLoop();
             return;
         }
@@ -175,13 +179,21 @@ async function startAuroraCore(root, targetCanvas) {
     };
 
     const observer = new IntersectionObserver((entries) => {
-        state.intersecting = entries.some((entry) => entry.isIntersecting);
+        const latestEntry = entries[entries.length - 1];
+        if (!latestEntry) {
+            return;
+        }
+        state.intersecting = latestEntry.isIntersecting;
         synchronizePlayback();
     }, { threshold: 0.01 });
     observer.observe(root);
 
     window.addEventListener("resize", () => {
-        resize();
+        const resized = resize();
+        readScroll();
+        if (resized && quality.name === "reduced") {
+            staticFrameRendered = false;
+        }
         ensureFrameLoop();
     }, { passive: true });
     window.addEventListener("scroll", readScroll, { passive: true });
