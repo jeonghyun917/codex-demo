@@ -3,174 +3,63 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>King Yurina</title>
+    <meta name="theme-color" content="#03050b">
+    <title>King Yurina | Quant Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" th:href="@{/css/main.css(v='20260705-cleanup')}" href="../static/css/main.css?v=20260705-cleanup">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/home-cinematic.css(v='20260718')}" href="../static/css/home-cinematic.css?v=20260718">
 </head>
-<body class="home-3d-body">
-<div class="page-shell">
-    <header class="site-header home-3d-nav" aria-label="Primary navigation">
-        <a class="brand-mark home-3d-brand" href="/" aria-label="King Yurina home">
-            <span class="home-crown" aria-hidden="true">
-                <svg viewBox="0 0 32 32" focusable="false">
-                    <path d="M5 23h22l-2 4H7l-2-4Z"/>
-                    <path d="M7 20 10 9l6 8 6-8 3 11H7Z"/>
-                    <circle cx="10" cy="8" r="2"/>
-                    <circle cx="16" cy="6" r="2"/>
-                    <circle cx="22" cy="8" r="2"/>
-                </svg>
-            </span>
-            <strong>king yurina</strong>
-        </a>
-        <nav class="nav-links" aria-label="Main menu">
-            <a th:each="menu : ${mainMenus}"
-               th:href="${menu.href}"
-               th:text="${menu.label}"
-               href="/quant">Quant</a>
-        </nav>
-        <a class="header-action home-3d-dashboard" th:href="@{/quant}" href="/quant">
-            <span aria-hidden="true">::</span>
-            Dashboard
-        </a>
-    </header>
+<body class="cinematic-home">
+<div class="cinematic-scroll" data-cinematic-lab>
+    <div class="cinematic-viewport">
+        <canvas class="cinematic-canvas" data-cinematic-canvas aria-hidden="true"></canvas>
+        <div class="cinematic-fallback" aria-hidden="true"></div>
+        <div class="cinematic-vignette" aria-hidden="true"></div>
 
-    <main class="hero home-3d">
-        <section class="hero-stage home-3d-stage" data-home-showcase-stage aria-labelledby="hero-title">
-            <canvas class="home-3d-canvas" data-home-nature-3d aria-hidden="true"></canvas>
-            <div class="home-3d-atmosphere" aria-hidden="true"></div>
+        <header class="cinematic-nav" aria-label="Primary navigation">
+            <a class="cinematic-brand" href="/" aria-label="King Yurina home">
+                <span aria-hidden="true">♕</span>
+                <strong>king yurina</strong>
+            </a>
+            <nav aria-label="Main menu">
+                <a th:each="menu : ${mainMenus}"
+                   th:href="${menu.href}"
+                   th:text="${menu.label}"
+                   href="/quant">Quant</a>
+            </nav>
+            <a class="cinematic-dashboard" th:href="@{/quant}" href="/quant">Dashboard</a>
+        </header>
 
-            <aside class="home-quant-stack home-quant-stack-left" aria-label="Quant signal snapshot">
-                <article class="home-metric-card">
-                    <span class="home-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" focusable="false">
-                            <path d="M4 17h5l3-8 6 16 4-11h6"/>
-                        </svg>
-                    </span>
-                    <div>
-                        <span>Signal</span>
-                        <strong>79<small>/100</small></strong>
-                        <em>Strong</em>
-                    </div>
-                </article>
-                <article class="home-metric-card">
-                    <span class="home-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" focusable="false">
-                            <path d="M6 23 14 9l5 8 7-10"/>
-                            <path d="M20 7h6v6"/>
-                        </svg>
-                    </span>
-                    <div>
-                        <span>20D Alpha</span>
-                        <strong>+2.4%</strong>
-                        <em>vs. benchmark</em>
-                    </div>
-                </article>
-                <article class="home-metric-card">
-                    <span class="home-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" focusable="false">
-                            <path d="M6 22h20"/>
-                            <path d="M9 20 16 9l7 11"/>
-                        </svg>
-                    </span>
-                    <div>
-                        <span>Upside</span>
-                        <strong>58%</strong>
-                        <em>Probability</em>
-                    </div>
-                </article>
-                <article class="home-metric-card">
-                    <span class="home-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 32 32" focusable="false">
-                            <path d="M16 4 7 8v7c0 6 4 10 9 13 5-3 9-7 9-13V8l-9-4Z"/>
-                            <path d="M12 16l3 3 6-7"/>
-                        </svg>
-                    </span>
-                    <div>
-                        <span>Risk</span>
-                        <strong>Medium</strong>
-                        <em>Controlled</em>
-                    </div>
-                </article>
-            </aside>
-
-            <div class="hero-editorial home-3d-editorial">
-                <span class="home-crest" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false">
-                        <path d="M5 23h22l-2 4H7l-2-4Z"/>
-                        <path d="M7 20 10 9l6 8 6-8 3 11H7Z"/>
-                        <circle cx="10" cy="8" r="2"/>
-                        <circle cx="16" cy="6" r="2"/>
-                        <circle cx="22" cy="8" r="2"/>
-                    </svg>
-                </span>
-                <p class="eyebrow">Calibrated &middot; Intelligent &middot; Disciplined</p>
+        <main class="cinematic-content">
+            <section class="cinematic-intro" data-scene-phase="intro" aria-labelledby="hero-title">
+                <p>Calibrated · Intelligent · Disciplined</p>
                 <h1 id="hero-title">king yurina</h1>
-                <p class="hero-copy">Quant AI for calibrated market decisions</p>
-                <a class="home-inline-action" th:href="@{/quant}" href="/quant">Explore the Intelligence</a>
+                <span>Quant AI engineered for calibrated market decisions</span>
+            </section>
+
+            <aside class="cinematic-metrics" aria-label="Illustrative Quant metrics">
+                <article data-metric="signal"><span>Signal</span><strong>79<small>/100</small></strong><em>Strong</em></article>
+                <article data-metric="alpha"><span>20D Alpha</span><strong>+2.4%</strong><em>vs. benchmark</em></article>
+                <article data-metric="upside"><span>Upside</span><strong>58%</strong><em>Probability</em></article>
+                <article data-metric="risk"><span>Risk</span><strong>Medium</strong><em>Controlled</em></article>
+            </aside>
+
+            <section class="cinematic-handoff" data-scene-phase="handoff">
+                <p>Quant Engine · Online</p>
+                <h2>Enter the intelligence core.</h2>
+                <a th:href="@{/quant}" href="/quant">Explore the Intelligence</a>
+            </section>
+
+            <div class="cinematic-scroll-cue" aria-hidden="true">
+                <span></span>
+                <b>Scroll to enter</b>
             </div>
-
-            <aside class="home-market-card" aria-label="Market overview">
-                <div class="home-market-head">
-                    <strong>Market Overview</strong>
-                    <span>...</span>
-                </div>
-                <svg viewBox="0 0 300 116" role="img" aria-label="Market overview line chart">
-                    <defs>
-                        <linearGradient id="homeChartFill" x1="0" x2="0" y1="0" y2="1">
-                            <stop offset="0%" stop-color="#2f7cff" stop-opacity="0.24"/>
-                            <stop offset="100%" stop-color="#2f7cff" stop-opacity="0"/>
-                        </linearGradient>
-                    </defs>
-                    <path class="home-chart-fill" d="M0 88 L18 76 L36 82 L54 56 L72 64 L90 47 L108 60 L126 42 L144 48 L162 30 L180 45 L198 26 L216 34 L234 20 L252 27 L270 14 L300 22 L300 116 L0 116 Z"/>
-                    <path class="home-chart-line" d="M0 88 L18 76 L36 82 L54 56 L72 64 L90 47 L108 60 L126 42 L144 48 L162 30 L180 45 L198 26 L216 34 L234 20 L252 27 L270 14 L300 22"/>
-                </svg>
-                <dl>
-                    <div><dt>SPX</dt><dd>5,437.91 <span>+0.65%</span></dd></div>
-                    <div><dt>NDX</dt><dd>19,123.58 <span>+0.72%</span></dd></div>
-                    <div><dt>VIX</dt><dd>12.85 <span class="down">-1.22%</span></dd></div>
-                </dl>
-                <p>As of 10:15 AM ET</p>
-            </aside>
-
-            <aside class="home-engine-status" aria-label="Quant engine status">
-                <span aria-hidden="true"></span>
-                <div>
-                    <strong>Quant Engine v5.2</strong>
-                    <em>Adaptive &middot; Regime-aware &middot; Calibrated</em>
-                </div>
-            </aside>
-
-            <div class="home-reference-cleanup home-reference-cleanup-left" aria-hidden="true"></div>
-            <div class="home-reference-cleanup home-reference-cleanup-center" aria-hidden="true"></div>
-            <div class="home-reference-cleanup home-reference-cleanup-right" aria-hidden="true"></div>
-        </section>
-
-        <section class="detail-strip" aria-label="Brand details">
-            <article id="studio">
-                <span>01</span>
-                <strong>Engine</strong>
-                <p>Porcelain light, cobalt glass, and polished market signals frame the quant core.</p>
-            </article>
-            <article id="systems">
-                <span>02</span>
-                <strong>Signal</strong>
-                <p>Signal, expected return, calibrated probability, and risk move as one system.</p>
-            </article>
-            <article id="signal">
-                <span>03</span>
-                <strong>Portfolio</strong>
-                <p>Covariance-aware optimization and benchmark review remain one click away.</p>
-            </article>
-            <article>
-                <span>04</span>
-                <strong>Opinion</strong>
-                <p>Readable quant reasoning is framed as a calm premium research service.</p>
-            </article>
-        </section>
-    </main>
+            <div class="cinematic-progress" data-cinematic-progress aria-hidden="true"><span></span></div>
+            <p class="cinematic-disclosure">Illustrative model outputs · Not live market data</p>
+        </main>
+    </div>
 </div>
-<script type="module" th:src="@{/js/home-nature-3d.js}" src="../static/js/home-nature-3d.js"></script>
+<script type="module" th:src="@{/js/home-cinematic-3d.js(v='20260718')}" src="../static/js/home-cinematic-3d.js?v=20260718"></script>
 </body>
 </html>
