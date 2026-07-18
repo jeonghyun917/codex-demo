@@ -50,6 +50,28 @@ class HomePageTemplateContractTest {
         assertFalse(template.contains("fonts.gstatic.com"));
     }
 
+    @Test
+    void auroraFieldUsesOneLocalShaderPlaneAndRequiredUniforms() throws IOException {
+        String field = resource("static/js/home-aurora-field.js");
+
+        assertTrue(field.contains("export function createAuroraField"));
+        assertTrue(field.contains("new THREE.PlaneGeometry(2, 2)"));
+        assertTrue(field.contains("new THREE.ShaderMaterial"));
+        assertTrue(field.contains("uTime"));
+        assertTrue(field.contains("uResolution"));
+        assertTrue(field.contains("uPointer"));
+        assertTrue(field.contains("uPointerEnergy"));
+        assertTrue(field.contains("uScroll"));
+        assertTrue(field.contains("uQuality"));
+        assertTrue(field.contains("fbm"));
+        assertTrue(field.contains("auroraBand"));
+        assertTrue(field.contains("grain"));
+        assertFalse(field.contains("TorusGeometry"));
+        assertFalse(field.contains("PointsMaterial"));
+        assertFalse(field.contains("https://"));
+        assertFalse(field.contains("fetch("));
+    }
+
     private static String resource(String path) throws IOException {
         ClassPathResource resource = new ClassPathResource(path);
         return resource.exists() ? resource.getContentAsString(StandardCharsets.UTF_8) : "";
