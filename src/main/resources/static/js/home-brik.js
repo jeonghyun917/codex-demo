@@ -1,9 +1,11 @@
 import {
     normalizePointer,
     selectHomeMotionProfile,
+    shouldContinueHomeMotion,
     staggerDelay
 } from "./home-brik-motion.js";
 
+const HOME_MOTION_WAKE_MS = 1200;
 const root = document.documentElement;
 const hero = document.querySelector("[data-home-hero]");
 const canvas = document.querySelector("[data-home-canvas]");
@@ -42,6 +44,8 @@ function startHomeMotion() {
         targetEnergy: 0,
         heroVisible: false,
         frameId: 0,
+        now: 0,
+        wakeUntil: 0,
         neutralGradient: null,
         coralGradient: null,
         blueGradient: null,
@@ -142,11 +146,11 @@ function startHomeMotion() {
 
     function drawFrame(time) {
         const phase = profile.animate ? time * 0.00018 : 0;
-        state.pointerX += (state.targetX - state.pointerX) * 0.075;
-        state.pointerY += (state.targetY - state.pointerY) * 0.075;
-        state.energy += (state.targetEnergy - state.energy) * 0.055;
+        state.pointerX += (state.targetX - state.pointerX) * 0.18;
+        state.pointerY += (state.targetY - state.pointerY) * 0.18;
+        state.energy += (state.targetEnergy - state.energy) * 0.18;
         if (state.targetEnergy > 0) {
-            state.targetEnergy *= 0.986;
+            state.targetEnergy *= 0.9;
         }
 
         context.clearRect(0, 0, state.width, state.height);
@@ -164,22 +168,32 @@ function startHomeMotion() {
         context.restore();
     }
 
-    function shouldRun() {
+    function canRun() {
         return profile.animate && state.heroVisible && !document.hidden;
     }
 
     function tick(time) {
         state.frameId = 0;
+        if (!canRun()) {
+            return;
+        }
+
+        state.now = time;
         drawFrame(time);
-        if (shouldRun()) {
+        if (shouldContinueHomeMotion(state)) {
             state.frameId = requestAnimationFrame(tick);
         }
     }
 
-    function syncAnimation() {
-        if (shouldRun() && !state.frameId) {
+    function wakeMotion() {
+        state.wakeUntil = performance.now() + HOME_MOTION_WAKE_MS;
+        if (canRun() && !state.frameId) {
             state.frameId = requestAnimationFrame(tick);
-        } else if (!shouldRun() && state.frameId) {
+        }
+    }
+
+    function sleepMotion() {
+        if (state.frameId) {
             cancelAnimationFrame(state.frameId);
             state.frameId = 0;
         }
@@ -228,22 +242,32 @@ function startHomeMotion() {
 
     const heroObserver = new IntersectionObserver((entries) => {
         state.heroVisible = entries[0]?.isIntersecting ?? false;
-        syncAnimation();
+        if (state.heroVisible) {
+            wakeMotion();
+        } else {
+            sleepMotion();
+        }
     }, { threshold: 0.01 });
     heroObserver.observe(hero);
 
-    document.addEventListener("visibilitychange", syncAnimation);
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            sleepMotion();
+        } else {
+            wakeMotion();
+        }
+    });
 
     if ("ResizeObserver" in window) {
         const resizeObserver = new ResizeObserver(() => {
             resizeCanvas();
-            drawFrame(0);
+            wakeMotion();
         });
         resizeObserver.observe(hero);
     } else {
         window.addEventListener("resize", () => {
             resizeCanvas();
-            drawFrame(0);
+            wakeMotion();
         }, { passive: true });
     }
 
@@ -257,12 +281,14 @@ function startHomeMotion() {
             state.targetX = pointer.x;
             state.targetY = pointer.y;
             state.targetEnergy = 1;
+            wakeMotion();
         }, { passive: true });
 
         hero.addEventListener("pointerleave", () => {
             state.targetX = 0;
             state.targetY = 0;
             state.targetEnergy = 0;
+            wakeMotion();
         }, { passive: true });
     }
 

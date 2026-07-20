@@ -37,3 +37,24 @@ export function staggerDelay(index, step = 48) {
     const safeStep = Number.isFinite(step) ? Math.max(step, 0) : 48;
     return safeIndex * safeStep;
 }
+
+export function shouldContinueHomeMotion(state) {
+    if (!state
+            || !Number.isFinite(state.now)
+            || !Number.isFinite(state.wakeUntil)
+            || !Number.isFinite(state.pointerX)
+            || !Number.isFinite(state.pointerY)
+            || !Number.isFinite(state.targetX)
+            || !Number.isFinite(state.targetY)
+            || !Number.isFinite(state.energy)
+            || !Number.isFinite(state.targetEnergy)
+            || state.now >= state.wakeUntil) {
+        return false;
+    }
+
+    const epsilon = 0.002;
+    return Math.abs(state.pointerX - state.targetX) > epsilon
+        || Math.abs(state.pointerY - state.targetY) > epsilon
+        || Math.abs(state.energy) > epsilon
+        || Math.abs(state.targetEnergy) > epsilon;
+}

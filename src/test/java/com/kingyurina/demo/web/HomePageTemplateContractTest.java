@@ -108,6 +108,30 @@ class HomePageTemplateContractTest {
         assertFalse(entry.contains("https://"));
     }
 
+    @Test
+    void homepageCanvasUsesEventDrivenBoundedWakeAndSleepsWhenSettled() throws IOException {
+        String entry = resource("static/js/home-brik.js");
+
+        assertTrue(occurrences(entry, "shouldContinueHomeMotion") >= 2);
+        assertTrue(entry.contains("wakeUntil"));
+        assertTrue(entry.contains("wakeMotion"));
+        assertFalse(entry.contains("setInterval"));
+    }
+
+    @Test
+    void homepageHeroCopyUsesItsCssLoadRevealOnly() throws IOException {
+        String template = resource("templates/index.html");
+        String css = resource("static/css/home-brik.css");
+        Pattern heroCopyReveal = Pattern.compile(
+                "<[^>]*class=\"[^\"]*\\bhome-hero-copy\\b[^\"]*\""
+                        + "[^>]*\\bdata-home-reveal\\b[^>]*>",
+                Pattern.DOTALL
+        );
+
+        assertFalse(heroCopyReveal.matcher(template).find());
+        assertTrue(cssRule(css, ".home-hero-copy").contains("animation: home-rise-in"));
+    }
+
     private static boolean hasProductCardRoute(String template, String href) {
         Pattern productCard = Pattern.compile(
                 "<a\\b(?=[^>]*\\bdata-home-product-card\\b)"
