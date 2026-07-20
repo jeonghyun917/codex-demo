@@ -47,6 +47,19 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageRetiresAuroraRuntimeAndItsTemplateMarkers() throws IOException {
+        String template = resource("templates/index.html");
+
+        assertFalse(template.contains("home-aurora"));
+        assertFalse(template.contains("data-aurora"));
+        assertFalse(new ClassPathResource("static/css/home-aurora.css").exists());
+        assertFalse(new ClassPathResource("static/js/home-aurora.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-aurora-field.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-aurora-motion.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-aurora-quality.js").exists());
+    }
+
+    @Test
     void homepageLinksEveryApprovedProductRouteAndUsesOnePrimaryHeading() throws IOException {
         String template = resource("templates/index.html");
 
