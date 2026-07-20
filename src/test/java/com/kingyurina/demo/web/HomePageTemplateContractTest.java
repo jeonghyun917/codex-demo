@@ -86,6 +86,28 @@ class HomePageTemplateContractTest {
         assertFalse(noscriptRule.contains("position: fixed"));
     }
 
+    @Test
+    void homepageLoadsLocalProgressiveMotionRuntimeWithoutNetworkTransports() throws IOException {
+        String template = resource("templates/index.html");
+        String entry = resource("static/js/home-brik.js");
+
+        assertTrue(template.contains("/js/home-brik.js"));
+        assertTrue(entry.contains("./home-brik-motion.js"));
+        assertTrue(entry.contains("getContext(\"2d\")"));
+        assertTrue(entry.contains("IntersectionObserver"));
+        assertTrue(entry.contains("requestAnimationFrame"));
+        assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("pointermove"));
+        assertTrue(entry.contains("pointerleave"));
+        assertTrue(entry.contains(".animate("));
+        assertFalse(entry.contains("fetch("));
+        assertFalse(entry.contains("XMLHttpRequest"));
+        assertFalse(entry.contains("WebSocket"));
+        assertFalse(entry.contains("EventSource"));
+        assertFalse(entry.contains("http://"));
+        assertFalse(entry.contains("https://"));
+    }
+
     private static boolean hasProductCardRoute(String template, String href) {
         Pattern productCard = Pattern.compile(
                 "<a\\b(?=[^>]*\\bdata-home-product-card\\b)"
