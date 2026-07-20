@@ -192,6 +192,26 @@ class HomePageTemplateContractTest {
                 .contains("font-size: clamp(3rem, 15vw, 4.5rem)"));
     }
 
+    @Test
+    void homepageSearchInputMeetsControlAndPlaceholderContrast() throws IOException {
+        String css = resource("static/css/home-brik.css");
+        String input = cssRule(css, ".home-composer-controls input");
+        String hover = cssRule(css, ".home-composer-controls input:hover");
+        String placeholder = cssRule(css, ".home-composer-controls input::placeholder");
+        String inputBackground = resolvedCssColor(css, cssProperty(input, "background"));
+        String surroundingSurface = resolvedCssColor(css, "var(--home-color-surface)");
+        String normalBorder = resolvedCssColor(css, cssBorderColor(input));
+        String hoverBorder = resolvedCssColor(css, cssBorderColor(hover));
+        String placeholderColor = resolvedCssColor(css, cssProperty(placeholder, "color"));
+
+        assertContrastAtLeast(normalBorder, inputBackground, 3.0, "normal input border on input background");
+        assertContrastAtLeast(normalBorder, surroundingSurface, 3.0, "normal input border on surrounding surface");
+        assertContrastAtLeast(hoverBorder, inputBackground, 3.0, "hover input border on input background");
+        assertContrastAtLeast(hoverBorder, surroundingSurface, 3.0, "hover input border on surrounding surface");
+        assertContrastAtLeast(placeholderColor, inputBackground, 4.5, "input placeholder text");
+        assertEquals("1", cssProperty(placeholder, "opacity"));
+    }
+
     private static boolean hasProductCardRoute(String template, String href) {
         Pattern productCard = Pattern.compile(
                 "<a\\b(?=[^>]*\\bdata-home-product-card\\b)"
@@ -215,6 +235,59 @@ class HomePageTemplateContractTest {
         }
 
         return false;
+    }
+
+    private static String cssBorderColor(String rule) {
+        String borderColor = cssProperty(rule, "border-color");
+        return borderColor.isEmpty() ? cssProperty(rule, "border") : borderColor;
+    }
+
+    private static String cssProperty(String rule, String property) {
+        Matcher declaration = Pattern.compile(
+                "(?:^|[;{])\\s*" + Pattern.quote(property) + "\\s*:\\s*([^;}]*)",
+                Pattern.MULTILINE
+        ).matcher(rule);
+        return declaration.find() ? declaration.group(1).strip() : "";
+    }
+
+    private static String resolvedCssColor(String css, String declaration) {
+        Matcher variable = Pattern.compile("var\\((--[a-z0-9-]+)\\)", Pattern.CASE_INSENSITIVE)
+                .matcher(declaration);
+        if (variable.find()) {
+            String value = cssProperty(cssRule(css, ":root"), variable.group(1));
+            return resolvedCssColor(css, value);
+        }
+
+        Matcher hex = Pattern.compile("#[0-9a-f]{6}", Pattern.CASE_INSENSITIVE).matcher(declaration);
+        if (!hex.find()) {
+            throw new IllegalArgumentException("No supported CSS color in declaration: " + declaration);
+        }
+        return hex.group();
+    }
+
+    private static void assertContrastAtLeast(String foreground, String background, double minimum, String label) {
+        double ratio = contrastRatio(foreground, background);
+        assertTrue(ratio >= minimum,
+                () -> label + " contrast was " + String.format("%.2f", ratio) + ":1; expected at least " + minimum + ":1");
+    }
+
+    private static double contrastRatio(String first, String second) {
+        double lighter = Math.max(relativeLuminance(first), relativeLuminance(second));
+        double darker = Math.min(relativeLuminance(first), relativeLuminance(second));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double relativeLuminance(String hex) {
+        int rgb = Integer.parseInt(hex.substring(1), 16);
+        double red = linearChannel((rgb >> 16) & 0xff);
+        double green = linearChannel((rgb >> 8) & 0xff);
+        double blue = linearChannel(rgb & 0xff);
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    }
+
+    private static double linearChannel(int channel) {
+        double srgb = channel / 255.0;
+        return srgb <= 0.04045 ? srgb / 12.92 : Math.pow((srgb + 0.055) / 1.055, 2.4);
     }
 
     private static String cssRule(String css, String selector) {

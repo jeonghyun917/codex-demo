@@ -349,7 +349,7 @@ main {
 
 .home-composer-controls input {
     min-width: 0;
-    border: 1px solid var(--home-color-border);
+    border: 1px solid #8b8e87;
     padding: 0 var(--home-space-4);
     background: #f7f8f5;
     color: var(--home-color-text);
@@ -357,11 +357,12 @@ main {
 }
 
 .home-composer-controls input::placeholder {
-    color: #777a73;
+    color: #6b6e68;
+    opacity: 1;
 }
 
 .home-composer-controls input:hover {
-    border-color: #9b9e97;
+    border-color: #6b6e68;
 }
 
 .home-composer-controls input:focus-visible {
