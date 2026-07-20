@@ -125,9 +125,6 @@ svg {
     font-weight: 700;
     line-height: 1;
     text-decoration: none;
-    transition:
-        background-color 180ms var(--home-ease-state),
-        color 180ms var(--home-ease-state);
 }
 
 .home-brand {
@@ -293,9 +290,7 @@ main {
     color: var(--home-color-surface);
     font-weight: 700;
     text-decoration: none;
-    transition:
-        transform 180ms var(--home-ease-out),
-        background-color 180ms var(--home-ease-state);
+    transition: transform 180ms var(--home-ease-out);
 }
 
 .home-primary-link:hover {
@@ -380,9 +375,7 @@ main {
     color: var(--home-color-surface);
     cursor: pointer;
     font-weight: 700;
-    transition:
-        transform 180ms var(--home-ease-out),
-        background-color 180ms var(--home-ease-state);
+    transition: transform 180ms var(--home-ease-out);
 }
 
 .home-composer-controls button:hover {
@@ -414,10 +407,6 @@ main {
     font-size: .8125rem;
     font-weight: 700;
     text-decoration: none;
-    transition:
-        border-color 160ms var(--home-ease-state),
-        background-color 160ms var(--home-ease-state),
-        color 160ms var(--home-ease-state);
 }
 
 .home-prompts a:hover {
@@ -571,9 +560,6 @@ main {
     padding: var(--home-space-6);
     background: #f3f4f1;
     text-decoration: none;
-    transition:
-        border-color 180ms var(--home-ease-state),
-        box-shadow 180ms var(--home-ease-state);
 }
 
 .home-product-card:hover {
@@ -636,8 +622,8 @@ main {
     z-index: 1;
     pointer-events: none;
     transition:
-        opacity 240ms var(--home-ease-state),
-        transform 240ms var(--home-ease-out);
+        opacity 200ms var(--home-ease-state),
+        transform 200ms var(--home-ease-out);
 }
 
 .home-product-card:hover .home-card-visual {
@@ -901,9 +887,7 @@ main {
     color: var(--home-color-surface);
     font-weight: 700;
     text-decoration: none;
-    transition:
-        transform 180ms var(--home-ease-out),
-        background-color 180ms var(--home-ease-state);
+    transition: transform 180ms var(--home-ease-out);
 }
 
 .home-final-cta a:hover {
@@ -953,17 +937,12 @@ main {
 }
 
 .home-noscript {
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    z-index: var(--home-z-nav);
-    max-width: 360px;
-    margin: 0;
-    padding: var(--home-space-4);
+    max-width: 480px;
+    margin: 0 var(--home-space-5) var(--home-space-5);
+    padding: var(--home-space-3) var(--home-space-4);
     border: 1px solid var(--home-color-border);
     border-radius: var(--home-radius-control);
     background: var(--home-color-surface);
-    box-shadow: var(--home-shadow-low);
     font-size: .8125rem;
 }
 
@@ -1138,6 +1117,10 @@ main {
 
     .home-footer p {
         text-align: left;
+    }
+
+    .home-noscript {
+        margin: 0 var(--home-space-3) var(--home-space-3);
     }
 }
 
