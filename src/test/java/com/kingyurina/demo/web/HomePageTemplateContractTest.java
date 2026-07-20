@@ -145,6 +145,53 @@ class HomePageTemplateContractTest {
         assertTrue(cssRule(css, ".home-hero-copy").contains("animation: home-rise-in"));
     }
 
+    @Test
+    void homepageCompactsThePrimaryToolOnlyOnShortDesktopViewports() throws IOException {
+        String css = resource("static/css/home-brik.css");
+        String shortDesktop = cssMediaRule(css, "@media (min-width: 1024px) and (max-height: 820px)");
+
+        assertFalse(shortDesktop.isEmpty());
+        assertTrue(shortDesktop.contains(".home-hero-copy"));
+        assertTrue(shortDesktop.contains(".home-hero h1"));
+        assertTrue(shortDesktop.contains(".home-hero-summary"));
+        assertTrue(shortDesktop.contains(".home-primary-link"));
+        assertTrue(shortDesktop.contains(".home-tool-stage"));
+        assertTrue(shortDesktop.contains(".home-composer-surface"));
+        assertTrue(shortDesktop.contains(".home-instrument"));
+        assertTrue(shortDesktop.contains(".home-metrics > div"));
+    }
+
+    @Test
+    void homepageKeepsTheScrollableNavigationWithoutNativeScrollbars() throws IOException {
+        String css = resource("static/css/home-brik.css");
+
+        assertTrue(cssRule(css, ".home-nav-menu").contains("scrollbar-width: none"));
+        assertTrue(cssRule(css, ".home-nav-menu::-webkit-scrollbar").contains("display: none"));
+        assertFalse(css.contains("scrollbar-width: thin"));
+    }
+
+    @Test
+    void homepagePlacesMobileNavigationInTwoExplicitRows() throws IOException {
+        String css = resource("static/css/home-brik.css");
+        String mobile = cssMediaRule(css, "@media (max-width: 767px)");
+
+        assertTrue(cssRule(mobile, ".home-dashboard").contains("grid-column: 2"));
+        assertTrue(cssRule(mobile, ".home-dashboard").contains("grid-row: 1"));
+        assertTrue(cssRule(mobile, ".home-nav-menu").contains("grid-column: 1 / -1"));
+        assertTrue(cssRule(mobile, ".home-nav-menu").contains("grid-row: 2"));
+    }
+
+    @Test
+    void homepagePreservesAnEditorialButCompactMobileHero() throws IOException {
+        String css = resource("static/css/home-brik.css");
+        String mobile = cssMediaRule(css, "@media (max-width: 767px)");
+
+        assertTrue(cssRule(mobile, ".home-hero-copy")
+                .contains("padding: 44px var(--home-space-4) 32px"));
+        assertTrue(cssRule(mobile, ".home-hero h1")
+                .contains("font-size: clamp(3rem, 15vw, 4.5rem)"));
+    }
+
     private static boolean hasProductCardRoute(String template, String href) {
         Pattern productCard = Pattern.compile(
                 "<a\\b(?=[^>]*\\bdata-home-product-card\\b)"
@@ -178,6 +225,25 @@ class HomePageTemplateContractTest {
 
         int end = css.indexOf('}', start);
         return end < 0 ? css.substring(start) : css.substring(start, end + 1);
+    }
+
+    private static String cssMediaRule(String css, String query) {
+        int start = css.indexOf(query + " {");
+        if (start < 0) {
+            return "";
+        }
+
+        int depth = 0;
+        for (int i = start; i < css.length(); i++) {
+            char current = css.charAt(i);
+            if (current == '{') {
+                depth++;
+            } else if (current == '}' && --depth == 0) {
+                return css.substring(start, i + 1);
+            }
+        }
+
+        return css.substring(start);
     }
 
     private static int occurrences(String source, String target) {
