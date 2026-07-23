@@ -26,6 +26,8 @@ public record StockMarketView(
             String dataQualityScore, String dataQualityTone, Integer dataQualityValue,
             String expectedExcessReturn, String calibratedUpsideProbability, String expectedConfidence,
             Integer expectedConfidenceValue, String expectedModelVersion, String expectedSignalDate,
+            Integer valuationScore, Integer qualityScore, Integer growthScore, Integer stabilityScore,
+            Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore,
             String threeMonthHighRatio, BigDecimal threeMonthHighRatioValue, String threeMonthHighRatioTone) {
     }
 

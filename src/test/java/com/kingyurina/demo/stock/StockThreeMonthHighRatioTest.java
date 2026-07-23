@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +46,18 @@ class StockThreeMonthHighRatioTest {
         assertUnavailable(StockThreeMonthHighRatio.from(BigDecimal.ZERO, BigDecimal.TEN));
         assertUnavailable(StockThreeMonthHighRatio.from(BigDecimal.TEN, BigDecimal.ZERO));
         assertUnavailable(StockThreeMonthHighRatio.from(new BigDecimal("-1"), BigDecimal.TEN));
+    }
+
+    @Test
+    void retainsFactorScoresBeforeThreeMonthHighRatioProjection() {
+        assertEquals(List.of(
+                "valuationScore", "qualityScore", "growthScore", "stabilityScore", "earningsScore",
+                "analystScore", "newsScore", "momentumScore", "riskScore",
+                "threeMonthHighRatio", "threeMonthHighRatioValue", "threeMonthHighRatioTone"),
+                Arrays.stream(StockMarketView.Row.class.getRecordComponents())
+                        .skip(27)
+                        .map(component -> component.getName())
+                        .toList());
     }
 
     private static StockThreeMonthHighRatio ratio(String percent) {
