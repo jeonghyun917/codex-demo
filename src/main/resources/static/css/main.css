@@ -2971,13 +2971,10 @@ html:has(body.home-3d-body) {
         minmax(86px, 0.66fr)
         minmax(84px, 0.64fr)
         minmax(82px, 0.62fr)
-        minmax(72px, 0.58fr)
-        minmax(72px, 0.58fr)
-        minmax(86px, 0.66fr)
-        minmax(70px, 0.56fr);
+        minmax(104px, 0.72fr);
     gap: 10px;
     align-items: center;
-    min-width: 1340px;
+    min-width: 1080px;
     min-height: 48px;
     border-bottom: 1px solid var(--market-line);
     color: #f5f6fb;
@@ -3107,6 +3104,27 @@ html:has(body.home-3d-body) {
     font-weight: 850;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.three-month-high-ratio {
+    color: #dfe4f4;
+    font-variant-numeric: tabular-nums;
+}
+
+.three-month-high-ratio.near-high {
+    color: #7ee2ad;
+}
+
+.three-month-high-ratio.mid-range {
+    color: #d9d58a;
+}
+
+.three-month-high-ratio.extended {
+    color: #ff9d9d;
+}
+
+.three-month-high-ratio.neutral {
+    color: var(--market-muted);
 }
 
 .dashboard-stock-copy {

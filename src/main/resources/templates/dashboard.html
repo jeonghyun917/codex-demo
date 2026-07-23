@@ -102,24 +102,11 @@
                                   data-tip="표본 수, 데이터 최신성, calibration, 모델 버전 한계를 반영한 Expected Return 모델 신뢰도입니다.">i</span>
                         </span>
                         <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="valuation">Value</button>
-                            <span class="header-help" tabindex="0" aria-label="Value 설명"
-                                  data-tip="PER, PBR, PSR, 섹터 상대 밸류에이션을 기반으로 만든 가치 factor입니다.">i</span>
-                        </span>
-                        <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="growth">Growth</button>
-                            <span class="header-help" tabindex="0" aria-label="Growth 설명"
-                                  data-tip="SEC 재무제표 기반 매출, 이익, 현금흐름 성장성과 최근 개선 흐름을 반영합니다.">i</span>
-                        </span>
-                        <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="momentum">Momentum</button>
-                            <span class="header-help" tabindex="0" aria-label="Momentum 설명"
-                                  data-tip="일봉 기반 추세, 이동평균, RSI, 52주 위치, 단기 가격 흐름을 반영합니다.">i</span>
-                        </span>
-                        <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="risk">Risk</button>
-                            <span class="header-help" tabindex="0" aria-label="Risk 설명"
-                                  data-tip="변동성, beta, 유동성, drawdown, 포트폴리오 편입 리스크를 반영한 방어 점수입니다.">i</span>
+                            <button class="sp-sort" type="button" data-sort="threeMonthHighRatio">3M 고점비율</button>
+                            <span class="header-help"
+                                  tabindex="0"
+                                  aria-label="3개월 고점 대비 현재가 비율 설명"
+                                  data-tip="저장된 최신 거래일부터 3개월간의 장중 고가 최댓값을 100으로 본 현재가 비율입니다.">i</span>
                         </span>
                     </div>
                     <a class="quant-dashboard-row"
@@ -145,10 +132,10 @@
                         <span class="quant-factor-score" th:text="${row.expectedExcessReturn}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
                         <span class="quant-factor-score" th:text="${row.calibratedUpsideProbability}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
                         <span class="market-signal-score compact" th:text="${row.expectedConfidence}" th:title="${row.expectedModelVersion + ' · ' + row.expectedSignalDate}">-</span>
-                        <span class="quant-factor-score" th:text="${row.valuationScore != null ? row.valuationScore + ' / 100' : '-'}">-</span>
-                        <span class="quant-factor-score" th:text="${row.growthScore != null ? row.growthScore + ' / 100' : '-'}">-</span>
-                        <span class="quant-factor-score" th:text="${row.momentumScore != null ? row.momentumScore + ' / 100' : '-'}">-</span>
-                        <span class="quant-factor-score" th:text="${row.riskScore != null ? row.riskScore + ' / 100' : '-'}">-</span>
+                        <span class="three-month-high-ratio"
+                              th:classappend="${row.threeMonthHighRatioTone}"
+                              th:text="${row.threeMonthHighRatio}"
+                              th:attr="data-sort-value=${row.threeMonthHighRatioValue}">-</span>
                     </a>
                 </div>
 
@@ -318,10 +305,7 @@
         expected: 7,
         upside: 8,
         confidence: 9,
-        valuation: 10,
-        growth: 11,
-        momentum: 12,
-        risk: 13
+        threeMonthHighRatio: 10
     };
     let rows = Array.from(table.querySelectorAll(".quant-dashboard-row:not(.quant-dashboard-head)"));
     let visibleCount = rows.filter((row) => !row.classList.contains("is-collapsed")).length;
