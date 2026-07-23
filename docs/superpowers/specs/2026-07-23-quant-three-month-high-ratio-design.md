@@ -127,4 +127,3 @@ Automated tests will cover:
 Verification will include the focused tests, the full Maven suite, and a browser
 check of the Quant page for data rendering, sorting, horizontal layout, and
 console errors.
-
