@@ -3,6 +3,20 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kingyurina.demo.stock.IndexConstituentMapper">
+    <sql id="threeMonthHighBySymbol">
+        SELECT
+            c.symbol,
+            MAX(c.high_price) AS three_month_high
+        FROM stock_candle_daily c
+        CROSS JOIN (
+            SELECT MAX(trade_date) AS latest_trade_date
+            FROM stock_candle_daily
+        ) window
+        WHERE c.trade_date BETWEEN DATE_SUB(window.latest_trade_date, INTERVAL 3 MONTH)
+                               AND window.latest_trade_date
+        GROUP BY c.symbol
+    </sql>
+
     <select id="findLatestSeenAt" resultType="java.time.LocalDateTime">
         SELECT MAX(last_seen_at)
         FROM index_constituent
@@ -113,6 +127,7 @@
             q.open_price,
             q.high_price,
             q.low_price,
+            highs.three_month_high AS threeMonthHigh,
             m.pe_normalized_annual,
             m.pb_annual,
             m.roe_ttm,
@@ -145,6 +160,10 @@
             ON p.symbol = i.symbol
         LEFT JOIN stock_quote_cache q
             ON q.symbol = i.symbol
+        LEFT JOIN (
+            <include refid="threeMonthHighBySymbol"/>
+        ) highs
+            ON highs.symbol = i.symbol
         LEFT JOIN stock_institution_flow_quarterly inst
             ON inst.symbol = i.symbol
             AND inst.report_quarter = (
@@ -199,6 +218,7 @@
             q.open_price,
             q.high_price,
             q.low_price,
+            highs.three_month_high AS threeMonthHigh,
             m.pe_normalized_annual,
             m.pb_annual,
             m.roe_ttm,
@@ -229,6 +249,10 @@
             ON ic.symbol = p.symbol
         LEFT JOIN stock_quote_cache q
             ON q.symbol = p.symbol
+        LEFT JOIN (
+            <include refid="threeMonthHighBySymbol"/>
+        ) highs
+            ON highs.symbol = p.symbol
         LEFT JOIN stock_institution_flow_quarterly inst
             ON inst.symbol = p.symbol
             AND inst.report_quarter = (
