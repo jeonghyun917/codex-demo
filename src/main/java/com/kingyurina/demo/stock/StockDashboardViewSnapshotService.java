@@ -17,7 +17,7 @@ import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationSummaryServi
 @Service
 public class StockDashboardViewSnapshotService {
 
-    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_EVALUATION_V3";
+    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_EVALUATION_V4";
     private static final Duration DASHBOARD_VIEW_CACHE_TTL = Duration.ofMinutes(10);
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
