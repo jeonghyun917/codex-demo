@@ -11,9 +11,9 @@
         CROSS JOIN (
             SELECT MAX(trade_date) AS latest_trade_date
             FROM stock_candle_daily
-        ) window
-        WHERE c.trade_date BETWEEN DATE_SUB(window.latest_trade_date, INTERVAL 3 MONTH)
-                               AND window.latest_trade_date
+        ) date_window
+        WHERE c.trade_date BETWEEN DATE_SUB(date_window.latest_trade_date, INTERVAL 3 MONTH)
+                               AND date_window.latest_trade_date
         GROUP BY c.symbol
     </sql>
 
