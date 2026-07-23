@@ -16,6 +16,7 @@ public class StockMarketRow {
     private Integer institutionHolderCount;
     private java.time.LocalDate institutionReportQuarter;
     private BigDecimal currentPrice;
+    private BigDecimal threeMonthHigh;
     private BigDecimal previousClose;
     private BigDecimal openPrice;
     private BigDecimal highPrice;
@@ -130,6 +131,14 @@ public class StockMarketRow {
 
     public void setCurrentPrice(BigDecimal currentPrice) {
         this.currentPrice = currentPrice;
+    }
+
+    public BigDecimal getThreeMonthHigh() {
+        return threeMonthHigh;
+    }
+
+    public void setThreeMonthHigh(BigDecimal threeMonthHigh) {
+        this.threeMonthHigh = threeMonthHigh;
     }
 
     public BigDecimal getPreviousClose() {

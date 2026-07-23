@@ -174,6 +174,8 @@ public class StockMarketViewService {
 
     private StockMarketView.Row toViewRow(StockMarketRow row, int rank, boolean includeSignal) {
         BigDecimal change = changePercent(row);
+        StockThreeMonthHighRatio threeMonthHighRatio = StockThreeMonthHighRatio.from(
+                row.getCurrentPrice(), row.getThreeMonthHigh());
         return new StockMarketView.Row(
                 rank <= 0 ? "-" : String.valueOf(rank),
                 row.getSymbol(),
@@ -202,15 +204,9 @@ public class StockMarketViewService {
                 row.getExpectedConfidence(),
                 row.getExpectedModelVersion() == null ? "-" : row.getExpectedModelVersion(),
                 row.getExpectedSignalDate() == null ? "-" : row.getExpectedSignalDate().toString(),
-                row.getValuationScore(),
-                row.getQualityScore(),
-                row.getGrowthScore(),
-                row.getStabilityScore(),
-                row.getEarningsScore(),
-                row.getAnalystScore(),
-                row.getNewsScore(),
-                row.getMomentumScore(),
-                row.getRiskScore());
+                threeMonthHighRatio.display(),
+                threeMonthHighRatio.value(),
+                threeMonthHighRatio.tone());
     }
 
     private static String blankToNull(String value) {
