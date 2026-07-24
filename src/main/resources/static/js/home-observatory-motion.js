@@ -60,12 +60,30 @@ export function selectHomeQualityProfile(environment = {}) {
 const resolveRange = (value, start, end) =>
     clampUnit((value - start) / Math.max(end - start, Number.EPSILON));
 
+const smoothStep = (value) => {
+    const t = clampUnit(value);
+    return t * t * (3 - 2 * t);
+};
+
+function resolveCameraTravel(progress) {
+    if (progress <= 0.18) {
+        return 0.3 * smoothStep(resolveRange(progress, 0, 0.18));
+    }
+    if (progress <= 0.52) {
+        return 0.3 + 0.9 * smoothStep(resolveRange(progress, 0.18, 0.52));
+    }
+    if (progress <= 0.68) {
+        return 1.2 + 0.12 * smoothStep(resolveRange(progress, 0.52, 0.68));
+    }
+    return 1.32 + 1.08 * smoothStep(resolveRange(progress, 0.68, 1));
+}
+
 export function createScenePose(progress, pointer = { x: 0, y: 0 }) {
     const p = clampUnit(progress);
     const resolve = resolveRange(p, 0.18, 0.52);
     const act = resolveRange(p, 0.68, 1);
     return {
-        cameraZ: 8.8 - p * 2.4,
+        cameraZ: 8.8 - resolveCameraTravel(p),
         cameraY: 0.3 - p * 0.22 + Math.max(-1, Math.min(1, pointer.y || 0)) * 0.08,
         housingOpen: resolve,
         irisRotation: resolve * Math.PI * 0.42,

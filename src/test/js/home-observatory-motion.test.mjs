@@ -68,6 +68,23 @@ test("keeps intermediate scene poses within the physical instrument envelope", (
     assert.ok(pose.metricOpacity >= 0 && pose.metricOpacity <= 1);
 });
 
+test("slows camera travel through the hold phase", () => {
+    const cameraRate = (start, end) => Math.abs(
+        createScenePose(end).cameraZ - createScenePose(start).cameraZ
+    ) / (end - start);
+    const resolveRate = cameraRate(0.28, 0.42);
+    const holdRate = cameraRate(0.56, 0.64);
+    const actRate = cameraRate(0.76, 0.9);
+
+    assert.ok(holdRate < resolveRate * 0.5);
+    assert.ok(holdRate < actRate * 0.5);
+    for (const boundary of [0.18, 0.52, 0.68]) {
+        const atBoundary = createScenePose(boundary).cameraZ;
+        assert.ok(Math.abs(createScenePose(boundary - 0.000001).cameraZ - atBoundary) < 0.0001);
+        assert.ok(Math.abs(createScenePose(boundary + 0.000001).cameraZ - atBoundary) < 0.0001);
+    }
+});
+
 test("renders only when the scene can contribute a visible frame", () => {
     assert.equal(shouldRenderFrame({
         visible: true, hidden: false, webgl: true, reducedMotion: false, dirty: true
