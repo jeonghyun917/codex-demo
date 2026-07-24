@@ -39,21 +39,22 @@ export function selectHomeQualityProfile(environment = {}) {
     if (environment.reduceMotion || !environment.webgl) {
         return {
             name: "static", pixelRatio: 1, pointerEnabled: false,
-            webgl: false, shadows: false, segments: 0
+            webgl: false, shadows: false, segments: 0, coreScale: 1
         };
     }
 
+    const coreScale = environment.mobile ? 2 : environment.tablet ? 1.7 : 1;
     if (environment.mobile || Number(environment.cores) <= 4) {
         return {
             name: "low", pixelRatio: 1, pointerEnabled: false,
-            webgl: true, shadows: false, segments: 48
+            webgl: true, shadows: false, segments: 48, coreScale
         };
     }
 
     const devicePixelRatio = Number.isFinite(environment.dpr) ? environment.dpr : 1;
     return {
         name: "high", pixelRatio: Math.min(Math.max(devicePixelRatio, 1), 1.5),
-        pointerEnabled: true, webgl: true, shadows: true, segments: 96
+        pointerEnabled: true, webgl: true, shadows: true, segments: 96, coreScale
     };
 }
 

@@ -5,12 +5,30 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.io.ClassPathResource;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HomePageTemplateContractTest {
+
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void homepageVendorAssetsArePublicWhileUnrelatedPathsRemainProtected() throws Exception {
+        assertEquals(200, get("/vendor/lenis/lenis.css").statusCode());
+        assertEquals(200, get("/vendor/lenis/lenis.min.js").statusCode());
+        assertEquals(200, get("/vendor/motion/motion.js").statusCode());
+        assertEquals(403, get("/admin").statusCode());
+    }
 
     @Test
     void homepageRuntimeDependenciesAndFontsArePinnedLocally() throws IOException {
@@ -93,6 +111,7 @@ class HomePageTemplateContractTest {
         assertTrue(scene.contains("InstancedMesh"));
         assertTrue(scene.contains("ACESFilmicToneMapping"));
         assertTrue(scene.contains("setPixelRatio(profile.pixelRatio)"));
+        assertTrue(scene.contains("QuantCore.scale.setScalar(profile.coreScale)"));
         assertTrue(scene.contains("dispose()"));
         assertFalse(scene.contains("fetch("));
         assertFalse(scene.contains("http://"));
@@ -144,6 +163,79 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageKeepsTheMobileQuantCoreBelowTheHeroActions() throws IOException {
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                "@media (max-width: 767px) {"));
+        assertTrue(css.contains(
+                "[data-home-canvas] { top: 60svh; bottom: auto; height: 40svh; }"));
+        assertTrue(css.contains(
+                ".home-webgl-ready [data-home-canvas] { opacity: .72; }"));
+        assertTrue(css.contains(
+                ".home-core-fallback { top: 60svh; right: auto; left: 50%; "
+                        + "width: min(62vw, 15rem); transform: translateX(-50%); }"));
+        assertTrue(css.contains(
+                ".home-webgl-failed .home-core-fallback { opacity: .72; }"));
+    }
+
+    @Test
+    void homepageKeepsTabletNavigationProductsAndCoreWithinTheViewport() throws IOException {
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                "@media (min-width: 768px) and (max-width: 1024px) { "
+                        + "[data-home-canvas] { top: 20svh; right: auto; bottom: auto; "
+                        + "left: 38%; width: 62%; height: 80svh; }"));
+        assertTrue(css.contains(
+                "@media (min-width: 768px) and (max-width: 1024px) "
+                        + "and (orientation: portrait) { "
+                        + "[data-home-canvas] { top: 42svh; left: 30%; "
+                        + "width: 70%; height: 58svh; }"));
+        assertTrue(css.contains(
+                "justify-content: flex-start; overflow-x: auto; scrollbar-width: none;"));
+        assertTrue(css.contains(
+                ".home-nav nav::-webkit-scrollbar { display: none; }"));
+        assertTrue(css.contains(
+                ".home-product-list { min-width: 0;"));
+        assertTrue(css.contains(
+                "grid-template-columns: "
+                        + "3rem minmax(0, .8fr) minmax(0, 1fr) auto; gap: 1rem;"));
+        assertTrue(css.contains(
+                "@media (min-width: 1024px) {"));
+        assertTrue(css.contains(
+                ".home-products { grid-template-columns: "
+                        + "minmax(13rem, .65fr) minmax(0, 1.35fr); }"));
+    }
+
+    @Test
+    void homepageKeepsTheStaticQuantCoreClearOfHeaderAndHeroCopy() throws IOException {
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".home-core-fallback { position: absolute; z-index: 0; top: 22svh; "
+                        + "right: 5vw; width: min(40vw, 32rem);"));
+        assertTrue(css.contains(
+                "pointer-events: none;"));
+        assertTrue(css.contains(
+                ".home-core-fallback { position: absolute; top: 30svh; right: auto; "
+                        + "left: 69%; width: min(38vw, 24rem);"));
+        assertTrue(css.contains(
+                "@media (min-width: 1440px) { "
+                        + ".home-core-fallback { width: min(36vw, 32rem); }"));
+        assertFalse(css.contains("rotateX("));
+    }
+
+    @Test
+    void homepageLimitsHeroSubtitleMeasureBeforeTheQuantCore() throws IOException {
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".home-chapter > p:not(.home-eyebrow):not(.home-chapter-index) "
+                        + "{ max-width: 28ch;"));
+    }
+
+    @Test
     void homepageRetiresAuroraRuntimeAndItsTemplateMarkers() throws IOException {
         String template = resource("templates/index.html");
 
@@ -176,5 +268,13 @@ class HomePageTemplateContractTest {
         return resource.getContentAsString(StandardCharsets.UTF_8)
                 .replace("\r\n", "\n")
                 .replace('\r', '\n');
+    }
+
+    private HttpResponse<Void> get(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .GET()
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.discarding());
     }
 }

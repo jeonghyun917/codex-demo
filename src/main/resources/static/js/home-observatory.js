@@ -22,6 +22,7 @@ const environment = {
     reduceMotion: overrides.forceReduced
         || window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     mobile: window.matchMedia("(max-width: 767px)").matches,
+    tablet: window.matchMedia("(min-width: 768px) and (max-width: 1024px)").matches,
     cores: navigator.hardwareConcurrency || 4,
     dpr: window.devicePixelRatio || 1,
     webgl: !overrides.forceStatic && detectWebGLSupport()

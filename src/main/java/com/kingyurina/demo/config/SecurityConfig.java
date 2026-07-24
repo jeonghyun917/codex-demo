@@ -31,6 +31,7 @@ public class SecurityConfig {
                                 pathPattern("/design-concepts/**"),
                                 pathPattern("/images/**"),
                                 pathPattern("/js/**"),
+                                pathPattern("/vendor/**"),
                                 pathPattern("/favicon.ico")).permitAll()
                         .anyRequest().authenticated()
                 )

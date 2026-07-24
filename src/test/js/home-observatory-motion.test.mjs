@@ -29,16 +29,23 @@ test("selects accessible bounded quality profiles", () => {
         reduceMotion: true, mobile: false, cores: 16, dpr: 3, webgl: true
     }), {
         name: "static", pixelRatio: 1, pointerEnabled: false,
-        webgl: false, shadows: false, segments: 0
+        webgl: false, shadows: false, segments: 0, coreScale: 1
     });
-    assert.equal(selectHomeQualityProfile({
+    const compactProfile = selectHomeQualityProfile({
         reduceMotion: false, mobile: true, cores: 8, dpr: 3, webgl: true
-    }).name, "low");
+    });
+    assert.equal(compactProfile.name, "low");
+    assert.ok(compactProfile.coreScale >= 1.9 && compactProfile.coreScale <= 2.1);
+    const tabletProfile = selectHomeQualityProfile({
+        reduceMotion: false, mobile: false, tablet: true, cores: 8, dpr: 2, webgl: true
+    });
+    assert.equal(tabletProfile.name, "high");
+    assert.ok(tabletProfile.coreScale >= 1.6 && tabletProfile.coreScale <= 1.8);
     assert.deepEqual(selectHomeQualityProfile({
         reduceMotion: false, mobile: false, cores: 16, dpr: 3, webgl: true
     }), {
         name: "high", pixelRatio: 1.5, pointerEnabled: true,
-        webgl: true, shadows: true, segments: 96
+        webgl: true, shadows: true, segments: 96, coreScale: 1
     });
 });
 

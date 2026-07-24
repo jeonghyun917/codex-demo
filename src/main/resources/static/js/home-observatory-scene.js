@@ -255,6 +255,7 @@ export async function createQuantCoreScene({ canvas, profile } = {}) {
 
     const QuantCore = new THREE.Group();
     QuantCore.name = "QuantCore";
+    QuantCore.scale.setScalar(profile.coreScale);
     scene.add(QuantCore);
 
     const segments = Math.max(48, profile.segments || 48);
