@@ -84,6 +84,22 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageQuantCoreSceneUsesLocalPhysicalRenderingContracts() throws IOException {
+        String scene = resource("static/js/home-observatory-scene.js");
+
+        assertTrue(scene.contains("/js/vendor/three.module.js"));
+        assertTrue(scene.contains("createQuantCoreScene"));
+        assertTrue(scene.contains("MeshPhysicalMaterial"));
+        assertTrue(scene.contains("InstancedMesh"));
+        assertTrue(scene.contains("ACESFilmicToneMapping"));
+        assertTrue(scene.contains("setPixelRatio(profile.pixelRatio)"));
+        assertTrue(scene.contains("dispose()"));
+        assertFalse(scene.contains("fetch("));
+        assertFalse(scene.contains("http://"));
+        assertFalse(scene.contains("https://"));
+    }
+
+    @Test
     void homepageRetiresAuroraRuntimeAndItsTemplateMarkers() throws IOException {
         String template = resource("templates/index.html");
 

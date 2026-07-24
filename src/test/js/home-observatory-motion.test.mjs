@@ -61,6 +61,13 @@ test("maps scroll into the three approved mechanical states", () => {
     assert.equal(createScenePose(1, { x: 0, y: 0 }).productOpacity, 1);
 });
 
+test("keeps intermediate scene poses within the physical instrument envelope", () => {
+    const pose = createScenePose(0.35, { x: 1, y: -1 });
+    assert.ok(pose.cameraZ >= 6.4 && pose.cameraZ <= 8.8);
+    assert.ok(pose.housingOpen >= 0 && pose.housingOpen <= 1);
+    assert.ok(pose.metricOpacity >= 0 && pose.metricOpacity <= 1);
+});
+
 test("renders only when the scene can contribute a visible frame", () => {
     assert.equal(shouldRenderFrame({
         visible: true, hidden: false, webgl: true, reducedMotion: false, dirty: true
