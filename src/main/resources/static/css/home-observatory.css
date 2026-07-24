@@ -74,6 +74,9 @@ a { -webkit-tap-highlight-color: transparent; }
 
 .home-skip:focus { transform: translateY(0); }
 
+.home-skip,
+.home-footer a { display: inline-flex; align-items: center; }
+
 :focus-visible { outline: 2px solid var(--home-signal); outline-offset: 4px; }
 
 .home-nav {
@@ -92,6 +95,7 @@ a { -webkit-tap-highlight-color: transparent; }
     backdrop-filter: blur(18px);
 }
 
+.home-skip,
 .home-brand,
 .home-primary-action,
 .home-nav nav a,

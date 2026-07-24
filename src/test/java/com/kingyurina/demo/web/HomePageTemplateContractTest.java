@@ -124,6 +124,26 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageKeepsLenisFromCapturingHorizontalNavigation() throws IOException {
+        String template = resource("templates/index.html");
+
+        assertTrue(template.contains(
+                "<nav aria-label=\"Primary navigation\" data-lenis-prevent-horizontal>"));
+    }
+
+    @Test
+    void homepageSkipAndFooterLinksHaveFortyFourPixelClickTargets() throws IOException {
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".home-skip, .home-footer a { display: inline-flex; align-items: center; }"));
+        assertTrue(css.contains(
+                ".home-skip, .home-brand, .home-primary-action, .home-nav nav a, "
+                        + ".home-story-link, .home-product-list > a, .home-footer a "
+                        + "{ min-height: 44px; }"));
+    }
+
+    @Test
     void homepageRetiresAuroraRuntimeAndItsTemplateMarkers() throws IOException {
         String template = resource("templates/index.html");
 
