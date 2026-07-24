@@ -3,278 +3,101 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#e8e9e6">
+    <meta name="theme-color" content="#030405">
     <title>King Yurina | Quant Intelligence</title>
-    <link rel="stylesheet" th:href="@{/css/home-brik.css(v='20260720')}" href="../static/css/home-brik.css?v=20260720">
+    <link rel="stylesheet" th:href="@{/css/home-observatory.css(v='20260724')}" href="../static/css/home-observatory.css?v=20260724">
 </head>
-<body class="home-page">
+<body class="home-page home-observatory">
 <a class="home-skip" href="#main-content">Skip to content</a>
 
 <header class="home-nav" data-home-nav>
     <a class="home-brand" href="/" aria-label="King Yurina home">
         <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M5 5h8v8H5zM19 5h8v8h-8zM5 19h8v8H5zM19 19h8v8h-8z"/>
+            <circle cx="16" cy="16" r="11"></circle>
+            <circle cx="16" cy="16" r="4"></circle>
+            <path d="M16 5v6M16 21v6M5 16h6M21 16h6"></path>
         </svg>
         <span>King Yurina</span>
     </a>
-    <nav class="home-nav-menu" aria-label="Main menu">
+    <nav aria-label="Primary navigation">
         <a th:each="menu : ${mainMenus}"
            th:href="${menu.href}"
            th:text="${menu.label}"
            href="/quant">Quant</a>
     </nav>
-    <a class="home-dashboard" th:href="@{/quant}" href="/quant">
-        <span>Open dashboard</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h13M14 7l5 5-5 5"/>
-        </svg>
-    </a>
+    <a class="home-primary-action" th:href="@{/quant}" href="/quant">Enter Quant</a>
 </header>
 
 <main id="main-content">
-    <section class="home-hero" data-home-hero aria-labelledby="home-hero-title">
-        <canvas class="home-hero-canvas" data-home-canvas aria-hidden="true"></canvas>
-        <div class="home-hero-copy">
-            <p class="home-eyebrow">Quant intelligence, ready to explore</p>
-            <h1 id="home-hero-title">See the market.<br>Shape the signal.</h1>
-            <p class="home-hero-summary">
-                Search a symbol, scan the market, and move from raw data to a decision-ready view.
-            </p>
-            <a class="home-primary-link" th:href="@{/quant}" href="/quant">
-                <span>Enter Quant Intelligence</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-        </div>
-
-        <div class="home-tool-stage" data-home-reveal>
-            <div class="home-composer-surface">
-                <form action="/stocks" method="get" data-home-composer>
-                    <label for="home-symbol">Search a stock symbol</label>
-                    <div class="home-composer-controls">
-                        <input id="home-symbol"
-                               name="symbol"
-                               type="search"
-                               inputmode="search"
-                               autocomplete="off"
-                               placeholder="AAPL, MSFT, NVDA">
-                        <button type="submit">
-                            <span>View stock</span>
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M5 12h13M14 7l5 5-5 5"/>
-                            </svg>
-                        </button>
-                    </div>
-                </form>
-                <div class="home-prompts" aria-label="Explore market views">
-                    <a href="/quant?index=SP500">S&amp;P 500 overview</a>
-                    <a href="/stocks">Stock explorer</a>
-                    <a href="/stocks/heatmap?index=SP500">Market heatmap</a>
-                    <a href="/etfs">ETF radar</a>
-                    <a href="/signals/backtest">Backtest a signal</a>
-                </div>
+    <section class="home-story" data-home-story aria-labelledby="home-title">
+        <div class="home-scene" data-home-scene aria-hidden="true">
+            <div class="home-core-fallback" data-home-core-fallback>
+                <span class="home-core-ring home-core-ring--outer"></span>
+                <span class="home-core-ring home-core-ring--middle"></span>
+                <span class="home-core-ring home-core-ring--inner"></span>
+                <span class="home-core-iris"></span>
+                <span class="home-core-lens"></span>
+                <span class="home-core-emitter"></span>
             </div>
-
-            <aside class="home-instrument"
-                   data-home-instrument
-                   aria-labelledby="home-instrument-title">
-                <div class="home-instrument-heading">
-                    <div>
-                        <p>Illustrative snapshot</p>
-                        <h2 id="home-instrument-title">Quant instrument</h2>
-                    </div>
-                    <span class="home-instrument-status">Model view</span>
-                </div>
-                <dl class="home-metrics">
-                    <div data-home-metric="signal">
-                        <dt>Signal</dt>
-                        <dd>79 <small>/ 100</small></dd>
-                    </div>
-                    <div data-home-metric="alpha">
-                        <dt>20D Alpha</dt>
-                        <dd>+2.4%</dd>
-                    </div>
-                    <div data-home-metric="risk">
-                        <dt>Risk</dt>
-                        <dd>Medium</dd>
-                    </div>
-                </dl>
-                <p class="home-instrument-note">
-                    Illustrative model view &middot; dashboard data remains authoritative
-                </p>
-            </aside>
+            <canvas data-home-canvas></canvas>
         </div>
+
+        <section class="home-chapter home-chapter--observe" data-home-chapter="observe">
+            <p class="home-eyebrow">QUANT INTELLIGENCE / SYSTEM ONLINE</p>
+            <h1 id="home-title" aria-label="Market intelligence, resolved.">Market intelligence,<br>resolved.</h1>
+            <p>Observe the market. Resolve the signal. Act with context.</p>
+            <a class="home-primary-action" href="/quant">Enter Quant</a>
+            <a class="home-story-link" href="#resolve">Explore the system
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg>
+            </a>
+        </section>
+
+        <section id="resolve" class="home-chapter home-chapter--resolve" data-home-chapter="resolve" data-home-reveal>
+            <p class="home-chapter-index">02 / RESOLVE</p>
+            <h2>Three readings.<br>One market view.</h2>
+            <dl class="home-metrics" aria-label="Illustrative model view">
+                <div data-home-metric="signal"><dt>Signal</dt><dd>79 <small>/ 100</small></dd></div>
+                <div data-home-metric="alpha"><dt>20D Alpha</dt><dd>+2.4%</dd></div>
+                <div data-home-metric="risk"><dt>Risk</dt><dd>Medium</dd></div>
+            </dl>
+            <p>Illustrative model view</p>
+        </section>
+
+        <section id="act" class="home-chapter home-chapter--act" data-home-chapter="act" data-home-reveal>
+            <p class="home-chapter-index">03 / ACT</p>
+            <h2>Turn market noise<br>into a decision.</h2>
+            <ol><li>Scan the market.</li><li>Resolve competing signals.</li><li>Open the authoritative dashboard.</li></ol>
+            <a class="home-primary-action" href="/quant">Enter Quant</a>
+        </section>
     </section>
 
-    <section id="systems"
-             class="home-products"
-             data-home-products
-             aria-labelledby="home-products-title">
+    <section class="home-products" aria-labelledby="products-title">
         <div class="home-section-heading" data-home-reveal>
-            <p class="home-eyebrow">Working product surfaces</p>
-            <h2 id="home-products-title">One market.<br>Six ways in.</h2>
-            <p>Move from a broad scan to a focused decision with tools that share one analytical language.</p>
+            <p class="home-eyebrow">PRODUCT SURFACES</p>
+            <h2 id="products-title">Six ways into the market.</h2>
         </div>
-
-        <div class="home-product-grid">
-            <a class="home-product-card home-product-card--quant"
-               data-home-product-card
-               data-home-reveal
-               href="/quant">
-                <span class="home-card-index">01</span>
-                <div class="home-card-copy">
-                    <h3>Quant Intelligence</h3>
-                    <p>Resolve signal, alpha, upside, and risk in one decision-ready market view.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--signal" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-
-            <a class="home-product-card home-product-card--stocks"
-               data-home-product-card
-               data-home-reveal
-               href="/stocks">
-                <span class="home-card-index">02</span>
-                <div class="home-card-copy">
-                    <h3>Stocks</h3>
-                    <p>Inspect individual symbols with context that keeps the market in frame.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--bars" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-
-            <a class="home-product-card home-product-card--heatmap"
-               data-home-product-card
-               data-home-reveal
-               href="/stocks/heatmap">
-                <span class="home-card-index">03</span>
-                <div class="home-card-copy">
-                    <h3>Market Heatmap</h3>
-                    <p>See leadership, pressure, and rotation across the market at a glance.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--tiles" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span><span></span><span></span>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-
-            <a class="home-product-card home-product-card--etfs"
-               data-home-product-card
-               data-home-reveal
-               href="/etfs">
-                <span class="home-card-index">04</span>
-                <div class="home-card-copy">
-                    <h3>ETF Radar</h3>
-                    <p>Compare diversified exposures and find where market themes are concentrating.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--radar" aria-hidden="true">
-                    <span></span><i></i><b></b>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-
-            <a class="home-product-card home-product-card--atelier"
-               data-home-product-card
-               data-home-reveal
-               href="/atelier">
-                <span class="home-card-index">05</span>
-                <div class="home-card-copy">
-                    <h3>Strategy Atelier</h3>
-                    <p>Shape a market thesis into a clear, testable analytical workflow.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--steps" aria-hidden="true">
-                    <span></span><span></span><span></span>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
-
-            <a class="home-product-card home-product-card--backtest"
-               data-home-product-card
-               data-home-reveal
-               href="/signals/backtest">
-                <span class="home-card-index">06</span>
-                <div class="home-card-copy">
-                    <h3>Signal Backtest</h3>
-                    <p>Measure how a signal behaved before carrying it into the next decision.</p>
-                </div>
-                <div class="home-card-visual home-card-visual--line" aria-hidden="true">
-                    <svg viewBox="0 0 220 90" aria-hidden="true">
-                        <path d="M4 72C28 64 34 28 60 42s31 34 55 6 41-38 55-12 25 9 46-24"/>
-                    </svg>
-                </div>
-                <svg class="home-card-arrow" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h13M14 7l5 5-5 5"/>
-                </svg>
-            </a>
+        <div class="home-product-list">
+            <a data-home-product-link href="/quant"><span>01</span><h3>Quant Intelligence</h3><p>Resolve signal, alpha, and risk.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
+            <a data-home-product-link href="/stocks"><span>02</span><h3>Stocks</h3><p>Inspect one symbol in market context.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
+            <a data-home-product-link href="/stocks/heatmap?index=SP500"><span>03</span><h3>Market Heatmap</h3><p>See leadership, pressure, and rotation.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
+            <a data-home-product-link href="/etfs"><span>04</span><h3>ETF Radar</h3><p>Compare diversified market exposures.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
+            <a data-home-product-link href="/atelier"><span>05</span><h3>Strategy Atelier</h3><p>Shape a thesis into a testable workflow.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
+            <a data-home-product-link href="/signals/backtest"><span>06</span><h3>Signal Backtest</h3><p>Measure signal behavior through time.</p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 7l5 5-5 5"></path></svg></a>
         </div>
     </section>
 
-    <section id="how-it-works"
-             class="home-method"
-             aria-labelledby="home-method-title">
-        <div class="home-method-statement" data-home-reveal>
-            <p class="home-eyebrow">A clearer route through complexity</p>
-            <h2 id="home-method-title">
-                Market data becomes useful when it resolves into a view you can act on.
-            </h2>
-        </div>
-        <ol class="home-method-steps">
-            <li data-home-reveal>
-                <span>01</span>
-                <h3>Observe</h3>
-                <p>Start with the symbol, index, or market surface that frames the question.</p>
-            </li>
-            <li data-home-reveal>
-                <span>02</span>
-                <h3>Resolve</h3>
-                <p>Connect signal, performance, and risk without losing the wider context.</p>
-            </li>
-            <li data-home-reveal>
-                <span>03</span>
-                <h3>Act</h3>
-                <p>Carry a decision-ready view into research, testing, and portfolio work.</p>
-            </li>
-        </ol>
-    </section>
-
-    <section class="home-final-cta" data-home-reveal aria-labelledby="home-cta-title">
-        <div>
-            <p class="home-eyebrow">Your next market view is ready</p>
-            <h2 id="home-cta-title">Turn the noise into a signal.</h2>
-        </div>
-        <a th:href="@{/quant}" href="/quant">
-            <span>Open Quant Intelligence</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 12h13M14 7l5 5-5 5"/>
-            </svg>
-        </a>
+    <section class="home-final-cta" data-home-reveal aria-labelledby="final-title">
+        <p class="home-eyebrow">DECISION READY</p>
+        <h2 id="final-title">Turn market noise into a decision.</h2>
+        <a class="home-primary-action" href="/quant">Enter Quant</a>
     </section>
 </main>
 
 <footer id="contact" class="home-footer">
-    <a class="home-footer-brand" href="/">King Yurina</a>
+    <a href="/" aria-label="King Yurina home">King Yurina</a>
     <p>Quant intelligence for decision-ready market views.</p>
     <a href="#main-content">Back to top</a>
 </footer>
-
-<noscript>
-    <p class="home-noscript">All market tools remain available. Visual motion is disabled because JavaScript is off.</p>
-</noscript>
-<script type="module" th:src="@{/js/home-brik.js(v='20260720')}" src="../static/js/home-brik.js?v=20260720"></script>
+<noscript><p class="home-noscript">The complete Quant experience remains available without motion.</p></noscript>
 </body>
 </html>
