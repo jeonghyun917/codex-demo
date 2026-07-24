@@ -23,10 +23,13 @@ class HomePageTemplateContractTest {
     private int port;
 
     @Test
-    void homepageVendorAssetsArePublicWhileUnrelatedPathsRemainProtected() throws Exception {
+    void homepageAssetsArePublicWhileUnrelatedPathsRemainProtected() throws Exception {
         assertEquals(200, get("/vendor/lenis/lenis.css").statusCode());
         assertEquals(200, get("/vendor/lenis/lenis.min.js").statusCode());
         assertEquals(200, get("/vendor/motion/motion.js").statusCode());
+        assertEquals(200, get("/fonts/instrument-sans-latin-wght-normal.woff2").statusCode());
+        assertEquals(200, get("/fonts/ibm-plex-mono-latin-400-normal.woff2").statusCode());
+        assertEquals(200, get("/fonts/ibm-plex-mono-latin-500-normal.woff2").statusCode());
         assertEquals(403, get("/admin").statusCode());
     }
 
@@ -131,8 +134,10 @@ class HomePageTemplateContractTest {
         assertTrue(entry.contains("./home-observatory-motion.js"));
         assertTrue(entry.contains("./home-observatory-scene.js"));
         assertTrue(entry.contains("requestAnimationFrame"));
+        assertTrue(entry.contains("createPageLifecycle"));
         assertTrue(entry.contains("IntersectionObserver"));
         assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("pageshow"));
         assertTrue(entry.contains("prefers-reduced-motion: reduce"));
         assertFalse(entry.contains("setInterval"));
         assertFalse(entry.contains("fetch("));
@@ -224,6 +229,28 @@ class HomePageTemplateContractTest {
                 "@media (min-width: 1440px) { "
                         + ".home-core-fallback { width: min(36vw, 32rem); }"));
         assertFalse(css.contains("rotateX("));
+    }
+
+    @Test
+    void homepageUsesRestrainedChapterIndicesAndNavigationOpacity() throws IOException {
+        String template = resource("templates/index.html");
+        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+
+        assertTrue(template.contains(
+                "<p class=\"home-chapter-index\">01 / OBSERVE</p>"));
+        assertTrue(template.contains(
+                "<p class=\"home-chapter-index\">02 / RESOLVE</p>"));
+        assertTrue(template.contains(
+                "<p class=\"home-chapter-index\">03 / ACT</p>"));
+        assertEquals(3, occurrences(template, "class=\"home-chapter-index\""));
+        assertTrue(css.contains(
+                "[data-observatory-chapter=\"observe\"] .home-nav nav { opacity: .78; }"));
+        assertTrue(css.contains(
+                "[data-observatory-chapter=\"resolve\"] .home-nav nav { opacity: .68; }"));
+        assertTrue(css.contains(
+                "[data-observatory-chapter=\"act\"] .home-nav nav { opacity: .82; }"));
+        assertTrue(css.contains(
+                ".home-nav nav:hover, .home-nav nav:focus-within { opacity: 1; }"));
     }
 
     @Test

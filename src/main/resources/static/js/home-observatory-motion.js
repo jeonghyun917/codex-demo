@@ -97,6 +97,100 @@ export function shouldRenderFrame(state) {
     return Boolean(state?.visible && !state.hidden && state.webgl && state.dirty);
 }
 
+export function createPageLifecycle({
+    requestFrame,
+    cancelFrame,
+    onFrame,
+    onPause,
+    onResume,
+    onDestroy
+} = {}) {
+    let frameId = 0;
+    let frameScheduled = false;
+    let paused = false;
+    let destroyed = false;
+
+    function scheduleFrame() {
+        if (destroyed || paused || frameScheduled || typeof requestFrame !== "function") {
+            return;
+        }
+        frameScheduled = true;
+        frameId = requestFrame(runFrame);
+    }
+
+    function runFrame(time) {
+        frameScheduled = false;
+        frameId = 0;
+        if (destroyed || paused) {
+            return;
+        }
+        onFrame?.(time);
+        scheduleFrame();
+    }
+
+    function start() {
+        scheduleFrame();
+    }
+
+    function pause() {
+        if (destroyed || paused) {
+            return;
+        }
+        paused = true;
+        if (frameScheduled) {
+            cancelFrame?.(frameId);
+            frameScheduled = false;
+            frameId = 0;
+        }
+        onPause?.();
+    }
+
+    function resume() {
+        if (destroyed || !paused) {
+            return;
+        }
+        paused = false;
+        onResume?.();
+        scheduleFrame();
+    }
+
+    function destroy() {
+        if (destroyed) {
+            return;
+        }
+        destroyed = true;
+        if (frameScheduled) {
+            cancelFrame?.(frameId);
+            frameScheduled = false;
+            frameId = 0;
+        }
+        onDestroy?.();
+    }
+
+    function handlePageHide(event) {
+        if (event?.persisted) {
+            pause();
+        } else {
+            destroy();
+        }
+    }
+
+    function handlePageShow(event) {
+        if (event?.persisted) {
+            resume();
+        }
+    }
+
+    return {
+        start,
+        pause,
+        resume,
+        destroy,
+        handlePageHide,
+        handlePageShow
+    };
+}
+
 function makeVisible(element) {
     if (!element?.style) {
         return;
@@ -106,7 +200,7 @@ function makeVisible(element) {
 }
 
 function revealAll(root) {
-    root?.querySelectorAll?.("[data-motion-reveal]")?.forEach(makeVisible);
+    root?.querySelectorAll?.("[data-home-reveal]")?.forEach(makeVisible);
 }
 
 export function createDomMotion({ MotionAPI, root, reduceMotion } = {}) {

@@ -105,7 +105,12 @@ a { -webkit-tap-highlight-color: transparent; }
 
 .home-brand { display: inline-flex; align-items: center; gap: .65rem; width: fit-content; font-size: .9rem; font-weight: 600; letter-spacing: -.02em; }
 .home-brand svg { width: 1.6rem; height: 1.6rem; fill: none; stroke: currentColor; stroke-width: 1.5; }
-.home-nav nav { display: none; }
+.home-nav nav { display: none; transition: opacity 260ms var(--home-ease-out); }
+[data-observatory-chapter="observe"] .home-nav nav { opacity: .78; }
+[data-observatory-chapter="resolve"] .home-nav nav { opacity: .68; }
+[data-observatory-chapter="act"] .home-nav nav { opacity: .82; }
+.home-nav nav:hover,
+.home-nav nav:focus-within { opacity: 1; }
 
 .home-primary-action {
     display: inline-flex;
@@ -151,6 +156,10 @@ a { -webkit-tap-highlight-color: transparent; }
 .home-chapter--act { top: 226svh; }
 .home-eyebrow,
 .home-chapter-index { margin: 0 0 1rem; color: var(--home-signal); font: 500 .68rem/1.35 var(--home-font-data); letter-spacing: .13em; }
+.home-chapter-index { opacity: .58; transition: opacity 260ms var(--home-ease-out), color 260ms var(--home-ease-out); }
+[data-observatory-chapter="observe"] .home-chapter--observe .home-chapter-index,
+[data-observatory-chapter="resolve"] .home-chapter--resolve .home-chapter-index,
+[data-observatory-chapter="act"] .home-chapter--act .home-chapter-index { opacity: 1; color: var(--home-fg-primary); }
 .home-chapter h1,
 .home-chapter h2,
 .home-section-heading h2,

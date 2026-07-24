@@ -4,6 +4,7 @@ import test from "node:test";
 import {
     clampUnit,
     createDomMotion,
+    createPageLifecycle,
     createScenePose,
     normalizePointer,
     normalizeScrollProgress,
@@ -168,4 +169,74 @@ test("keeps content visible without Motion and avoids animations in reduced moti
     reduced.reveal(element);
     reduced.setChapter("actuation");
     assert.equal(animations, 0);
+});
+
+test("reveals elements using the homepage reveal marker", () => {
+    const element = { style: { opacity: "0", transform: "translateY(16px)" } };
+    let selector = "";
+    const root = {
+        querySelectorAll(value) {
+            selector = value;
+            return value === "[data-home-reveal]" ? [element] : [];
+        }
+    };
+
+    createDomMotion({ MotionAPI: null, root, reduceMotion: false });
+
+    assert.equal(selector, "[data-home-reveal]");
+    assert.equal(element.style.opacity, "1");
+    assert.equal(element.style.transform, "none");
+});
+
+test("pauses and resumes one animation loop across the back-forward cache", () => {
+    let nextFrameId = 0;
+    const queuedFrames = new Map();
+    const calls = { frame: 0, pause: 0, resume: 0, destroy: 0 };
+    const lifecycle = createPageLifecycle({
+        requestFrame(callback) {
+            const id = ++nextFrameId;
+            queuedFrames.set(id, callback);
+            return id;
+        },
+        cancelFrame(id) {
+            queuedFrames.delete(id);
+        },
+        onFrame() {
+            calls.frame += 1;
+        },
+        onPause() {
+            calls.pause += 1;
+        },
+        onResume() {
+            calls.resume += 1;
+        },
+        onDestroy() {
+            calls.destroy += 1;
+        }
+    });
+
+    lifecycle.start();
+    assert.equal(queuedFrames.size, 1);
+
+    lifecycle.handlePageHide({ persisted: true });
+    lifecycle.handlePageHide({ persisted: true });
+    assert.deepEqual(calls, { frame: 0, pause: 1, resume: 0, destroy: 0 });
+    assert.equal(queuedFrames.size, 0);
+
+    lifecycle.handlePageShow({ persisted: true });
+    lifecycle.handlePageShow({ persisted: true });
+    assert.deepEqual(calls, { frame: 0, pause: 1, resume: 1, destroy: 0 });
+    assert.equal(queuedFrames.size, 1);
+
+    const [frameId, frameCallback] = queuedFrames.entries().next().value;
+    queuedFrames.delete(frameId);
+    frameCallback(16);
+    assert.equal(calls.frame, 1);
+    assert.equal(queuedFrames.size, 1);
+
+    lifecycle.handlePageHide({ persisted: false });
+    lifecycle.destroy();
+    lifecycle.handlePageShow({ persisted: true });
+    assert.deepEqual(calls, { frame: 1, pause: 1, resume: 1, destroy: 1 });
+    assert.equal(queuedFrames.size, 0);
 });

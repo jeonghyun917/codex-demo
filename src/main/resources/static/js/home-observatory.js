@@ -1,6 +1,7 @@
 import { createScrollController } from "./home-observatory-scroll.js";
 import {
     createDomMotion,
+    createPageLifecycle,
     normalizePointer,
     normalizeScrollProgress,
     resolveLocalTestOverrides,
@@ -44,8 +45,6 @@ if (story && sceneElement && canvas) {
 async function startObservatory() {
     let storyVisible = false;
     let pageHidden = document.hidden;
-    let frameId = 0;
-    let destroyed = false;
     let activeChapter = "";
     const renderTimes = [];
     const canAnimate = !environment.reduceMotion
@@ -146,9 +145,6 @@ async function startObservatory() {
     }
 
     function tick(time) {
-        if (destroyed) {
-            return;
-        }
         scroll.raf(time);
         if (storyVisible && !pageHidden) {
             updateStoryProgress();
@@ -156,7 +152,6 @@ async function startObservatory() {
         const startedAt = isLoopback ? performance.now() : 0;
         const rendered = scene?.render(time) || false;
         recordLocalDiagnostics(startedAt, rendered);
-        frameId = requestAnimationFrame(tick);
     }
 
     function handlePointer(event) {
@@ -186,9 +181,22 @@ async function startObservatory() {
         updateStoryProgress();
     }
 
+    function pauseForPageCache() {
+        scroll.stop();
+        scene?.setVisible(false);
+    }
+
+    function resumeFromPageCache() {
+        pageHidden = document.hidden;
+        if (!pageHidden) {
+            scroll.start();
+        }
+        scene?.resize();
+        updateSceneVisibility();
+        updateStoryProgress();
+    }
+
     function destroy() {
-        destroyed = true;
-        cancelAnimationFrame(frameId);
         storyObserver?.disconnect();
         revealObserver?.disconnect();
         scroll.destroy();
@@ -196,20 +204,31 @@ async function startObservatory() {
         scene?.dispose();
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("resize", handleResize);
-        window.removeEventListener("pagehide", destroy);
+        window.removeEventListener("pagehide", lifecycle.handlePageHide);
+        window.removeEventListener("pageshow", lifecycle.handlePageShow);
         if (profile.pointerEnabled) {
             sceneElement.removeEventListener("pointermove", handlePointer);
         }
     }
+
+    const lifecycle = createPageLifecycle({
+        requestFrame: (callback) => requestAnimationFrame(callback),
+        cancelFrame: (id) => cancelAnimationFrame(id),
+        onFrame: tick,
+        onPause: pauseForPageCache,
+        onResume: resumeFromPageCache,
+        onDestroy: destroy
+    });
 
     if (profile.pointerEnabled) {
         sceneElement.addEventListener("pointermove", handlePointer, { passive: true });
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("resize", handleResize, { passive: true });
-    window.addEventListener("pagehide", destroy, { once: true });
+    window.addEventListener("pagehide", lifecycle.handlePageHide);
+    window.addEventListener("pageshow", lifecycle.handlePageShow);
 
     updateSceneVisibility();
     updateStoryProgress();
-    frameId = requestAnimationFrame(tick);
+    lifecycle.start();
 }
