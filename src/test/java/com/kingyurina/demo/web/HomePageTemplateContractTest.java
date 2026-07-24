@@ -66,6 +66,7 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("href=\"/etfs\""));
         assertTrue(template.contains("href=\"/atelier\""));
         assertTrue(template.contains("href=\"/signals/backtest\""));
+        assertTrue(template.contains("id=\"systems\""));
         assertFalse(template.contains("http://"));
         assertFalse(template.contains("https://"));
 
