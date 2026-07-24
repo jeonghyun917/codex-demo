@@ -15,6 +15,26 @@ import org.springframework.core.io.ClassPathResource;
 class HomePageTemplateContractTest {
 
     @Test
+    void homepageRuntimeDependenciesAndFontsArePinnedLocally() throws IOException {
+        assertTrue(new ClassPathResource("static/vendor/lenis/lenis.min.js").exists());
+        assertTrue(new ClassPathResource("static/vendor/lenis/lenis.css").exists());
+        assertTrue(new ClassPathResource("static/vendor/lenis/LICENSE").exists());
+        assertTrue(new ClassPathResource("static/vendor/motion/motion.js").exists());
+        assertTrue(new ClassPathResource("static/vendor/motion/LICENSE.md").exists());
+        assertTrue(new ClassPathResource("static/js/vendor/three.module.js").exists());
+        assertTrue(new ClassPathResource("static/js/vendor/three.LICENSE").exists());
+        assertTrue(new ClassPathResource("static/fonts/instrument-sans-latin-wght-normal.woff2").exists());
+        assertTrue(new ClassPathResource("static/fonts/ibm-plex-mono-latin-400-normal.woff2").exists());
+        assertTrue(new ClassPathResource("static/fonts/ibm-plex-mono-latin-500-normal.woff2").exists());
+        assertTrue(new ClassPathResource("static/fonts/Instrument-Sans-LICENSE").exists());
+        assertTrue(new ClassPathResource("static/fonts/IBM-Plex-Mono-LICENSE").exists());
+
+        assertTrue(resource("static/vendor/lenis/lenis.min.js").contains("1.3.25"));
+        assertTrue(resource("static/vendor/motion/LICENSE.md").contains("MIT License"));
+        assertTrue(resource("static/js/vendor/three.module.js").contains("const REVISION = '165'"));
+    }
+
+    @Test
     void homepageDeclaresSemanticBrikSurfaceAndResponsiveContracts() throws IOException {
         String template = resource("templates/index.html");
         String css = resource("static/css/home-brik.css");
