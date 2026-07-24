@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#030405">
     <title>King Yurina | Quant Intelligence</title>
+    <link rel="stylesheet"
+          th:href="@{/vendor/lenis/lenis.css(v='1.3.25')}"
+          href="../static/vendor/lenis/lenis.css?v=1.3.25">
     <link rel="stylesheet" th:href="@{/css/home-observatory.css(v='20260724')}" href="../static/css/home-observatory.css?v=20260724">
 </head>
 <body class="home-page home-observatory">
@@ -99,5 +102,12 @@
     <a href="#main-content">Back to top</a>
 </footer>
 <noscript><p class="home-noscript">The complete Quant experience remains available without motion.</p></noscript>
+<script th:src="@{/vendor/lenis/lenis.min.js(v='1.3.25')}"
+        src="../static/vendor/lenis/lenis.min.js?v=1.3.25"></script>
+<script th:src="@{/vendor/motion/motion.js(v='12.29.2')}"
+        src="../static/vendor/motion/motion.js?v=12.29.2"></script>
+<script type="module"
+        th:src="@{/js/home-observatory.js(v='20260724')}"
+        src="../static/js/home-observatory.js?v=20260724"></script>
 </body>
 </html>

@@ -100,6 +100,30 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageCoordinatesProgressiveEnhancementAndRetiresBrikRuntime() throws IOException {
+        String template = resource("templates/index.html");
+        String entry = resource("static/js/home-observatory.js");
+
+        assertTrue(template.contains("/vendor/lenis/lenis.css"));
+        assertTrue(template.contains("/vendor/lenis/lenis.min.js"));
+        assertTrue(template.contains("/vendor/motion/motion.js"));
+        assertTrue(template.contains("/js/home-observatory.js"));
+        assertTrue(entry.contains("./home-observatory-scroll.js"));
+        assertTrue(entry.contains("./home-observatory-motion.js"));
+        assertTrue(entry.contains("./home-observatory-scene.js"));
+        assertTrue(entry.contains("requestAnimationFrame"));
+        assertTrue(entry.contains("IntersectionObserver"));
+        assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("prefers-reduced-motion: reduce"));
+        assertFalse(entry.contains("setInterval"));
+        assertFalse(entry.contains("fetch("));
+        assertFalse(template.contains("home-brik"));
+        assertFalse(new ClassPathResource("static/css/home-brik.css").exists());
+        assertFalse(new ClassPathResource("static/js/home-brik.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-brik-motion.js").exists());
+    }
+
+    @Test
     void homepageRetiresAuroraRuntimeAndItsTemplateMarkers() throws IOException {
         String template = resource("templates/index.html");
 
