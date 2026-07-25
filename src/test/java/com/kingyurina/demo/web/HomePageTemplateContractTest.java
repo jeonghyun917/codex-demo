@@ -201,7 +201,7 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(
                 "@media (max-width: 767px) {"));
         assertTrue(css.contains(
-                ".planet-chapter--observe { top: 7rem; }"));
+                ".planet-chapter--observe { top: 9rem; }"));
         assertTrue(css.contains(
                 ".planet-fallback { top: 55svh; right: auto; left: 50%; "
                         + "width: min(82vw, 19rem); transform: translateX(-50%); }"));
@@ -296,6 +296,39 @@ class HomePageTemplateContractTest {
                 "@media (prefers-reduced-motion: reduce)"));
         assertTrue(css.contains(
                 ".planet-motion-enabled [data-home-reveal] { opacity: 1; transform: none; }"));
+    }
+
+    @Test
+    void homepageKeepsMobileNavigationBrandAndProductDescriptionsVisible()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".home-nav nav { grid-column: 1 / -1; display: flex;"));
+        assertTrue(css.contains(
+                "overflow-x: auto; scrollbar-width: none;"));
+        assertTrue(css.contains(
+                ".home-product-list p { display: block;"));
+        assertFalse(css.contains(
+                ".home-brand span { display: none; }"));
+        assertFalse(css.contains(
+                ".home-product-list p { display: none;"));
+    }
+
+    @Test
+    void homepageUsesHighContrastFooterFocus() throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".home-footer :focus-visible { outline-color: var(--planet-paper); }"));
+    }
+
+    @Test
+    void homepageUsesHighContrastEyebrowText() throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".planet-eyebrow { color: var(--planet-ink); }"));
     }
 
     @Test

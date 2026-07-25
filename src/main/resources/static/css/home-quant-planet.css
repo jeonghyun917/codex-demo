@@ -156,8 +156,25 @@ a {
 }
 
 .home-nav nav {
-    display: none;
+    grid-column: 1 / -1;
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    gap: .125rem;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
     transition: opacity 220ms var(--planet-ease-out);
+}
+
+.home-nav nav::-webkit-scrollbar { display: none; }
+
+.home-nav nav a {
+    display: inline-flex;
+    align-items: center;
+    padding: .5rem .7rem;
+    font: 500 .68rem/1 var(--planet-font-data);
+    white-space: nowrap;
 }
 
 [data-planet-chapter="observe"] .home-nav nav { opacity: .78; }
@@ -512,6 +529,8 @@ a {
     letter-spacing: .12em;
 }
 
+.planet-eyebrow { color: var(--planet-ink); }
+
 .planet-chapter__index {
     color: var(--planet-ink);
     opacity: .72;
@@ -711,11 +730,13 @@ a {
 }
 
 .home-product-list span {
+    grid-row: 1 / 3;
     color: var(--planet-blue);
     font: 500 .68rem/1 var(--planet-font-data);
 }
 
 .home-product-list h3 {
+    grid-column: 2;
     margin: 0;
     font-size: clamp(1.2rem, 2vw, 1.75rem);
     font-weight: 560;
@@ -723,11 +744,17 @@ a {
 }
 
 .home-product-list p {
-    display: none;
+    display: block;
+    grid-column: 2;
     margin: 0;
     color: var(--planet-ink);
     font-size: .92rem;
     line-height: 1.5;
+}
+
+.home-product-list svg {
+    grid-column: 3;
+    grid-row: 1 / 3;
 }
 
 .home-final-cta {
@@ -764,6 +791,8 @@ a {
     width: fit-content;
 }
 
+.home-footer :focus-visible { outline-color: var(--planet-paper); }
+
 .home-noscript {
     position: relative;
     z-index: var(--layer-content);
@@ -784,8 +813,14 @@ a {
         gap: .5rem;
     }
 
-    .home-brand span {
-        display: none;
+    .home-brand {
+        gap: .375rem;
+        font-size: .78rem;
+    }
+
+    .home-brand svg {
+        width: 1.4rem;
+        height: 1.4rem;
     }
 
     .home-nav > .planet-primary-action {
@@ -793,7 +828,7 @@ a {
         font-size: .6rem;
     }
 
-    .planet-chapter--observe { top: 7rem; }
+    .planet-chapter--observe { top: 9rem; }
 
     .planet-chapter--resolve {
         top: 113svh;
@@ -830,7 +865,7 @@ a {
     }
 
     .home-nav nav {
-        display: flex;
+        grid-column: auto;
         gap: .125rem;
         justify-content: flex-start; overflow-x: auto; scrollbar-width: none;
     }
@@ -892,6 +927,14 @@ a {
 
     .home-product-list > a {
         grid-template-columns: 3rem minmax(0, .8fr) minmax(0, 1fr) auto; gap: 1rem;
+    }
+
+    .home-product-list span,
+    .home-product-list h3,
+    .home-product-list p,
+    .home-product-list svg {
+        grid-column: auto;
+        grid-row: auto;
     }
 
     .home-final-cta {
@@ -971,7 +1014,7 @@ a {
     }
 
     .planet-chapter--observe {
-        top: 4.5rem;
+        top: 7rem;
         max-width: 29rem;
     }
 
