@@ -167,6 +167,8 @@ class HomePageTemplateContractTest {
         assertTrue(scene.contains("world?.dispose();"));
         assertTrue(scene.contains("renderer?.dispose();"));
         assertTrue(scene.contains("throw error"));
+        assertTrue(scene.contains("disposeInitializationResources"));
+        assertTrue(world.contains("disposeTrackedResources"));
         assertFalse(world.contains("fetch("));
         assertFalse(scene.contains("fetch("));
         assertFalse(world.contains("http://"));

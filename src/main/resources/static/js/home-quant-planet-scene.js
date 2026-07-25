@@ -34,6 +34,20 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
 
     let renderer = null;
     let world = null;
+
+    function disposeInitializationResources() {
+        try {
+            world?.dispose();
+        } catch {
+            // Preserve the initialization error after attempting every cleanup.
+        }
+        try {
+            renderer?.dispose();
+        } catch {
+            // Preserve the initialization error after attempting every cleanup.
+        }
+    }
+
     try {
         const THREE = await import("/js/vendor/three.module.js");
         renderer = new THREE.WebGLRenderer({
@@ -162,13 +176,15 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
                     return;
                 }
                 disposed = true;
-                world.dispose();
-                renderer.dispose();
+                try {
+                    world.dispose();
+                } finally {
+                    renderer.dispose();
+                }
             }
         };
     } catch (error) {
-        world?.dispose();
-        renderer?.dispose();
+        disposeInitializationResources();
         throw error;
     }
 }

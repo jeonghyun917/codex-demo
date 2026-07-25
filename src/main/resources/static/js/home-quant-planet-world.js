@@ -98,6 +98,26 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     const textures = new Set();
     const ownGeometry = (geometry) => (geometries.add(geometry), geometry);
     const ownMaterial = (material) => (materials.add(material), material);
+    let disposed = false;
+
+    function disposeTrackedResources() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
+        [geometries, materials, textures].forEach((resources) => {
+            resources.forEach((resource) => {
+                try {
+                    resource.dispose();
+                } catch {
+                    // Continue disposing independent resources during rollback.
+                }
+            });
+            resources.clear();
+        });
+    }
+
+    try {
     const gradientMap = createGradientMap(THREE);
     textures.add(gradientMap);
 
@@ -446,8 +466,6 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     const headingRotation = new THREE.Quaternion();
     const worldUp = new THREE.Vector3(0, 1, 0);
     const fullMotion = profile.name === "high";
-    let disposed = false;
-
     function update({ planetPose, courierPose, time = 0 }) {
         if (disposed || !planetPose || !courierPose) {
             return;
@@ -510,16 +528,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     }
 
     function dispose() {
-        if (disposed) {
-            return;
-        }
-        disposed = true;
-        geometries.forEach((resource) => resource.dispose());
-        materials.forEach((resource) => resource.dispose());
-        textures.forEach((resource) => resource.dispose());
-        geometries.clear();
-        materials.clear();
-        textures.clear();
+        disposeTrackedResources();
     }
 
     return {
@@ -527,4 +536,8 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         update,
         dispose
     };
+    } catch (error) {
+        disposeTrackedResources();
+        throw error;
+    }
 }

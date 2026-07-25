@@ -140,3 +140,46 @@ test("disposes every attached world resource exactly once", () => {
 
     assert.ok([...disposeCounts.values()].every((count) => count === 1));
 });
+
+test("rolls back every tracked resource when world construction throws", () => {
+    const allocations = [];
+    const trackDisposable = (Base) => class extends Base {
+        constructor(...args) {
+            super(...args);
+            const dispose = this.dispose.bind(this);
+            this.disposeCount = 0;
+            this.dispose = () => {
+                this.disposeCount += 1;
+                dispose();
+            };
+            allocations.push(this);
+        }
+    };
+    class ThrowingMesh extends THREE.Mesh {
+        constructor(...args) {
+            super(...args);
+            throw new Error("injected world construction failure");
+        }
+    }
+    const FaultThree = {
+        ...THREE,
+        DataTexture: trackDisposable(THREE.DataTexture),
+        MeshToonMaterial: trackDisposable(THREE.MeshToonMaterial),
+        MeshBasicMaterial: trackDisposable(THREE.MeshBasicMaterial),
+        BoxGeometry: trackDisposable(THREE.BoxGeometry),
+        CylinderGeometry: trackDisposable(THREE.CylinderGeometry),
+        IcosahedronGeometry: trackDisposable(THREE.IcosahedronGeometry),
+        ConeGeometry: trackDisposable(THREE.ConeGeometry),
+        TorusGeometry: trackDisposable(THREE.TorusGeometry),
+        SphereGeometry: trackDisposable(THREE.SphereGeometry),
+        CapsuleGeometry: trackDisposable(THREE.CapsuleGeometry),
+        Mesh: ThrowingMesh
+    };
+
+    assert.throws(
+        () => createQuantPlanetWorld(FaultThree, { profile }),
+        /injected world construction failure/
+    );
+    assert.ok(allocations.length > 0);
+    assert.ok(allocations.every((resource) => resource.disposeCount === 1));
+});
