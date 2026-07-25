@@ -24,8 +24,6 @@ class HomePageTemplateContractTest {
 
     @Test
     void homepageAssetsArePublicWhileUnrelatedPathsRemainProtected() throws Exception {
-        assertEquals(200, get("/vendor/lenis/lenis.css").statusCode());
-        assertEquals(200, get("/vendor/lenis/lenis.min.js").statusCode());
         assertEquals(200, get("/vendor/motion/motion.js").statusCode());
         assertEquals(200, get("/fonts/instrument-sans-latin-wght-normal.woff2").statusCode());
         assertEquals(200, get("/fonts/ibm-plex-mono-latin-400-normal.woff2").statusCode());
@@ -35,9 +33,6 @@ class HomePageTemplateContractTest {
 
     @Test
     void homepageRuntimeDependenciesAndFontsArePinnedLocally() throws IOException {
-        assertTrue(new ClassPathResource("static/vendor/lenis/lenis.min.js").exists());
-        assertTrue(new ClassPathResource("static/vendor/lenis/lenis.css").exists());
-        assertTrue(new ClassPathResource("static/vendor/lenis/LICENSE").exists());
         assertTrue(new ClassPathResource("static/vendor/motion/motion.js").exists());
         assertTrue(new ClassPathResource("static/vendor/motion/LICENSE.md").exists());
         assertTrue(new ClassPathResource("static/js/vendor/three.module.js").exists());
@@ -48,72 +43,61 @@ class HomePageTemplateContractTest {
         assertTrue(new ClassPathResource("static/fonts/Instrument-Sans-LICENSE").exists());
         assertTrue(new ClassPathResource("static/fonts/IBM-Plex-Mono-LICENSE").exists());
 
-        assertTrue(resource("static/vendor/lenis/lenis.min.js").contains("1.3.25"));
         assertTrue(resource("static/vendor/motion/LICENSE.md").contains("MIT License"));
         assertTrue(resource("static/js/vendor/three.module.js").contains("const REVISION = '165'"));
     }
 
     @Test
-    void homepageDeclaresSemanticQuantPlanetSurfaceAndResponsiveContracts() throws IOException {
+    void homepageIsOneFullscreenProductOrbit() throws IOException {
         String template = resource("templates/index.html");
-        String css = resource("static/css/home-quant-planet.css");
+        String css = resource("static/css/home-quant-planet.css")
+                .replaceAll("\\s+", " ");
 
-        assertTrue(template.contains("home-quant-planet.css"));
-        assertTrue(template.contains("/js/home-quant-planet.js"));
-        assertTrue(template.contains("class=\"home-page home-quant-planet\""));
-        assertTrue(template.contains("th:each=\"menu : ${mainMenus}\""));
-        assertTrue(template.contains("id=\"main-content\""));
-        assertTrue(template.contains("data-home-nav"));
-        assertTrue(template.contains("data-home-story"));
+        assertTrue(template.contains(
+                "class=\"home-page home-quant-planet home-quant-fullscreen\""));
+        assertTrue(template.contains("data-home-experience"));
         assertTrue(template.contains("data-home-scene"));
         assertTrue(template.contains("data-home-canvas"));
         assertTrue(template.contains("data-planet-fallback"));
-        assertTrue(template.contains("aria-hidden=\"true\""));
-        assertTrue(template.contains("data-home-reveal"));
-        assertEquals(3, occurrences(template, "data-home-chapter"));
-        assertEquals(3, occurrences(template, "data-home-metric"));
-        assertEquals(6, occurrences(template, "data-home-product-link"));
+        assertTrue(template.contains("data-intro-loader"));
+        assertTrue(template.contains("data-intro-mark"));
+        assertTrue(template.contains("data-product-orbit"));
+        assertTrue(template.contains("data-home-semantic-summary"));
+        assertTrue(template.contains("data-interaction-hint"));
+        assertEquals(6, occurrences(template, "data-product-orbit-link"));
         assertEquals(1, occurrences(template, "<h1"));
-        assertTrue(template.contains("Market intelligence,<br>in motion."));
-        assertTrue(template.contains("Observe the market. Resolve the signal. Act with context."));
-        assertTrue(template.contains("<dt>Signal</dt><dd>79 <small>/ 100</small></dd>"));
-        assertTrue(template.contains("<dt>20D Alpha</dt><dd>+2.4%</dd>"));
-        assertTrue(template.contains("<dt>Risk</dt><dd>Medium</dd>"));
+        assertTrue(template.contains("Market intelligence, in motion."));
+        assertTrue(template.contains(
+                "Observe the market. Resolve the signal. Act with context."));
+        assertTrue(template.contains(
+                "<dt>Signal</dt><dd>79 / 100</dd>"));
+        assertTrue(template.contains(
+                "<dt>20D Alpha</dt><dd>+2.4%</dd>"));
+        assertTrue(template.contains(
+                "<dt>Risk</dt><dd>Medium</dd>"));
         assertTrue(template.contains("Illustrative model view"));
-        assertTrue(template.contains("Arrive at a decision."));
-        assertTrue(template.contains("href=\"/quant\""));
-        assertTrue(template.contains("href=\"/stocks\""));
-        assertTrue(template.contains("href=\"/stocks/heatmap?index=SP500\""));
-        assertTrue(template.contains("href=\"/etfs\""));
-        assertTrue(template.contains("href=\"/atelier\""));
-        assertTrue(template.contains("href=\"/signals/backtest\""));
-        assertTrue(template.contains("id=\"systems\""));
-        assertFalse(template.contains("home-observatory"));
-        assertFalse(template.contains("http://"));
-        assertFalse(template.contains("https://"));
+        assertEquals(1, occurrences(template, ">Enter Quant</a>"));
+        assertTrue(template.contains("href=\"/quant\">QUANT</a>"));
+        assertTrue(template.contains("href=\"/stocks\">STOCKS</a>"));
+        assertTrue(template.contains(
+                "href=\"/stocks/heatmap?index=SP500\">HEATMAP</a>"));
+        assertTrue(template.contains("href=\"/etfs\">ETF</a>"));
+        assertTrue(template.contains("href=\"/atelier\">ATELIER</a>"));
+        assertTrue(template.contains(
+                "href=\"/signals/backtest\">SIGNAL</a>"));
+        assertFalse(template.contains("/vendor/lenis/"));
+        assertFalse(template.contains("data-home-chapter"));
+        assertFalse(template.contains("home-product-list"));
+        assertFalse(template.contains("home-footer"));
 
-        assertTrue(css.contains("--planet-sky: #9ed9d5"));
-        assertTrue(css.contains("--planet-haze: #d9efe8"));
-        assertTrue(css.contains("--planet-ground: #b8c989"));
-        assertTrue(css.contains("--planet-warm: #f1d7a4"));
-        assertTrue(css.contains("--planet-coral: #e8755d"));
-        assertTrue(css.contains("--planet-blue: #2357a5"));
-        assertTrue(css.contains("--planet-ink: #173149"));
-        assertTrue(css.contains("--planet-paper: #fff9ea"));
-        assertTrue(css.contains("--planet-positive: #2f8c73"));
-        assertTrue(css.contains("--planet-risk: #c85a5a"));
-        assertTrue(css.contains("--layer-world: 0"));
-        assertTrue(css.contains("--layer-content: 10"));
-        assertTrue(css.contains("--layer-nav: 30"));
-        assertTrue(css.contains("--layer-skip: 50"));
-        assertTrue(css.contains("@media (max-width: 767px)"));
-        assertTrue(css.contains("@media (min-width: 768px)"));
-        assertTrue(css.contains("@media (min-width: 1024px)"));
-        assertTrue(css.contains("@media (min-width: 1440px)"));
-        assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.contains("height: 100dvh"));
+        assertTrue(css.contains("overflow: hidden"));
+        assertTrue(css.contains("--planet-size: min(82vh, 72vw)"));
+        assertTrue(css.contains("--planet-size: min(92vw, 68vh)"));
+        assertTrue(css.contains(".product-orbit__link"));
         assertTrue(css.contains("min-height: 44px"));
         assertTrue(css.contains(":focus-visible"));
-        assertTrue(css.contains("overflow-x: clip"));
+        assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
     }
 
     @Test
@@ -123,17 +107,13 @@ class HomePageTemplateContractTest {
         String entry = resource("static/js/home-quant-planet.js");
 
         assertTrue(template.contains("/js/home-quant-planet.js"));
-        assertTrue(entry.contains("./home-quant-planet-scroll.js"));
         assertTrue(entry.contains("./home-quant-planet-motion.js"));
         assertTrue(entry.contains("./home-quant-planet-scene.js"));
         assertTrue(entry.contains("createPageLifecycle"));
-        assertTrue(entry.contains("IntersectionObserver"));
         assertTrue(entry.contains("visibilitychange"));
         assertTrue(entry.contains("pageshow"));
         assertTrue(entry.contains("prefers-reduced-motion: reduce"));
         assertTrue(entry.contains("\"[::1]\""));
-        assertFalse(entry.contains("if (!scene) {\n        return;\n    }"));
-        assertTrue(entry.contains("if (scene) {\n        scene.resize();\n        lifecycle.start();\n    }"));
         assertFalse(entry.contains("setInterval"));
         assertFalse(entry.contains("fetch("));
         assertFalse(new ClassPathResource("static/css/home-observatory.css").exists());
@@ -184,73 +164,12 @@ class HomePageTemplateContractTest {
     void homepageCoordinatesProgressiveEnhancementAndRetiresBrikRuntime() throws IOException {
         String template = resource("templates/index.html");
 
-        assertTrue(template.contains("/vendor/lenis/lenis.css"));
-        assertTrue(template.contains("/vendor/lenis/lenis.min.js"));
         assertTrue(template.contains("/vendor/motion/motion.js"));
         assertTrue(template.contains("/js/home-quant-planet.js"));
         assertFalse(template.contains("home-brik"));
         assertFalse(new ClassPathResource("static/css/home-brik.css").exists());
         assertFalse(new ClassPathResource("static/js/home-brik.js").exists());
         assertFalse(new ClassPathResource("static/js/home-brik-motion.js").exists());
-    }
-
-    @Test
-    void homepageKeepsLenisFromCapturingHorizontalNavigation() throws IOException {
-        String template = resource("templates/index.html");
-
-        assertTrue(template.contains(
-                "<nav aria-label=\"Primary navigation\" data-lenis-prevent-horizontal>"));
-    }
-
-    @Test
-    void homepageSkipAndFooterLinksHaveFortyFourPixelClickTargets() throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".home-skip, .home-footer a { display: inline-flex; align-items: center; }"));
-        assertTrue(css.contains(
-                ".home-skip, .home-brand, .home-nav > .planet-primary-action, "
-                        + ".home-nav nav a, .planet-primary-action, .planet-story-link, "
-                        + ".home-product-list > a, .home-footer a "
-                        + "{ min-height: 44px; }"));
-    }
-
-    @Test
-    void homepageKeepsTheMobilePlanetBelowTheHeroActionsAndMetricsBelowTheWorld()
-            throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                "@media (max-width: 767px) {"));
-        assertTrue(css.contains(
-                ".planet-chapter--observe { top: 9rem; }"));
-        assertTrue(css.contains(
-                ".planet-fallback { top: 55svh; right: auto; left: 50%; "
-                        + "width: min(82vw, 19rem); transform: translateX(-50%); }"));
-        assertTrue(css.contains(
-                ".planet-metrics { grid-template-columns: 1fr; }"));
-    }
-
-    @Test
-    void homepageKeepsTabletNavigationProductsAndPlanetWithinTheViewport() throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                "justify-content: flex-start; overflow-x: auto; scrollbar-width: none;"));
-        assertTrue(css.contains(
-                ".home-nav nav::-webkit-scrollbar { display: none; }"));
-        assertTrue(css.contains(
-                ".home-product-list { min-width: 0;"));
-        assertTrue(css.contains(
-                "grid-template-columns: "
-                        + "3rem minmax(0, .8fr) minmax(0, 1fr) auto; gap: 1rem;"));
-        assertTrue(css.contains(
-                "@media (min-width: 1024px) {"));
-        assertTrue(css.contains(
-                ".home-products { grid-template-columns: "
-                        + "minmax(13rem, .65fr) minmax(0, 1.35fr); }"));
-        assertTrue(css.contains(
-                "@media (min-width: 1440px) {"));
     }
 
     @Test
@@ -270,87 +189,6 @@ class HomePageTemplateContractTest {
                 ".planet-webgl-ready .planet-fallback { opacity: 0; }"));
         assertTrue(css.contains(
                 ".planet-webgl-failed .planet-fallback { opacity: 1; }"));
-    }
-
-    @Test
-    void homepageUsesRestrainedChapterIndicesAndNavigationOpacity() throws IOException {
-        String template = resource("templates/index.html");
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(template.contains(
-                "<p class=\"planet-chapter__index\">01 / OBSERVE</p>"));
-        assertTrue(template.contains(
-                "<p class=\"planet-chapter__index\">02 / RESOLVE</p>"));
-        assertTrue(template.contains(
-                "<p class=\"planet-chapter__index\">03 / ACT</p>"));
-        assertEquals(3, occurrences(template, "class=\"planet-chapter__index\""));
-        assertTrue(css.contains(
-                "[data-planet-chapter=\"observe\"] .home-nav nav { opacity: .78; }"));
-        assertTrue(css.contains(
-                "[data-planet-chapter=\"resolve\"] .home-nav nav { opacity: .68; }"));
-        assertTrue(css.contains(
-                "[data-planet-chapter=\"act\"] .home-nav nav { opacity: .82; }"));
-        assertTrue(css.contains(
-                ".home-nav nav:hover, .home-nav nav:focus-within { opacity: 1; }"));
-    }
-
-    @Test
-    void homepageLimitsHeroSubtitleMeasureBeforeThePlanet() throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".planet-chapter > p:not(.planet-eyebrow):not(.planet-chapter__index) "
-                        + "{ max-width: 28ch;"));
-    }
-
-    @Test
-    void homepageOnlyHidesRevealContentAfterMotionStartsAndRetainsShortLandscapeCta()
-            throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".planet-motion-enabled [data-home-reveal] { opacity: 0;"));
-        assertTrue(css.contains(
-                "@media (max-height: 540px) and (orientation: landscape) {"));
-        assertTrue(css.contains(
-                ".planet-chapter--observe .planet-primary-action { display: inline-flex; }"));
-        assertTrue(css.contains(
-                "@media (prefers-reduced-motion: reduce)"));
-        assertTrue(css.contains(
-                ".planet-motion-enabled [data-home-reveal] { opacity: 1; transform: none; }"));
-    }
-
-    @Test
-    void homepageKeepsMobileNavigationBrandAndProductDescriptionsVisible()
-            throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".home-nav nav { grid-column: 1 / -1; display: flex;"));
-        assertTrue(css.contains(
-                "overflow-x: auto; scrollbar-width: none;"));
-        assertTrue(css.contains(
-                ".home-product-list p { display: block;"));
-        assertFalse(css.contains(
-                ".home-brand span { display: none; }"));
-        assertFalse(css.contains(
-                ".home-product-list p { display: none;"));
-    }
-
-    @Test
-    void homepageUsesHighContrastFooterFocus() throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".home-footer :focus-visible { outline-color: var(--planet-paper); }"));
-    }
-
-    @Test
-    void homepageUsesHighContrastEyebrowText() throws IOException {
-        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
-
-        assertTrue(css.contains(
-                ".planet-eyebrow { color: var(--planet-ink); }"));
     }
 
     @Test
