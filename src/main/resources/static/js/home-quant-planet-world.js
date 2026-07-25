@@ -466,18 +466,18 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     const headingRotation = new THREE.Quaternion();
     const worldUp = new THREE.Vector3(0, 1, 0);
     const fullMotion = profile.name === "high";
-    function update({ planetPose, courierPose, time = 0 }) {
-        if (disposed || !planetPose || !courierPose) {
+    function update({ orbitPose, courierPose, time = 0 }) {
+        if (disposed || !orbitPose || !courierPose) {
             return;
         }
         const elapsed = Number.isFinite(time) ? time : 0;
         planet.rotation.set(
-            planetPose.planetPitch,
-            planetPose.planetYaw,
-            planetPose.planetRoll
+            orbitPose.planetPitch,
+            orbitPose.planetYaw,
+            orbitPose.planetRoll
         );
         const routeProgress = Math.min(Math.max(
-            (courierPose.routeAngle + .9) / 2.18, 0
+            Number(courierPose.routeProgress) || 0, 0
         ), 1);
         routeCurve.getPointAt(routeProgress, routePoint);
         normal.copy(routePoint).normalize();
@@ -498,15 +498,12 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         antenna.rotation.z = Math.sin(elapsed * .004) * .045
             * (1 - courierPose.idleBlend * .4);
 
-        const observeActivity = Math.min(Math.max(
-            Number(planetPose.landmarkActivity.observe) || 0, 0
-        ), 1);
-        const resolveActivity = Math.min(Math.max(
-            Number(planetPose.landmarkActivity.resolve) || 0, 0
-        ), 1);
-        const actActivity = Math.min(Math.max(
-            Number(planetPose.landmarkActivity.act) || 0, 0
-        ), 1);
+        const activity = courierPose.landmarkActivity;
+        const boundedActivity = (value) =>
+            Math.min(Math.max(Number(value) || 0, 0), 1);
+        const observeActivity = boundedActivity(activity.observe);
+        const resolveActivity = boundedActivity(activity.resolve);
+        const actActivity = boundedActivity(activity.act);
         observeDish.rotation.y = elapsed * .00018 * observeActivity;
         resolveSorter.position.y = resolveSorterBaseY
             + resolveActivity * Math.sin(elapsed * .003) * .08;

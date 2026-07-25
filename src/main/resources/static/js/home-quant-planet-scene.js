@@ -1,7 +1,6 @@
 import {
-    clampUnit,
-    createCourierPose,
-    createPlanetPose
+    createCourierLoopPose,
+    createOrbitPose
 } from "./home-quant-planet-motion.js";
 import { createQuantPlanetWorld } from "./home-quant-planet-world.js";
 
@@ -11,8 +10,8 @@ const BALANCED_LIMITS = Object.freeze({ drawCalls: 65, triangles: 90000 });
 function createStaticSceneController() {
     return {
         resize() {},
-        setProgress() {},
         setPointer() {},
+        setDragAngle() {},
         setVisible() {},
         render() { return false; },
         getDiagnostics() {
@@ -91,8 +90,8 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
         rim.position.set(5, 2, -6);
         scene.add(hemisphere, key, rim);
 
-        let progress = 0;
         let pointer = { x: 0, y: 0 };
+        let dragAngle = 0;
         let visible = true;
         let dirty = true;
         let disposed = false;
@@ -119,10 +118,12 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
 
         return {
             resize,
-            setProgress(value) {
-                const next = clampUnit(value);
-                if (next !== progress) {
-                    progress = next;
+            setDragAngle(value) {
+                const next = Math.max(-Math.PI * 4, Math.min(
+                    Math.PI * 4, Number(value) || 0
+                ));
+                if (next !== dragAngle) {
+                    dragAngle = next;
                     markDirty();
                 }
             },
@@ -144,18 +145,21 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
                 if (!visible || disposed || (!dirty && !ambientEnabled)) {
                     return false;
                 }
-                const planetPose = createPlanetPose(progress, pointer);
-                const courierPose = createCourierPose(progress, time);
-                world.update({ planetPose, courierPose, time });
+                const orbitPose = createOrbitPose({
+                    time, dragAngle, pointer,
+                    reduceMotion: profile.name === "static"
+                });
+                const courierPose = createCourierLoopPose(time, false);
+                world.update({ orbitPose, courierPose, time });
 
-                const distance = planetPose.cameraDistance;
-                const cosPitch = Math.cos(planetPose.cameraPitch);
+                const distance = orbitPose.cameraDistance;
+                const cosPitch = Math.cos(orbitPose.cameraPitch);
                 camera.position.set(
-                    Math.sin(planetPose.cameraYaw) * cosPitch * distance,
-                    Math.sin(planetPose.cameraPitch) * distance + .8,
-                    Math.cos(planetPose.cameraYaw) * cosPitch * distance
+                    Math.sin(orbitPose.cameraYaw) * cosPitch * distance,
+                    Math.sin(orbitPose.cameraPitch) * distance + .35,
+                    Math.cos(orbitPose.cameraYaw) * cosPitch * distance
                 );
-                camera.lookAt(0, .45, 0);
+                camera.lookAt(0, .35, 0);
                 renderer.render(scene, camera);
                 dirty = false;
                 return true;

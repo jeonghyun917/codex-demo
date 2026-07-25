@@ -4,6 +4,9 @@ import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     createQuantPlanetWorld
 } from "../../main/resources/static/js/home-quant-planet-world.js";
+import {
+    createCourierLoopPose
+} from "../../main/resources/static/js/home-quant-planet-motion.js";
 
 const profile = {
     name: "high",
@@ -19,34 +22,33 @@ function createWorld(t) {
     return world;
 }
 
-function update(world, landmarkActivity, time = 1000) {
+function update(world, courierPose, time = 1000) {
     world.update({
-        planetPose: {
-            planetPitch: 0,
-            planetYaw: 0,
-            planetRoll: 0,
-            routeActivity: 1,
-            landmarkActivity
+        orbitPose: {
+            planetPitch: -.08,
+            planetYaw: .42,
+            planetRoll: .02
         },
-        courierPose: {
-            routeAngle: 0,
-            elevation: .18,
-            heading: 0,
-            walkPhase: 0,
-            idleBlend: 0
-        },
+        courierPose,
         time
     });
+}
+
+function withLandmarkActivity(landmarkActivity) {
+    return {
+        ...createCourierLoopPose(0, false),
+        landmarkActivity
+    };
 }
 
 test("pauses Observe calibration outside the Observe chapter", (t) => {
     const world = createWorld(t);
     const dish = world.group.getObjectByName("ObserveDirectionalDish");
 
-    update(world, { observe: 0, resolve: 1, act: 0 });
+    update(world, withLandmarkActivity({ observe: 0, resolve: 1, act: 0 }));
     assert.equal(dish.rotation.y, 0);
 
-    update(world, { observe: 1, resolve: 0, act: 0 });
+    update(world, withLandmarkActivity({ observe: 1, resolve: 0, act: 0 }));
     assert.ok(dish.rotation.y > 0);
 });
 
@@ -54,9 +56,9 @@ test("gives Decision Gate an Act-linked portal response", (t) => {
     const world = createWorld(t);
     const portal = world.group.getObjectByName("QuantProductPortal");
 
-    update(world, { observe: 0, resolve: 1, act: 0 });
+    update(world, withLandmarkActivity({ observe: 0, resolve: 1, act: 0 }));
     const inactiveScale = portal.scale.x;
-    update(world, { observe: 0, resolve: 0, act: 1 });
+    update(world, withLandmarkActivity({ observe: 0, resolve: 0, act: 1 }));
 
     assert.ok(portal.scale.x > inactiveScale);
 });
@@ -65,7 +67,7 @@ test("illuminates only the route segment near the active chapter", (t) => {
     const world = createWorld(t);
     const routeLights = world.group.getObjectByName("InstancedRouteLamps");
 
-    update(world, { observe: 1, resolve: 0, act: 0 });
+    update(world, withLandmarkActivity({ observe: 1, resolve: 0, act: 0 }));
     assert.ok(routeLights.instanceColor, "route lights require per-instance color");
 
     const observeColor = new THREE.Color();
@@ -74,13 +76,25 @@ test("illuminates only the route segment near the active chapter", (t) => {
     routeLights.getColorAt(5, resolveColor);
     assert.ok(observeColor.r > resolveColor.r);
 
-    update(world, { observe: 0, resolve: 0, act: 1 });
+    update(world, withLandmarkActivity({ observe: 0, resolve: 0, act: 1 }));
     const previousObserveRed = observeColor.r;
     const actColor = new THREE.Color();
     routeLights.getColorAt(0, observeColor);
     routeLights.getColorAt(9, actColor);
     assert.ok(observeColor.r < previousObserveRed);
     assert.ok(actColor.r > observeColor.r);
+});
+
+test("moves the courier continuously and lights its nearest landmark", (t) => {
+    const world = createWorld(t);
+    const courier = world.group.getObjectByName("QuantCourier");
+    update(world, createCourierLoopPose(7000, false), 7000);
+    const resolvePosition = courier.position.clone();
+    const portal = world.group.getObjectByName("QuantProductPortal");
+    const inactivePortalScale = portal.scale.x;
+    update(world, createCourierLoopPose(15000, false), 15000);
+    assert.ok(courier.position.distanceTo(resolvePosition) > 1);
+    assert.ok(portal.scale.x > inactivePortalScale);
 });
 
 test("stays within the high-profile world render budget", (t) => {

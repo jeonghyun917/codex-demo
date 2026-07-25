@@ -168,6 +168,11 @@ class HomePageTemplateContractTest {
         assertTrue(scene.contains("renderer?.dispose();"));
         assertTrue(scene.contains("throw error"));
         assertTrue(scene.contains("disposeInitializationResources"));
+        assertTrue(scene.contains("setDragAngle(value)"));
+        assertTrue(scene.contains("createOrbitPose"));
+        assertTrue(scene.contains("createCourierLoopPose"));
+        assertFalse(scene.contains("setProgress(value)"));
+        assertFalse(scene.contains("createPlanetPose"));
         assertTrue(world.contains("disposeTrackedResources"));
         assertFalse(world.contains("fetch("));
         assertFalse(scene.contains("fetch("));
