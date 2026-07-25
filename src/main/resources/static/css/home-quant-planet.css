@@ -866,12 +866,15 @@ a {
     }
 
     .product-orbit {
+        position: absolute;
+        z-index: calc(var(--layer-content) + 1);
+        inset: 5rem 0 auto;
         display: grid;
         grid-template-columns: repeat(3, minmax(5rem, 7rem));
-        align-content: end;
+        align-content: start;
         justify-content: space-between;
         gap: .5rem;
-        padding: 1rem;
+        padding: .5rem 1rem;
         perspective: none;
     }
 

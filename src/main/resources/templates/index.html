@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#9ed9d5">
     <title>King Yurina | Quant Intelligence</title>
     <link rel="stylesheet"
-          th:href="@{/css/home-quant-planet.css(v='2026072605')}"
-          href="../static/css/home-quant-planet.css?v=2026072605">
+          th:href="@{/css/home-quant-planet.css(v='2026072606')}"
+          href="../static/css/home-quant-planet.css?v=2026072606">
 </head>
 <body class="home-page home-quant-planet home-quant-fullscreen">
 <a class="home-skip" href="#product-orbit">Skip to product navigation</a>
@@ -76,11 +76,15 @@
         .planet-intro-loader { display: none !important; }
         .home-semantic-summary { visibility: visible !important; }
         .product-orbit {
+            position: absolute !important;
+            z-index: calc(var(--layer-content) + 1) !important;
+            inset: 5rem 0 auto !important;
             display: grid !important;
             grid-template-columns: repeat(3, minmax(5rem, 1fr));
-            align-content: end;
+            align-content: start;
+            justify-content: space-between;
             gap: .5rem;
-            padding: 1rem;
+            padding: .5rem 1rem;
         }
         .product-orbit__link {
             position: relative !important;

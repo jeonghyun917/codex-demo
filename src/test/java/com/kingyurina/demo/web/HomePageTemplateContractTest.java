@@ -101,6 +101,44 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageFallbackNavigationOwnsAnUnobstructedTopBand() throws IOException {
+        String template = resource("templates/index.html")
+                .replaceAll("\\s+", " ");
+        String css = resource("static/css/home-quant-planet.css")
+                .replaceAll("\\s+", " ");
+
+        assertTrue(template.contains(
+                ".product-orbit { position: absolute !important; "
+                        + "z-index: calc(var(--layer-content) + 1) !important; "
+                        + "inset: 5rem 0 auto !important; display: grid !important; "
+                        + "grid-template-columns: repeat(3, minmax(5rem, 1fr)); "
+                        + "align-content: start;"));
+        assertTrue(template.contains(
+                ".product-orbit__link { position: relative !important; "
+                        + "inset: auto !important; transform: none !important; "
+                        + "opacity: 1 !important; }"));
+
+        assertTrue(css.contains(
+                "html, body { width: 100%; height: 100%; height: 100dvh; "
+                        + "margin: 0; overflow: hidden; overscroll-behavior: none; }"));
+        assertTrue(css.contains(
+                ".planet-experience { --planet-size: min(82vh, 72vw); "
+                        + "position: fixed; inset: 0; min-height: 100dvh; "
+                        + "overflow: hidden; isolation: isolate;"));
+        assertTrue(css.contains(
+                "@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.contains(
+                ".product-orbit { position: absolute; "
+                        + "z-index: calc(var(--layer-content) + 1); "
+                        + "inset: 5rem 0 auto; display: grid; "
+                        + "grid-template-columns: repeat(3, minmax(5rem, 7rem)); "
+                        + "align-content: start;"));
+        assertTrue(css.contains(
+                ".product-orbit__link { position: relative; inset: auto; "
+                        + "transform: none; opacity: 1; z-index: auto;"));
+    }
+
+    @Test
     void homepageCoordinatesProgressiveEnhancementAndRetiresObservatoryRuntime()
             throws IOException {
         String template = resource("templates/index.html");
