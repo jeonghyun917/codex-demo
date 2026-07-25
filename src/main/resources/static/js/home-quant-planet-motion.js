@@ -2,6 +2,11 @@ export function clampUnit(value) {
     return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
 }
 
+const TAU = Math.PI * 2;
+const RING_DURATION = 28000;
+const clamp = (value, min, max) =>
+    Math.min(Math.max(Number(value) || 0, min), max);
+
 export function normalizePointer(clientX, clientY, rect) {
     const width = Number.isFinite(rect?.width) && rect.width > 0 ? rect.width : 0;
     const height = Number.isFinite(rect?.height) && rect.height > 0 ? rect.height : 0;
@@ -12,14 +17,6 @@ export function normalizePointer(clientX, clientY, rect) {
         x: width ? clampUnit((clientX - left) / width) * 2 - 1 : 0,
         y: height ? clampUnit((clientY - top) / height) * 2 - 1 : 0
     };
-}
-
-export function normalizeScrollProgress(top, height, viewportHeight) {
-    const safeTop = Number.isFinite(top) ? top : 0;
-    const safeHeight = Number.isFinite(height) ? height : 0;
-    const safeViewport = Number.isFinite(viewportHeight) ? viewportHeight : 0;
-    const range = Math.max(safeHeight - safeViewport, Number.EPSILON);
-    return clampUnit(-safeTop / range);
 }
 
 export function resolveLocalTestOverrides({ hostname, search } = {}) {
@@ -42,11 +39,6 @@ const smoothStep = (value) => {
     const t = clampUnit(value);
     return t * t * (3 - 2 * t);
 };
-
-export function resolvePlanetChapter(progress) {
-    const p = clampUnit(progress);
-    return p < .30 ? "observe" : p < .66 ? "resolve" : "act";
-}
 
 export function selectPlanetQualityProfile(environment = {}) {
     if (environment.reduceMotion || !environment.webgl) {
@@ -71,45 +63,161 @@ export function selectPlanetQualityProfile(environment = {}) {
     };
 }
 
-export function createCourierPose(progress, time = 0) {
-    const p = clampUnit(progress);
-    const routeAngle = -.9 + p * 2.18;
-    const elapsed = Number.isFinite(time) ? time : 0;
-    const walkPhase = ((p * 20) + elapsed / 330) % (Math.PI * 2);
+export function wrapIndex(index, count = 6) {
+    const length = Math.max(1, Math.trunc(Number(count)) || 1);
+    return ((Math.trunc(Number(index)) || 0) % length + length) % length;
+}
+
+export function advanceRingAngle(
+    angle = 0, deltaMs = 0, paused = false, reduceMotion = false
+) {
+    const current = Number.isFinite(angle) ? angle : 0;
+    if (paused || reduceMotion) return current;
+    const delta = clamp(deltaMs, 0, 100);
+    return current + delta / RING_DURATION * TAU;
+}
+
+export function createNavigationRingState({
+    rotationAngle = 0, dragAngle = 0, selectedIndex = 0,
+    snapToSelected = false, itemCount = 6
+} = {}) {
+    const count = Math.max(1, Math.trunc(Number(itemCount)) || 1);
+    const selected = wrapIndex(selectedIndex, count);
+    const step = TAU / count;
+    const automatic = snapToSelected
+        ? -selected * step : Number(rotationAngle) || 0;
+    const baseAngle = automatic
+        + (snapToSelected ? 0 : clamp(dragAngle, -TAU * 2, TAU * 2));
+    const items = Array.from({ length: count }, (_, index) => {
+        const angle = baseAngle + index * step;
+        const depth = (Math.cos(angle) + 1) / 2;
+        return {
+            index, angle, depth,
+            opacity: .35 + depth * .65,
+            scale: .72 + depth * .40,
+            zIndex: Math.round(depth * 100)
+        };
+    });
+    const frontIndex = items.reduce((front, item) =>
+        item.depth > items[front].depth ? item.index : front, 0);
+    return { baseAngle, frontIndex, items };
+}
+
+export function createIntroState({
+    elapsed = 0, ready = false, readyElapsed = 0,
+    timedOut = false, reduceMotion = false
+} = {}) {
+    const total = Math.max(0, Number(elapsed) || 0);
+    const sinceReady = Math.max(0, Number(readyElapsed) || 0);
+    if (timedOut || (reduceMotion && ready)) {
+        return {
+            phase: "ready", loaderOpacity: 0, markProgress: 1,
+            splitProgress: 0, revealProgress: 1, worldScale: 1,
+            interactionReady: true
+        };
+    }
+    if (reduceMotion) {
+        return {
+            phase: "boot", loaderOpacity: 1, markProgress: 1,
+            splitProgress: 0, revealProgress: 0, worldScale: 1,
+            interactionReady: false
+        };
+    }
+    const markProgress = clamp((total - 250) / 625, 0, 1);
+    const splitProgress = ready ? smoothStep(sinceReady / 400) : 0;
+    const revealProgress = ready
+        ? smoothStep((sinceReady - 250) / 600) : 0;
+    const interactionReady = ready && revealProgress >= 1;
+    const phase = interactionReady ? "ready"
+        : ready ? (sinceReady < 250 ? "split" : "reveal")
+            : total < 250 ? "boot" : "mark";
     return {
-        routeAngle,
-        elevation: .17 + Math.sin(p * Math.PI) * .025,
-        heading: routeAngle + Math.PI / 2,
-        walkPhase: walkPhase < 0 ? walkPhase + Math.PI * 2 : walkPhase,
-        idleBlend: smoothStep(resolveRange(p, .9, 1))
+        phase,
+        loaderOpacity: 1 - revealProgress,
+        markProgress,
+        splitProgress,
+        revealProgress,
+        worldScale: .88 + revealProgress * .12,
+        interactionReady
     };
 }
 
-export function createPlanetPose(progress, pointer = { x: 0, y: 0 }) {
-    const p = clampUnit(progress);
-    const resolve = smoothStep(resolveRange(p, .24, .70));
-    const act = smoothStep(resolveRange(p, .62, 1));
-    const pointerX = Math.max(-1, Math.min(1, Number(pointer?.x) || 0));
-    const pointerY = Math.max(-1, Math.min(1, Number(pointer?.y) || 0));
+export function createOrbitPose({
+    time = 0, dragAngle = 0, pointer = { x: 0, y: 0 },
+    reduceMotion = false
+} = {}) {
+    const pointerX = clamp(pointer?.x, -1, 1);
+    const pointerY = clamp(pointer?.y, -1, 1);
+    const drag = clamp(dragAngle, -TAU * 2, TAU * 2);
+    const ambient = reduceMotion ? 0
+        : (Math.max(0, Number(time) || 0) % RING_DURATION)
+            / RING_DURATION * TAU;
     return {
-        cameraDistance: 10.8 - smoothStep(p) * 3.2,
-        cameraYaw: -.95 + p * 1.9 + pointerX * .0698,
-        cameraPitch: .32 - resolve * .18 + pointerY * .052,
-        planetYaw: -.48 + p * 1.35,
-        planetPitch: -.1 + resolve * .08,
-        planetRoll: -.04 + act * .07,
-        routeActivity: .28 + Math.sin(p * Math.PI) * .72,
-        landmarkActivity: {
-            observe: 1 - resolve,
-            resolve: resolve * (1 - act),
-            act
-        },
-        metricOpacity: clampUnit(resolve * (1 - act * .72))
+        cameraDistance: 8.9,
+        cameraYaw: clamp(drag * .18 + pointerX * .0698, -TAU, TAU),
+        cameraPitch: clamp(.12 + pointerY * .052, -.34, .34),
+        planetYaw: drag + ambient * .08,
+        planetPitch: clamp(-.08 + pointerY * .02, -.18, .18),
+        planetRoll: pointerX * .018
+    };
+}
+
+export function createCourierLoopPose(time = 0, reduceMotion = false) {
+    if (reduceMotion) {
+        return {
+            routeProgress: .5, routeAngle: .19, elevation: .195,
+            heading: .19 + Math.PI / 2, walkPhase: 0, idleBlend: 1,
+            routeActivity: .45,
+            landmarkActivity: { observe: 0, resolve: 1, act: 0 }
+        };
+    }
+    const elapsed = Math.max(0, Number(time) || 0);
+    const cycle = elapsed % 24000;
+    let routeProgress;
+    let direction = 1;
+    let idleBlend = 0;
+    if (cycle < 6000) {
+        routeProgress = .5 * smoothStep(cycle / 6000);
+    } else if (cycle < 8000) {
+        routeProgress = .5;
+        idleBlend = 1;
+    } else if (cycle < 14000) {
+        routeProgress = .5 + .5 * smoothStep((cycle - 8000) / 6000);
+    } else if (cycle < 16000) {
+        routeProgress = 1;
+        idleBlend = 1;
+    } else if (cycle < 22000) {
+        direction = -1;
+        routeProgress = 1 - smoothStep((cycle - 16000) / 6000);
+    } else {
+        direction = -1;
+        routeProgress = 0;
+        idleBlend = 1;
+    }
+    const routeAngle = -.9 + routeProgress * 2.18;
+    const observe = 1 - smoothStep(resolveRange(routeProgress, 0, .25));
+    const resolve = 1 - smoothStep(
+        clamp(Math.abs(routeProgress - .5) / .25, 0, 1)
+    );
+    const act = smoothStep(resolveRange(routeProgress, .75, 1));
+    const phase = (elapsed / 260) % TAU;
+    return {
+        routeProgress,
+        routeAngle,
+        elevation: .17 + Math.sin(routeProgress * Math.PI) * .025,
+        heading: routeAngle + (direction > 0 ? Math.PI / 2 : -Math.PI / 2),
+        walkPhase: phase < 0 ? phase + TAU : phase,
+        idleBlend,
+        routeActivity: 1 - idleBlend * .55,
+        landmarkActivity: { observe, resolve, act }
     };
 }
 
 export function shouldRenderFrame(state) {
-    return Boolean(state?.visible && !state.hidden && state.webgl && state.dirty);
+    return Boolean(
+        state?.visible && !state.hidden && state.webgl
+        && (state.dirty || state.ambient)
+    );
 }
 
 export function createPageLifecycle({
