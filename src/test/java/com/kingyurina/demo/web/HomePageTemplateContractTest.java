@@ -122,6 +122,31 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageBuildsAnOriginalLocalQuantPlanetWorld() throws IOException {
+        String world = resource("static/js/home-quant-planet-world.js");
+        String scene = resource("static/js/home-quant-planet-scene.js");
+
+        assertTrue(world.contains("createQuantPlanetWorld"));
+        assertTrue(world.contains("ObserveStation"));
+        assertTrue(world.contains("ResolveWorks"));
+        assertTrue(world.contains("DecisionGate"));
+        assertTrue(world.contains("QuantCourier"));
+        assertTrue(world.contains("MeshToonMaterial"));
+        assertTrue(world.contains("CatmullRomCurve3"));
+        assertTrue(world.contains("InstancedMesh"));
+        assertTrue(world.contains("BackSide"));
+        assertTrue(scene.contains("/js/vendor/three.module.js"));
+        assertTrue(scene.contains("createQuantPlanetScene"));
+        assertTrue(scene.contains("setPixelRatio(profile.pixelRatio)"));
+        assertTrue(scene.contains("getDiagnostics"));
+        assertTrue(scene.contains("dispose()"));
+        assertFalse(world.contains("fetch("));
+        assertFalse(scene.contains("fetch("));
+        assertFalse(world.contains("http://"));
+        assertFalse(scene.contains("https://"));
+    }
+
+    @Test
     void homepageCoordinatesProgressiveEnhancementAndRetiresBrikRuntime() throws IOException {
         String template = resource("templates/index.html");
         String entry = resource("static/js/home-observatory.js");
