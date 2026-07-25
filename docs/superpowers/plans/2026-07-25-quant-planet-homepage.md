@@ -558,9 +558,9 @@
   assertEquals(1, occurrences(template, "<h1"));
   assertTrue(template.contains("Market intelligence, in motion."));
   assertTrue(template.contains("Observe the market. Resolve the signal. Act with context."));
-  assertTrue(template.contains("Signal 79 <small>/ 100</small>"));
-  assertTrue(template.contains("20D Alpha +2.4%"));
-  assertTrue(template.contains("Risk Medium"));
+  assertTrue(template.contains("<dt>Signal</dt><dd>79 <small>/ 100</small></dd>"));
+  assertTrue(template.contains("<dt>20D Alpha</dt><dd>+2.4%</dd>"));
+  assertTrue(template.contains("<dt>Risk</dt><dd>Medium</dd>"));
   assertTrue(template.contains("Illustrative model view"));
   assertFalse(template.contains("home-observatory"));
   assertFalse(template.contains("http://"));
