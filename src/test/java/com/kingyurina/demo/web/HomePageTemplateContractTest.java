@@ -54,33 +54,33 @@ class HomePageTemplateContractTest {
     }
 
     @Test
-    void homepageDeclaresSemanticObservatorySurfaceAndResponsiveContracts() throws IOException {
+    void homepageDeclaresSemanticQuantPlanetSurfaceAndResponsiveContracts() throws IOException {
         String template = resource("templates/index.html");
-        String css = resource("static/css/home-observatory.css");
+        String css = resource("static/css/home-quant-planet.css");
 
-        assertTrue(template.contains("home-observatory.css"));
-        assertTrue(template.contains("class=\"home-page home-observatory\""));
+        assertTrue(template.contains("home-quant-planet.css"));
+        assertTrue(template.contains("/js/home-quant-planet.js"));
+        assertTrue(template.contains("class=\"home-page home-quant-planet\""));
         assertTrue(template.contains("th:each=\"menu : ${mainMenus}\""));
         assertTrue(template.contains("id=\"main-content\""));
         assertTrue(template.contains("data-home-nav"));
         assertTrue(template.contains("data-home-story"));
         assertTrue(template.contains("data-home-scene"));
         assertTrue(template.contains("data-home-canvas"));
-        assertTrue(template.contains("data-home-core-fallback"));
+        assertTrue(template.contains("data-planet-fallback"));
+        assertTrue(template.contains("aria-hidden=\"true\""));
         assertTrue(template.contains("data-home-reveal"));
         assertEquals(3, occurrences(template, "data-home-chapter"));
         assertEquals(3, occurrences(template, "data-home-metric"));
         assertEquals(6, occurrences(template, "data-home-product-link"));
         assertEquals(1, occurrences(template, "<h1"));
-        assertTrue(template.contains("Market intelligence, resolved."));
+        assertTrue(template.contains("Market intelligence,<br>in motion."));
         assertTrue(template.contains("Observe the market. Resolve the signal. Act with context."));
-        assertTrue(template.contains("Signal"));
-        assertTrue(template.contains("79 <small>/ 100</small>"));
-        assertTrue(template.contains("20D Alpha"));
-        assertTrue(template.contains("+2.4%"));
-        assertTrue(template.contains("Risk"));
-        assertTrue(template.contains("Medium"));
+        assertTrue(template.contains("<dt>Signal</dt><dd>79 <small>/ 100</small></dd>"));
+        assertTrue(template.contains("<dt>20D Alpha</dt><dd>+2.4%</dd>"));
+        assertTrue(template.contains("<dt>Risk</dt><dd>Medium</dd>"));
         assertTrue(template.contains("Illustrative model view"));
+        assertTrue(template.contains("Arrive at a decision."));
         assertTrue(template.contains("href=\"/quant\""));
         assertTrue(template.contains("href=\"/stocks\""));
         assertTrue(template.contains("href=\"/stocks/heatmap?index=SP500\""));
@@ -88,12 +88,24 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("href=\"/atelier\""));
         assertTrue(template.contains("href=\"/signals/backtest\""));
         assertTrue(template.contains("id=\"systems\""));
+        assertFalse(template.contains("home-observatory"));
         assertFalse(template.contains("http://"));
         assertFalse(template.contains("https://"));
 
-        assertTrue(css.contains("--home-bg-deep: #030405"));
-        assertTrue(css.contains("--home-fg-primary: #f5f7fa"));
-        assertTrue(css.contains("--home-signal: #6ea8ff"));
+        assertTrue(css.contains("--planet-sky: #9ed9d5"));
+        assertTrue(css.contains("--planet-haze: #d9efe8"));
+        assertTrue(css.contains("--planet-ground: #b8c989"));
+        assertTrue(css.contains("--planet-warm: #f1d7a4"));
+        assertTrue(css.contains("--planet-coral: #e8755d"));
+        assertTrue(css.contains("--planet-blue: #2357a5"));
+        assertTrue(css.contains("--planet-ink: #173149"));
+        assertTrue(css.contains("--planet-paper: #fff9ea"));
+        assertTrue(css.contains("--planet-positive: #2f8c73"));
+        assertTrue(css.contains("--planet-risk: #c85a5a"));
+        assertTrue(css.contains("--layer-world: 0"));
+        assertTrue(css.contains("--layer-content: 10"));
+        assertTrue(css.contains("--layer-nav: 30"));
+        assertTrue(css.contains("--layer-skip: 50"));
         assertTrue(css.contains("@media (max-width: 767px)"));
         assertTrue(css.contains("@media (min-width: 768px)"));
         assertTrue(css.contains("@media (min-width: 1024px)"));
@@ -149,23 +161,11 @@ class HomePageTemplateContractTest {
     @Test
     void homepageCoordinatesProgressiveEnhancementAndRetiresBrikRuntime() throws IOException {
         String template = resource("templates/index.html");
-        String entry = resource("static/js/home-observatory.js");
 
         assertTrue(template.contains("/vendor/lenis/lenis.css"));
         assertTrue(template.contains("/vendor/lenis/lenis.min.js"));
         assertTrue(template.contains("/vendor/motion/motion.js"));
-        assertTrue(template.contains("/js/home-observatory.js"));
-        assertTrue(entry.contains("./home-observatory-scroll.js"));
-        assertTrue(entry.contains("./home-observatory-motion.js"));
-        assertTrue(entry.contains("./home-observatory-scene.js"));
-        assertTrue(entry.contains("requestAnimationFrame"));
-        assertTrue(entry.contains("createPageLifecycle"));
-        assertTrue(entry.contains("IntersectionObserver"));
-        assertTrue(entry.contains("visibilitychange"));
-        assertTrue(entry.contains("pageshow"));
-        assertTrue(entry.contains("prefers-reduced-motion: reduce"));
-        assertFalse(entry.contains("setInterval"));
-        assertFalse(entry.contains("fetch("));
+        assertTrue(template.contains("/js/home-quant-planet.js"));
         assertFalse(template.contains("home-brik"));
         assertFalse(new ClassPathResource("static/css/home-brik.css").exists());
         assertFalse(new ClassPathResource("static/js/home-brik.js").exists());
@@ -182,46 +182,37 @@ class HomePageTemplateContractTest {
 
     @Test
     void homepageSkipAndFooterLinksHaveFortyFourPixelClickTargets() throws IOException {
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
         assertTrue(css.contains(
                 ".home-skip, .home-footer a { display: inline-flex; align-items: center; }"));
         assertTrue(css.contains(
-                ".home-skip, .home-brand, .home-primary-action, .home-nav nav a, "
-                        + ".home-story-link, .home-product-list > a, .home-footer a "
+                ".home-skip, .home-brand, .home-nav > .planet-primary-action, "
+                        + ".home-nav nav a, .planet-primary-action, .planet-story-link, "
+                        + ".home-product-list > a, .home-footer a "
                         + "{ min-height: 44px; }"));
     }
 
     @Test
-    void homepageKeepsTheMobileQuantCoreBelowTheHeroActions() throws IOException {
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+    void homepageKeepsTheMobilePlanetBelowTheHeroActionsAndMetricsBelowTheWorld()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
         assertTrue(css.contains(
                 "@media (max-width: 767px) {"));
         assertTrue(css.contains(
-                "[data-home-canvas] { top: 60svh; bottom: auto; height: 40svh; }"));
+                ".planet-chapter--observe { top: 7rem; }"));
         assertTrue(css.contains(
-                ".home-webgl-ready [data-home-canvas] { opacity: .72; }"));
+                ".planet-fallback { top: 55svh; right: auto; left: 50%; "
+                        + "width: min(82vw, 19rem); transform: translateX(-50%); }"));
         assertTrue(css.contains(
-                ".home-core-fallback { top: 60svh; right: auto; left: 50%; "
-                        + "width: min(62vw, 15rem); transform: translateX(-50%); }"));
-        assertTrue(css.contains(
-                ".home-webgl-failed .home-core-fallback { opacity: .72; }"));
+                ".planet-metrics { grid-template-columns: 1fr; }"));
     }
 
     @Test
-    void homepageKeepsTabletNavigationProductsAndCoreWithinTheViewport() throws IOException {
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+    void homepageKeepsTabletNavigationProductsAndPlanetWithinTheViewport() throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
-        assertTrue(css.contains(
-                "@media (min-width: 768px) and (max-width: 1024px) { "
-                        + "[data-home-canvas] { top: 20svh; right: auto; bottom: auto; "
-                        + "left: 38%; width: 62%; height: 80svh; }"));
-        assertTrue(css.contains(
-                "@media (min-width: 768px) and (max-width: 1024px) "
-                        + "and (orientation: portrait) { "
-                        + "[data-home-canvas] { top: 42svh; left: 30%; "
-                        + "width: 70%; height: 58svh; }"));
         assertTrue(css.contains(
                 "justify-content: flex-start; overflow-x: auto; scrollbar-width: none;"));
         assertTrue(css.contains(
@@ -236,55 +227,75 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(
                 ".home-products { grid-template-columns: "
                         + "minmax(13rem, .65fr) minmax(0, 1.35fr); }"));
+        assertTrue(css.contains(
+                "@media (min-width: 1440px) {"));
     }
 
     @Test
-    void homepageKeepsTheStaticQuantCoreClearOfHeaderAndHeroCopy() throws IOException {
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+    void homepageRendersTheStaticPlanetRouteStationAndCourierUntilWebglIsReady()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
         assertTrue(css.contains(
-                ".home-core-fallback { position: absolute; z-index: 0; top: 22svh; "
-                        + "right: 5vw; width: min(40vw, 32rem);"));
+                ".planet-fallback { position: absolute;"));
+        assertTrue(css.contains(".planet-fallback__world {"));
+        assertTrue(css.contains(".planet-fallback__route {"));
+        assertTrue(css.contains(".planet-fallback__station {"));
+        assertTrue(css.contains(".planet-fallback__courier {"));
         assertTrue(css.contains(
                 "pointer-events: none;"));
         assertTrue(css.contains(
-                ".home-core-fallback { position: absolute; top: 30svh; right: auto; "
-                        + "left: 69%; width: min(38vw, 24rem);"));
+                ".planet-webgl-ready .planet-fallback { opacity: 0; }"));
         assertTrue(css.contains(
-                "@media (min-width: 1440px) { "
-                        + ".home-core-fallback { width: min(36vw, 32rem); }"));
-        assertFalse(css.contains("rotateX("));
+                ".planet-webgl-failed .planet-fallback { opacity: 1; }"));
     }
 
     @Test
     void homepageUsesRestrainedChapterIndicesAndNavigationOpacity() throws IOException {
         String template = resource("templates/index.html");
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
         assertTrue(template.contains(
-                "<p class=\"home-chapter-index\">01 / OBSERVE</p>"));
+                "<p class=\"planet-chapter__index\">01 / OBSERVE</p>"));
         assertTrue(template.contains(
-                "<p class=\"home-chapter-index\">02 / RESOLVE</p>"));
+                "<p class=\"planet-chapter__index\">02 / RESOLVE</p>"));
         assertTrue(template.contains(
-                "<p class=\"home-chapter-index\">03 / ACT</p>"));
-        assertEquals(3, occurrences(template, "class=\"home-chapter-index\""));
+                "<p class=\"planet-chapter__index\">03 / ACT</p>"));
+        assertEquals(3, occurrences(template, "class=\"planet-chapter__index\""));
         assertTrue(css.contains(
-                "[data-observatory-chapter=\"observe\"] .home-nav nav { opacity: .78; }"));
+                "[data-planet-chapter=\"observe\"] .home-nav nav { opacity: .78; }"));
         assertTrue(css.contains(
-                "[data-observatory-chapter=\"resolve\"] .home-nav nav { opacity: .68; }"));
+                "[data-planet-chapter=\"resolve\"] .home-nav nav { opacity: .68; }"));
         assertTrue(css.contains(
-                "[data-observatory-chapter=\"act\"] .home-nav nav { opacity: .82; }"));
+                "[data-planet-chapter=\"act\"] .home-nav nav { opacity: .82; }"));
         assertTrue(css.contains(
                 ".home-nav nav:hover, .home-nav nav:focus-within { opacity: 1; }"));
     }
 
     @Test
-    void homepageLimitsHeroSubtitleMeasureBeforeTheQuantCore() throws IOException {
-        String css = resource("static/css/home-observatory.css").replaceAll("\\s+", " ");
+    void homepageLimitsHeroSubtitleMeasureBeforeThePlanet() throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
 
         assertTrue(css.contains(
-                ".home-chapter > p:not(.home-eyebrow):not(.home-chapter-index) "
+                ".planet-chapter > p:not(.planet-eyebrow):not(.planet-chapter__index) "
                         + "{ max-width: 28ch;"));
+    }
+
+    @Test
+    void homepageOnlyHidesRevealContentAfterMotionStartsAndRetainsShortLandscapeCta()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css").replaceAll("\\s+", " ");
+
+        assertTrue(css.contains(
+                ".planet-motion-enabled [data-home-reveal] { opacity: 0;"));
+        assertTrue(css.contains(
+                "@media (max-height: 540px) and (orientation: landscape) {"));
+        assertTrue(css.contains(
+                ".planet-chapter--observe .planet-primary-action { display: inline-flex; }"));
+        assertTrue(css.contains(
+                "@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.contains(
+                ".planet-motion-enabled [data-home-reveal] { opacity: 1; transform: none; }"));
     }
 
     @Test
