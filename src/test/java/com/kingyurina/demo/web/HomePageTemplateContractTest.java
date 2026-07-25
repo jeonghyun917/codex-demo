@@ -117,20 +117,28 @@ class HomePageTemplateContractTest {
     }
 
     @Test
-    void homepageQuantCoreSceneUsesLocalPhysicalRenderingContracts() throws IOException {
-        String scene = resource("static/js/home-observatory-scene.js");
+    void homepageCoordinatesProgressiveEnhancementAndRetiresObservatoryRuntime()
+            throws IOException {
+        String template = resource("templates/index.html");
+        String entry = resource("static/js/home-quant-planet.js");
 
-        assertTrue(scene.contains("/js/vendor/three.module.js"));
-        assertTrue(scene.contains("createQuantCoreScene"));
-        assertTrue(scene.contains("MeshPhysicalMaterial"));
-        assertTrue(scene.contains("InstancedMesh"));
-        assertTrue(scene.contains("ACESFilmicToneMapping"));
-        assertTrue(scene.contains("setPixelRatio(profile.pixelRatio)"));
-        assertTrue(scene.contains("QuantCore.scale.setScalar(profile.coreScale)"));
-        assertTrue(scene.contains("dispose()"));
-        assertFalse(scene.contains("fetch("));
-        assertFalse(scene.contains("http://"));
-        assertFalse(scene.contains("https://"));
+        assertTrue(template.contains("/js/home-quant-planet.js"));
+        assertTrue(entry.contains("./home-quant-planet-scroll.js"));
+        assertTrue(entry.contains("./home-quant-planet-motion.js"));
+        assertTrue(entry.contains("./home-quant-planet-scene.js"));
+        assertTrue(entry.contains("createPageLifecycle"));
+        assertTrue(entry.contains("IntersectionObserver"));
+        assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("pageshow"));
+        assertTrue(entry.contains("prefers-reduced-motion: reduce"));
+        assertTrue(entry.contains("updateStoryProgress();\n    scene?.resize();\n    lifecycle.start();"));
+        assertFalse(entry.contains("setInterval"));
+        assertFalse(entry.contains("fetch("));
+        assertFalse(new ClassPathResource("static/css/home-observatory.css").exists());
+        assertFalse(new ClassPathResource("static/js/home-observatory.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-observatory-motion.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-observatory-scroll.js").exists());
+        assertFalse(new ClassPathResource("static/js/home-observatory-scene.js").exists());
     }
 
     @Test
