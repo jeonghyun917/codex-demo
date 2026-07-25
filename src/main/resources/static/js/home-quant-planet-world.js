@@ -118,9 +118,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         risk: ownMaterial(createToonMaterial(THREE, COLORS.risk, gradientMap)),
         rock: ownMaterial(createToonMaterial(THREE, COLORS.rock, gradientMap)),
         cloud: ownMaterial(createToonMaterial(THREE, COLORS.paper, gradientMap)),
-        routeLamp: ownMaterial(createToonMaterial(THREE, COLORS.coral, gradientMap, {
-            emissive: COLORS.coral, emissiveIntensity: .35
-        }))
+        routeLamp: ownMaterial(createToonMaterial(THREE, COLORS.paper, gradientMap))
     };
     const outline = profile.outlineLevel > 0
         ? ownMaterial(new THREE.MeshBasicMaterial({
@@ -277,10 +275,11 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     addOutlinedMesh(THREE, act, geometry.box, material.blue, null, {
         position: [0, .98, 0], scale: [.75, .18, .32], name: "DecisionGateHeader"
     });
-    addOutlinedMesh(THREE, act, geometry.ring, material.coral, null, {
+    const productPortal = addOutlinedMesh(THREE, act, geometry.ring, material.coral, null, {
         position: [0, .24, .04], rotation: [Math.PI / 2, 0, 0],
         scale: [.5, .65, .5], name: "QuantProductPortal"
     });
+    const productPortalBaseScale = productPortal.scale.clone();
     addCable(THREE, act, geometries, material.ink, [
         [-.48, .85, -.22], [0, 1.15, -.28], [.48, .85, -.22]
     ], "DecisionGatePowerCable");
@@ -330,11 +329,15 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     utilityPoles.name = "InstancedRouteUtilityPoles";
     const routeLights = new THREE.InstancedMesh(geometry.sphere, material.routeLamp, 10);
     routeLights.name = "InstancedRouteLamps";
+    const lampDim = new THREE.Color(0x425866);
+    const lampBright = new THREE.Color(COLORS.coral);
+    const lampColor = new THREE.Color();
     for (let index = 0; index < 10; index += 1) {
         const point = routeCurve.getPointAt(index / 9);
         orientInstance(THREE, instanceMatrix,
             [point.x, point.y + .15, point.z], [.07, .07, .07]);
         routeLights.setMatrixAt(index, instanceMatrix);
+        routeLights.setColorAt(index, lampDim);
         if (index < 7) {
             orientInstance(THREE, instanceMatrix,
                 [point.x, point.y - .06, point.z - .16], [.025, .2, .025]);
@@ -477,11 +480,30 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         antenna.rotation.z = Math.sin(elapsed * .004) * .045
             * (1 - courierPose.idleBlend * .4);
 
-        observeDish.rotation.y = elapsed * .00018;
+        const observeActivity = Math.min(Math.max(
+            Number(planetPose.landmarkActivity.observe) || 0, 0
+        ), 1);
+        const resolveActivity = Math.min(Math.max(
+            Number(planetPose.landmarkActivity.resolve) || 0, 0
+        ), 1);
+        const actActivity = Math.min(Math.max(
+            Number(planetPose.landmarkActivity.act) || 0, 0
+        ), 1);
+        observeDish.rotation.y = elapsed * .00018 * observeActivity;
         resolveSorter.position.y = resolveSorterBaseY
-            + planetPose.landmarkActivity.resolve * Math.sin(elapsed * .003) * .08;
-        routeLights.material.emissiveIntensity = .35
-            + planetPose.routeActivity * 1.4;
+            + resolveActivity * Math.sin(elapsed * .003) * .08;
+        const portalPulse = 1 + actActivity
+            * (.04 + Math.sin(elapsed * .003) * .025);
+        productPortal.scale.copy(productPortalBaseScale).multiplyScalar(portalPulse);
+        productPortal.rotation.z = actActivity * Math.sin(elapsed * .0017) * .08;
+        for (let index = 0; index < routeLights.count; index += 1) {
+            const activity = index < 3
+                ? observeActivity
+                : index < 7 ? resolveActivity : actActivity;
+            lampColor.copy(lampDim).lerp(lampBright, .15 + activity * .85);
+            routeLights.setColorAt(index, lampColor);
+        }
+        routeLights.instanceColor.needsUpdate = true;
         if (fullMotion) {
             clouds.rotation.y = elapsed * .000012;
         }
