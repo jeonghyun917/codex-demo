@@ -214,9 +214,14 @@ export function createCourierLoopPose(time = 0, reduceMotion = false) {
 }
 
 export function shouldRenderFrame(state) {
+    const ambient = state?.ambient ?? Boolean(
+        state?.profile?.webgl
+        && state.profile.name !== "static"
+        && !state?.reducedMotion
+    );
     return Boolean(
         state?.visible && !state.hidden && state.webgl
-        && (state.dirty || state.ambient)
+        && (state.dirty || ambient)
     );
 }
 

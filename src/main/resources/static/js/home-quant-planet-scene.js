@@ -1,6 +1,7 @@
 import {
     createCourierLoopPose,
-    createOrbitPose
+    createOrbitPose,
+    shouldRenderFrame
 } from "./home-quant-planet-motion.js";
 import { createQuantPlanetWorld } from "./home-quant-planet-world.js";
 
@@ -95,7 +96,6 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
         let visible = true;
         let dirty = true;
         let disposed = false;
-        const ambientEnabled = profile.name === "high";
         const limits = profile.name === "high" ? HIGH_LIMITS : BALANCED_LIMITS;
 
         function markDirty() {
@@ -142,7 +142,14 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
                 }
             },
             render(time = 0) {
-                if (!visible || disposed || (!dirty && !ambientEnabled)) {
+                if (disposed || !shouldRenderFrame({
+                    visible,
+                    hidden: false,
+                    webgl: profile.webgl,
+                    reducedMotion: profile.name === "static",
+                    dirty,
+                    profile
+                })) {
                     return false;
                 }
                 const orbitPose = createOrbitPose({

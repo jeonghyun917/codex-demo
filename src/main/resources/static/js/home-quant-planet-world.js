@@ -504,6 +504,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         const observeActivity = boundedActivity(activity.observe);
         const resolveActivity = boundedActivity(activity.resolve);
         const actActivity = boundedActivity(activity.act);
+        const routeActivity = boundedActivity(courierPose.routeActivity);
         observeDish.rotation.y = elapsed * .00018 * observeActivity;
         resolveSorter.position.y = resolveSorterBaseY
             + resolveActivity * Math.sin(elapsed * .003) * .08;
@@ -512,10 +513,12 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         productPortal.scale.copy(productPortalBaseScale).multiplyScalar(portalPulse);
         productPortal.rotation.z = actActivity * Math.sin(elapsed * .0017) * .08;
         for (let index = 0; index < routeLights.count; index += 1) {
-            const activity = index < 3
+            const localActivity = index < 3
                 ? observeActivity
                 : index < 7 ? resolveActivity : actActivity;
-            lampColor.copy(lampDim).lerp(lampBright, .15 + activity * .85);
+            const lampLevel = (.15 + localActivity * .85)
+                * (.45 + routeActivity * .55);
+            lampColor.copy(lampDim).lerp(lampBright, lampLevel);
             routeLights.setColorAt(index, lampColor);
         }
         routeLights.instanceColor.needsUpdate = true;

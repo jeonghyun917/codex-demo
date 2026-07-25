@@ -85,6 +85,24 @@ test("illuminates only the route segment near the active chapter", (t) => {
     assert.ok(actColor.r > observeColor.r);
 });
 
+test("uses route activity to brighten lamps independently of landmarks", (t) => {
+    const world = createWorld(t);
+    const routeLights = world.group.getObjectByName("InstancedRouteLamps");
+    const courierPose = {
+        ...createCourierLoopPose(0, false),
+        landmarkActivity: { observe: 0, resolve: 0, act: 0 }
+    };
+    const inactiveColor = new THREE.Color();
+    const activeColor = new THREE.Color();
+
+    update(world, { ...courierPose, routeActivity: 0 });
+    routeLights.getColorAt(5, inactiveColor);
+    update(world, { ...courierPose, routeActivity: 1 });
+    routeLights.getColorAt(5, activeColor);
+
+    assert.ok(activeColor.r > inactiveColor.r);
+});
+
 test("moves the courier continuously and lights its nearest landmark", (t) => {
     const world = createWorld(t);
     const courier = world.group.getObjectByName("QuantCourier");

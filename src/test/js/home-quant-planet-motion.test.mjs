@@ -164,6 +164,28 @@ test("renders only when the planet can contribute a visible frame", () => {
     }), true);
 });
 
+test("keeps balanced non-reduced scenes eligible for continuous frames", () => {
+    const balanced = selectPlanetQualityProfile({
+        reduceMotion: false, webgl: true, mobile: true, cores: 8, dpr: 2
+    });
+    assert.equal(shouldRenderFrame({
+        visible: true,
+        hidden: false,
+        webgl: balanced.webgl,
+        reducedMotion: false,
+        dirty: false,
+        profile: balanced
+    }), true);
+    assert.equal(shouldRenderFrame({
+        visible: true,
+        hidden: false,
+        webgl: false,
+        reducedMotion: true,
+        dirty: false,
+        profile: { name: "static", webgl: false }
+    }), false);
+});
+
 test("does not construct Lenis when reduced motion is active", () => {
     let constructed = 0;
     class FakeLenis {
