@@ -66,6 +66,9 @@ test("accepts deterministic fallback overrides only on loopback", () => {
         hostname: "127.0.0.1", search: "?render=static&motion=reduce"
     }), { forceStatic: true, forceReduced: true });
     assert.deepEqual(resolveLocalTestOverrides({
+        hostname: "[::1]", search: "?render=static&motion=reduce"
+    }), { forceStatic: true, forceReduced: true });
+    assert.deepEqual(resolveLocalTestOverrides({
         hostname: "kingyurina.example", search: "?render=static&motion=reduce"
     }), { forceStatic: false, forceReduced: false });
 });
@@ -220,4 +223,32 @@ test("pauses and resumes one animation loop across the back-forward cache", () =
     lifecycle.handlePageShow({ persisted: true });
     assert.deepEqual(calls, { frame: 1, pause: 1, resume: 1, destroy: 1 });
     assert.equal(queuedFrames.size, 0);
+});
+
+test("does not schedule an animation frame when a static lifecycle resumes from BFCache", () => {
+    const queuedFrames = new Map();
+    let nextFrameId = 0;
+    const calls = { pause: 0, resume: 0, destroy: 0 };
+    const lifecycle = createPageLifecycle({
+        requestFrame(callback) {
+            const id = ++nextFrameId;
+            queuedFrames.set(id, callback);
+            return id;
+        },
+        cancelFrame(id) {
+            queuedFrames.delete(id);
+        },
+        onPause() { calls.pause += 1; },
+        onResume() { calls.resume += 1; },
+        onDestroy() { calls.destroy += 1; }
+    });
+
+    lifecycle.handlePageHide({ persisted: true });
+    lifecycle.handlePageShow({ persisted: true });
+
+    assert.deepEqual(calls, { pause: 1, resume: 1, destroy: 0 });
+    assert.equal(queuedFrames.size, 0);
+
+    lifecycle.handlePageHide({ persisted: false });
+    assert.equal(calls.destroy, 1);
 });

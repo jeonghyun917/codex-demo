@@ -23,7 +23,7 @@ export function normalizeScrollProgress(top, height, viewportHeight) {
 }
 
 export function resolveLocalTestOverrides({ hostname, search } = {}) {
-    const loopback = ["127.0.0.1", "localhost", "::1"].includes(hostname);
+    const loopback = ["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname);
     if (!loopback) {
         return { forceStatic: false, forceReduced: false };
     }
@@ -124,6 +124,7 @@ export function createPageLifecycle({
     let frameScheduled = false;
     let paused = false;
     let destroyed = false;
+    let started = false;
 
     function scheduleFrame() {
         if (destroyed || paused || frameScheduled || typeof requestFrame !== "function") {
@@ -144,6 +145,7 @@ export function createPageLifecycle({
     }
 
     function start() {
+        started = true;
         scheduleFrame();
     }
 
@@ -166,7 +168,9 @@ export function createPageLifecycle({
         }
         paused = false;
         onResume?.();
-        scheduleFrame();
+        if (started) {
+            scheduleFrame();
+        }
     }
 
     function destroy() {

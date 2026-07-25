@@ -131,7 +131,9 @@ class HomePageTemplateContractTest {
         assertTrue(entry.contains("visibilitychange"));
         assertTrue(entry.contains("pageshow"));
         assertTrue(entry.contains("prefers-reduced-motion: reduce"));
-        assertTrue(entry.contains("updateStoryProgress();\n    scene?.resize();\n    lifecycle.start();"));
+        assertTrue(entry.contains("\"[::1]\""));
+        assertFalse(entry.contains("if (!scene) {\n        return;\n    }"));
+        assertTrue(entry.contains("if (scene) {\n        scene.resize();\n        lifecycle.start();\n    }"));
         assertFalse(entry.contains("setInterval"));
         assertFalse(entry.contains("fetch("));
         assertFalse(new ClassPathResource("static/css/home-observatory.css").exists());
@@ -160,6 +162,11 @@ class HomePageTemplateContractTest {
         assertTrue(scene.contains("setPixelRatio(profile.pixelRatio)"));
         assertTrue(scene.contains("getDiagnostics"));
         assertTrue(scene.contains("dispose()"));
+        assertTrue(scene.contains("let renderer = null"));
+        assertTrue(scene.contains("let world = null"));
+        assertTrue(scene.contains("world?.dispose();"));
+        assertTrue(scene.contains("renderer?.dispose();"));
+        assertTrue(scene.contains("throw error"));
         assertFalse(world.contains("fetch("));
         assertFalse(scene.contains("fetch("));
         assertFalse(world.contains("http://"));

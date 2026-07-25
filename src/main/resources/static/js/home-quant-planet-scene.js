@@ -32,135 +32,143 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
         return createStaticSceneController();
     }
 
-    const THREE = await import("/js/vendor/three.module.js");
-    const renderer = new THREE.WebGLRenderer({
-        canvas,
-        alpha: true,
-        antialias: profile.name === "high",
-        powerPreference: "high-performance"
-    });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
-    renderer.setPixelRatio(profile.pixelRatio);
-    renderer.shadowMap.enabled = Boolean(profile.shadows);
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    let renderer = null;
+    let world = null;
+    try {
+        const THREE = await import("/js/vendor/three.module.js");
+        renderer = new THREE.WebGLRenderer({
+            canvas,
+            alpha: true,
+            antialias: profile.name === "high",
+            powerPreference: "high-performance"
+        });
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.08;
+        renderer.setPixelRatio(profile.pixelRatio);
+        renderer.shadowMap.enabled = Boolean(profile.shadows);
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0xd9efe8, 11, 24);
-    const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
-    const world = createQuantPlanetWorld(THREE, { profile });
-    world.group.scale.setScalar(profile.planetScale || 1);
-    scene.add(world.group);
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0xd9efe8, 11, 24);
+        const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
+        world = createQuantPlanetWorld(THREE, { profile });
+        world.group.scale.setScalar(profile.planetScale || 1);
+        scene.add(world.group);
 
-    const hemisphere = new THREE.HemisphereLight(0xfff9ea, 0x71847e, 1.7);
-    hemisphere.name = "SkyHemisphereFill";
-    const key = new THREE.DirectionalLight(0xfff1cc, 3.1);
-    key.name = "DaylightKey";
-    key.position.set(-5.5, 8, 6);
-    key.castShadow = Boolean(profile.shadows);
-    key.shadow.mapSize.set(
-        profile.name === "high" ? 1024 : 512,
-        profile.name === "high" ? 1024 : 512
-    );
-    key.shadow.camera.near = 1;
-    key.shadow.camera.far = 20;
-    key.shadow.camera.left = -5;
-    key.shadow.camera.right = 5;
-    key.shadow.camera.top = 5;
-    key.shadow.camera.bottom = -5;
-    const rim = new THREE.DirectionalLight(0xe8755d, .85);
-    rim.name = "WarmRimLight";
-    rim.position.set(5, 2, -6);
-    scene.add(hemisphere, key, rim);
+        const hemisphere = new THREE.HemisphereLight(0xfff9ea, 0x71847e, 1.7);
+        hemisphere.name = "SkyHemisphereFill";
+        const key = new THREE.DirectionalLight(0xfff1cc, 3.1);
+        key.name = "DaylightKey";
+        key.position.set(-5.5, 8, 6);
+        key.castShadow = Boolean(profile.shadows);
+        key.shadow.mapSize.set(
+            profile.name === "high" ? 1024 : 512,
+            profile.name === "high" ? 1024 : 512
+        );
+        key.shadow.camera.near = 1;
+        key.shadow.camera.far = 20;
+        key.shadow.camera.left = -5;
+        key.shadow.camera.right = 5;
+        key.shadow.camera.top = 5;
+        key.shadow.camera.bottom = -5;
+        const rim = new THREE.DirectionalLight(0xe8755d, .85);
+        rim.name = "WarmRimLight";
+        rim.position.set(5, 2, -6);
+        scene.add(hemisphere, key, rim);
 
-    let progress = 0;
-    let pointer = { x: 0, y: 0 };
-    let visible = true;
-    let dirty = true;
-    let disposed = false;
-    const ambientEnabled = profile.name === "high";
-    const limits = profile.name === "high" ? HIGH_LIMITS : BALANCED_LIMITS;
+        let progress = 0;
+        let pointer = { x: 0, y: 0 };
+        let visible = true;
+        let dirty = true;
+        let disposed = false;
+        const ambientEnabled = profile.name === "high";
+        const limits = profile.name === "high" ? HIGH_LIMITS : BALANCED_LIMITS;
 
-    function markDirty() {
-        if (!disposed) {
-            dirty = true;
+        function markDirty() {
+            if (!disposed) {
+                dirty = true;
+            }
         }
-    }
 
-    function resize() {
-        if (disposed) {
-            return;
-        }
-        const width = Math.max(1, canvas.clientWidth);
-        const height = Math.max(1, canvas.clientHeight);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height, false);
-        markDirty();
-    }
-
-    return {
-        resize,
-        setProgress(value) {
-            const next = clampUnit(value);
-            if (next !== progress) {
-                progress = next;
-                markDirty();
-            }
-        },
-        setPointer(value) {
-            const next = value || { x: 0, y: 0 };
-            if (next.x !== pointer.x || next.y !== pointer.y) {
-                pointer = next;
-                markDirty();
-            }
-        },
-        setVisible(value) {
-            const next = Boolean(value);
-            if (next !== visible) {
-                visible = next;
-                markDirty();
-            }
-        },
-        render(time = 0) {
-            if (!visible || disposed || (!dirty && !ambientEnabled)) {
-                return false;
-            }
-            const planetPose = createPlanetPose(progress, pointer);
-            const courierPose = createCourierPose(progress, time);
-            world.update({ planetPose, courierPose, time });
-
-            const distance = planetPose.cameraDistance;
-            const cosPitch = Math.cos(planetPose.cameraPitch);
-            camera.position.set(
-                Math.sin(planetPose.cameraYaw) * cosPitch * distance,
-                Math.sin(planetPose.cameraPitch) * distance + .8,
-                Math.cos(planetPose.cameraYaw) * cosPitch * distance
-            );
-            camera.lookAt(0, .45, 0);
-            renderer.render(scene, camera);
-            dirty = false;
-            return true;
-        },
-        getDiagnostics() {
-            const drawCalls = renderer.info.render.calls;
-            const triangles = renderer.info.render.triangles;
-            return {
-                drawCalls,
-                triangles,
-                limits: { ...limits },
-                withinBudget: drawCalls <= limits.drawCalls
-                    && triangles <= limits.triangles
-            };
-        },
-        dispose() {
+        function resize() {
             if (disposed) {
                 return;
             }
-            disposed = true;
-            world.dispose();
-            renderer.dispose();
+            const width = Math.max(1, canvas.clientWidth);
+            const height = Math.max(1, canvas.clientHeight);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height, false);
+            markDirty();
         }
-    };
+
+        return {
+            resize,
+            setProgress(value) {
+                const next = clampUnit(value);
+                if (next !== progress) {
+                    progress = next;
+                    markDirty();
+                }
+            },
+            setPointer(value) {
+                const next = value || { x: 0, y: 0 };
+                if (next.x !== pointer.x || next.y !== pointer.y) {
+                    pointer = next;
+                    markDirty();
+                }
+            },
+            setVisible(value) {
+                const next = Boolean(value);
+                if (next !== visible) {
+                    visible = next;
+                    markDirty();
+                }
+            },
+            render(time = 0) {
+                if (!visible || disposed || (!dirty && !ambientEnabled)) {
+                    return false;
+                }
+                const planetPose = createPlanetPose(progress, pointer);
+                const courierPose = createCourierPose(progress, time);
+                world.update({ planetPose, courierPose, time });
+
+                const distance = planetPose.cameraDistance;
+                const cosPitch = Math.cos(planetPose.cameraPitch);
+                camera.position.set(
+                    Math.sin(planetPose.cameraYaw) * cosPitch * distance,
+                    Math.sin(planetPose.cameraPitch) * distance + .8,
+                    Math.cos(planetPose.cameraYaw) * cosPitch * distance
+                );
+                camera.lookAt(0, .45, 0);
+                renderer.render(scene, camera);
+                dirty = false;
+                return true;
+            },
+            getDiagnostics() {
+                const drawCalls = renderer.info.render.calls;
+                const triangles = renderer.info.render.triangles;
+                return {
+                    drawCalls,
+                    triangles,
+                    limits: { ...limits },
+                    withinBudget: drawCalls <= limits.drawCalls
+                        && triangles <= limits.triangles
+                };
+            },
+            dispose() {
+                if (disposed) {
+                    return;
+                }
+                disposed = true;
+                world.dispose();
+                renderer.dispose();
+            }
+        };
+    } catch (error) {
+        world?.dispose();
+        renderer?.dispose();
+        throw error;
+    }
 }

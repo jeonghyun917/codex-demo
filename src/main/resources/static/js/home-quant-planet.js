@@ -10,7 +10,7 @@ import {
 import { createScrollController } from "./home-quant-planet-scroll.js";
 import { createQuantPlanetScene } from "./home-quant-planet-scene.js";
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const root = document.documentElement;
 const story = document.querySelector("[data-home-story]");
 const sceneElement = document.querySelector("[data-home-scene]");
@@ -84,12 +84,9 @@ async function startQuantPlanet() {
     } catch {
         scene?.dispose();
         scene = null;
-        scroll.destroy();
-        domMotion.destroy();
         root.classList.remove("planet-motion-enabled");
         root.classList.remove("planet-webgl-ready");
         root.classList.add("planet-webgl-failed");
-        return;
     }
 
     function updateStoryProgress() {
@@ -229,10 +226,7 @@ async function startQuantPlanet() {
         revealElements.forEach((element) => domMotion.reveal(element));
     }
 
-    if (!scene) {
-        return;
-    }
-    if (profile.pointerEnabled) {
+    if (scene && profile.pointerEnabled) {
         sceneElement.addEventListener("pointermove", handlePointer, { passive: true });
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -242,6 +236,8 @@ async function startQuantPlanet() {
 
     updateSceneVisibility();
     updateStoryProgress();
-    scene?.resize();
-    lifecycle.start();
+    if (scene) {
+        scene.resize();
+        lifecycle.start();
+    }
 }
