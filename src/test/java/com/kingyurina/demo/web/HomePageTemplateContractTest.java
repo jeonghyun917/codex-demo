@@ -162,6 +162,28 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageCoordinatesFullscreenOrbitRuntime() throws IOException {
+        String entry = resource("static/js/home-quant-planet.js");
+
+        assertTrue(entry.contains("./home-quant-planet-input.js"));
+        assertTrue(entry.contains("createIntroState"));
+        assertTrue(entry.contains("createNavigationRingState"));
+        assertTrue(entry.contains("createOrbitInputController"));
+        assertTrue(entry.contains("webglcontextlost"));
+        assertTrue(entry.contains("4000"));
+        assertTrue(entry.contains("visibilitychange"));
+        assertTrue(entry.contains("pagehide"));
+        assertTrue(entry.contains("pageshow"));
+        assertFalse(entry.contains("createScrollController"));
+        assertFalse(entry.contains("normalizeScrollProgress"));
+        assertFalse(entry.contains("IntersectionObserver"));
+        assertFalse(entry.contains("setInterval"));
+        assertFalse(entry.contains("fetch("));
+        assertFalse(new ClassPathResource(
+                "static/js/home-quant-planet-scroll.js").exists());
+    }
+
+    @Test
     void homepageBuildsAnOriginalLocalQuantPlanetWorld() throws IOException {
         String world = resource("static/js/home-quant-planet-world.js");
         String scene = resource("static/js/home-quant-planet-scene.js");

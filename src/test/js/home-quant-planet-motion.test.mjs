@@ -4,7 +4,6 @@ import {
     advanceRingAngle,
     clampUnit,
     createCourierLoopPose,
-    createDomMotion,
     createIntroState,
     createNavigationRingState,
     createOrbitPose,
@@ -15,7 +14,6 @@ import {
     shouldRenderFrame,
     wrapIndex
 } from "../../main/resources/static/js/home-quant-planet-motion.js";
-import { createScrollController } from "../../main/resources/static/js/home-quant-planet-scroll.js";
 
 test("selects bounded planet quality profiles", () => {
     assert.equal(selectPlanetQualityProfile({
@@ -184,93 +182,6 @@ test("keeps balanced non-reduced scenes eligible for continuous frames", () => {
         dirty: false,
         profile: { name: "static", webgl: false }
     }), false);
-});
-
-test("does not construct Lenis when reduced motion is active", () => {
-    let constructed = 0;
-    class FakeLenis {
-        constructor() { constructed += 1; }
-    }
-    const controller = createScrollController({
-        LenisClass: FakeLenis,
-        reduceMotion: true,
-        onScroll() {}
-    });
-    assert.equal(controller.isEnabled, false);
-    assert.equal(constructed, 0);
-});
-
-test("forwards Lenis scroll events and owns the Lenis lifecycle", () => {
-    let options;
-    let listener;
-    const calls = [];
-    class FakeLenis {
-        constructor(value) { options = value; }
-        on(name, callback) { assert.equal(name, "scroll"); listener = callback; }
-        raf(time) { calls.push(["raf", time]); }
-        stop() { calls.push(["stop"]); }
-        start() { calls.push(["start"]); }
-        destroy() { calls.push(["destroy"]); }
-    }
-    let received;
-    const controller = createScrollController({
-        LenisClass: FakeLenis,
-        reduceMotion: false,
-        onScroll(value) { received = value; }
-    });
-    assert.equal(controller.isEnabled, true);
-    assert.deepEqual(options, {
-        autoRaf: false, anchors: true, lerp: 0.085, smoothWheel: true,
-        syncTouch: false, wheelMultiplier: 0.9
-    });
-    listener({ progress: 0.4 });
-    assert.deepEqual(received, { progress: 0.4 });
-    controller.raf(42);
-    controller.stop();
-    controller.start();
-    controller.destroy();
-    assert.deepEqual(calls, [["raf", 42], ["stop"], ["start"], ["destroy"]]);
-});
-
-test("keeps content visible without Motion and avoids animations in reduced motion", () => {
-    const element = { style: {} };
-    const root = {
-        querySelectorAll() { return [element]; },
-        setAttribute() {}
-    };
-    const missing = createDomMotion({ MotionAPI: null, root, reduceMotion: false });
-    missing.reveal(element);
-    assert.equal(element.style.opacity, "1");
-    assert.equal(element.style.transform, "none");
-
-    let animations = 0;
-    const reduced = createDomMotion({
-        MotionAPI: { animate() { animations += 1; } }, root, reduceMotion: true
-    });
-    reduced.reveal(element);
-    reduced.setChapter("act");
-    assert.equal(animations, 0);
-});
-
-test("reveals elements using the homepage marker and changes the planet chapter", () => {
-    const element = { style: { opacity: "0", transform: "translateY(16px)" } };
-    let selector = "";
-    let attribute;
-    const root = {
-        querySelectorAll(value) {
-            selector = value;
-            return value === "[data-home-reveal]" ? [element] : [];
-        },
-        setAttribute(name, value) { attribute = [name, value]; }
-    };
-
-    const motion = createDomMotion({ MotionAPI: null, root, reduceMotion: false });
-    motion.setChapter("resolve");
-
-    assert.equal(selector, "[data-home-reveal]");
-    assert.equal(element.style.opacity, "1");
-    assert.equal(element.style.transform, "none");
-    assert.deepEqual(attribute, ["data-planet-chapter", "resolve"]);
 });
 
 test("pauses and resumes one animation loop across the back-forward cache", () => {
