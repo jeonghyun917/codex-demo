@@ -146,8 +146,8 @@ export function createOrbitPose({
     time = 0, dragAngle = 0, pointer = { x: 0, y: 0 },
     reduceMotion = false
 } = {}) {
-    const pointerX = clamp(pointer?.x, -1, 1);
-    const pointerY = clamp(pointer?.y, -1, 1);
+    const pointerX = reduceMotion ? 0 : clamp(pointer?.x, -1, 1);
+    const pointerY = reduceMotion ? 0 : clamp(pointer?.y, -1, 1);
     const drag = clamp(dragAngle, -TAU * 2, TAU * 2);
     const ambient = reduceMotion ? 0
         : (Math.max(0, Number(time) || 0) % RING_DURATION)

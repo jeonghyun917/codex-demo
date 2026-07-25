@@ -78,6 +78,18 @@ test("keeps fullscreen orbit bounded under extreme input", () => {
     assert.ok(Number.isFinite(pose.planetYaw));
 });
 
+test("removes orbit pointer parallax in reduced motion", () => {
+    const pointerLeft = createOrbitPose({
+        time: 14000, dragAngle: .6,
+        pointer: { x: -1, y: -1 }, reduceMotion: true
+    });
+    const pointerRight = createOrbitPose({
+        time: 14000, dragAngle: .6,
+        pointer: { x: 1, y: 1 }, reduceMotion: true
+    });
+    assert.deepEqual(pointerLeft, pointerRight);
+});
+
 test("wraps six product links and brings the selected item forward", () => {
     assert.equal(wrapIndex(-1, 6), 5);
     assert.equal(wrapIndex(6, 6), 0);
