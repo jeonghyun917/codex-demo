@@ -47,6 +47,16 @@ function createDonutInFirstCell(width, height) {
     return image;
 }
 
+function createNineSinglePixelGlyphs() {
+    const image = createImageData(9, 9);
+    for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+            paintRectangle(image, column * 3 + 1, row * 3 + 1, 1, 1);
+        }
+    }
+    return image;
+}
+
 function signedArea(loop) {
     return loop.slice(1).reduce((area, point, index) => {
         const previous = loop[index];
@@ -95,6 +105,19 @@ test("simplifies pixel stairs while preserving closed contours", () => {
         simplified[0][0].outer[0],
         simplified[0][0].outer.at(-1)
     );
+});
+
+test("keeps one-pixel glyphs non-degenerate at default tolerance", () => {
+    const glyphs = extractGlyphContours(createNineSinglePixelGlyphs());
+
+    assert.equal(glyphs.length, 9);
+    glyphs.forEach(([glyph]) => {
+        const distinctVertices = new Set(
+            glyph.outer.slice(0, -1).map(({ x, y }) => `${x},${y}`)
+        );
+        assert.ok(distinctVertices.size >= 3);
+        assert.ok(Math.abs(signedArea(glyph.outer) - 1 / 9) < 1e-12);
+    });
 });
 
 test("rejects a grid cell without an alpha contour", () => {

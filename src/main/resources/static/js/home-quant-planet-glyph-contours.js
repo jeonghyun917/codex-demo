@@ -206,10 +206,17 @@ function simplifyClosedLoop(loop, tolerance) {
     for (let index = 0; index <= firstIndex; index += 1) {
         secondPath.push(ring[index]);
     }
-    return closeLoop([
+    const simplified = closeLoop([
         ...simplifyOpenLoop(firstPath, tolerance).slice(0, -1),
         ...simplifyOpenLoop(secondPath, tolerance)
     ]);
+    const distinctVertices = new Set(
+        simplified.slice(0, -1).map(pointKey)
+    ).size;
+    if (distinctVertices < 3 || signedArea(simplified) === 0) {
+        return closeLoop(loop);
+    }
+    return simplified;
 }
 
 function normalizeLoop(loop, bounds) {
