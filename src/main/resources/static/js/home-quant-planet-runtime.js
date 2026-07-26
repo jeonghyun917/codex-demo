@@ -65,6 +65,7 @@ export function createQuantPlanetRuntime({
     const renderTimes = [];
     const motionAnimations = new Set();
     let activeElapsedMs = 0;
+    let currentIntroState = null;
     let destroyed = false;
     let inputController = null;
     let inputState = {
@@ -76,10 +77,7 @@ export function createQuantPlanetRuntime({
     let introReady = false;
     let lastFrameTime = startedAt;
     let ambientFrameTime = null;
-    let lastDragDelta = 0;
     let lifecycle = null;
-    let releaseElapsedMs = REFERENCE_HERO.settleMs;
-    let releaseImpulse = 0;
     let runtimeFailed = false;
     let scene = null;
     let sceneReady = false;
@@ -111,6 +109,7 @@ export function createQuantPlanetRuntime({
     }
 
     function applyIntroState(state) {
+        currentIntroState = state;
         root.dataset.introPhase = state.phase;
         experience.style.setProperty(
             "--intro-world-progress",
@@ -312,7 +311,7 @@ export function createQuantPlanetRuntime({
     }
 
     function updateInputState(state) {
-        const nextState = {
+        inputState = {
             ...DEFAULT_INPUT_STATE,
             ...state,
             pointer: {
@@ -320,41 +319,6 @@ export function createQuantPlanetRuntime({
                 ...state?.pointer
             }
         };
-        if (nextState.dragging) {
-            lastDragDelta = inputState.dragging
-                ? nextState.dragAngle - inputState.dragAngle
-                : 0;
-            releaseElapsedMs = REFERENCE_HERO.settleMs;
-            releaseImpulse = 0;
-        } else if (inputState.dragging && nextState.settling) {
-            releaseElapsedMs = 0;
-            releaseImpulse = clamp(
-                lastDragDelta * RELEASE_IMPULSE_SCALE,
-                -MAX_RELEASE_OFFSET_RADIANS,
-                MAX_RELEASE_OFFSET_RADIANS
-            );
-        } else if (!nextState.settling) {
-            releaseElapsedMs = REFERENCE_HERO.settleMs;
-            releaseImpulse = 0;
-        }
-        inputState = nextState;
-    }
-
-    function advanceReleaseOffset(deltaTime) {
-        if (
-            !inputState.settling
-            || releaseImpulse === 0
-            || releaseElapsedMs >= REFERENCE_HERO.settleMs
-        ) {
-            return 0;
-        }
-        releaseElapsedMs = Math.min(
-            REFERENCE_HERO.settleMs,
-            releaseElapsedMs + deltaTime
-        );
-        const remaining = 1
-            - releaseElapsedMs / REFERENCE_HERO.settleMs;
-        return releaseImpulse * remaining * remaining;
     }
 
     function tick(time) {
@@ -379,12 +343,11 @@ export function createQuantPlanetRuntime({
             }
             ambientFrameTime = frameTime;
         }
-        const releaseOffset = advanceReleaseOffset(deltaTime);
         const incrementalPose = createHeroPose({
             elapsedMs: ambientDeltaTime,
             worldAngle,
-            dragAngle: inputState.dragAngle + releaseOffset,
             pointer: inputState.pointer,
+            titleProgress: currentIntroState.title,
             reduceMotion: false
         });
         worldAngle = incrementalPose.worldAngle;
@@ -528,14 +491,5 @@ export function createQuantPlanetRuntime({
 
 const DEFAULT_INPUT_STATE = Object.freeze({
     pointer: Object.freeze({ x: 0, y: 0 }),
-    dragAngle: 0,
-    dragging: false,
-    settling: false
+    touching: false
 });
-
-const MAX_RELEASE_OFFSET_RADIANS = Math.PI / 18;
-const RELEASE_IMPULSE_SCALE = .5;
-
-function clamp(value, minimum, maximum) {
-    return Math.min(maximum, Math.max(minimum, value));
-}

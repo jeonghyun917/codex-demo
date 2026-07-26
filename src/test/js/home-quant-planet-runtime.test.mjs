@@ -34,9 +34,7 @@ const STATIC_PROFILE = {
 
 const DEFAULT_INPUT_STATE = {
     pointer: { x: 0, y: 0 },
-    dragAngle: 0,
-    dragging: false,
-    settling: false
+    touching: false
 };
 
 function createStyle() {
@@ -225,8 +223,7 @@ function createInputHarness() {
                 destroy: () => {
                     this.destroyCalls += 1;
                 },
-                getState: () => ({ ...DEFAULT_INPUT_STATE }),
-                setBaseAngle() {}
+                getState: () => ({ ...DEFAULT_INPUT_STATE })
             };
         },
         emit(state) {
@@ -510,101 +507,25 @@ test("anchors ambient time when a scene resolves seconds after the deadline", as
     ) < 1e-9);
 });
 
-test("forwards pointer and drag state through the Task 3 pose unchanged", async () => {
+test("forwards independent pointer and title progress through the pose", async () => {
     const harness = createRuntimeHarness();
     const scene = createScene();
     harness.sceneDeferred.resolve(scene);
     await flushPromises();
-    harness.frameQueue.runNext(2200);
+    harness.frameQueue.runNext(1200);
 
     harness.input.emit({
-        pointer: { x: .65, y: -.4 },
-        dragAngle: .72,
-        dragging: true
+        pointer: { x: .65, y: -.4 }
     });
-    harness.frameQueue.runNext(2300);
+    harness.frameQueue.runNext(1300);
 
     const forwarded = scene.poses.at(-1);
     assert.deepEqual(forwarded.pointer, { x: .65, y: -.4 });
-    assert.equal(forwarded.dragAngle, .72);
-    assert.ok(Math.abs(
-        forwarded.worldAngle
-        - Math.PI * 2 * 100 / REFERENCE_HERO.worldRevolutionMs
-    ) < 1e-9);
-    assert.equal(forwarded.elapsedMs, 2300);
+    assert.ok(forwarded.titleProgress > 0);
+    assert.ok(forwarded.titleProgress < 1);
+    assert.equal(forwarded.worldAngle, 0);
+    assert.equal(forwarded.elapsedMs, 1300);
     assert.equal(forwarded.reduceMotion, false);
-});
-
-test("renders a bounded final-delta release offset for exactly 720ms", async () => {
-    const harness = createRuntimeHarness();
-    const scene = createScene();
-    harness.sceneDeferred.resolve(scene);
-    await flushPromises();
-    harness.frameQueue.runNext(2200);
-
-    harness.input.emit({
-        dragAngle: .12,
-        dragging: true
-    });
-    harness.frameQueue.runNext(2216);
-    harness.input.emit({
-        dragAngle: .18,
-        dragging: true
-    });
-    harness.frameQueue.runNext(2232);
-    harness.input.emit({
-        dragAngle: .18,
-        dragging: false,
-        settling: true
-    });
-
-    harness.frameQueue.runNext(2248);
-    const initialOffset = scene.poses.at(-1).dragAngle - .18;
-    assert.ok(initialOffset > 0);
-    assert.ok(initialOffset < .06);
-
-    harness.frameQueue.runNext(2592);
-    const midpointOffset = scene.poses.at(-1).dragAngle - .18;
-    assert.ok(midpointOffset > 0);
-    assert.ok(midpointOffset < initialOffset);
-
-    harness.frameQueue.runNext(2952);
-    assert.equal(scene.poses.at(-1).dragAngle, .18);
-});
-
-test("bounds a large release impulse without snapping the committed angle", async () => {
-    const harness = createRuntimeHarness();
-    const scene = createScene();
-    harness.sceneDeferred.resolve(scene);
-    await flushPromises();
-    harness.frameQueue.runNext(2200);
-
-    harness.input.emit({
-        dragAngle: 0,
-        dragging: true
-    });
-    harness.input.emit({
-        dragAngle: 12,
-        dragging: true
-    });
-    harness.input.emit({
-        dragAngle: 12,
-        dragging: false,
-        settling: true
-    });
-    harness.frameQueue.runNext(2216);
-
-    const renderedAngle = scene.poses.at(-1).dragAngle;
-    assert.ok(renderedAngle > 12);
-    assert.ok(renderedAngle - 12 <= Math.PI / 18);
-
-    harness.input.emit({
-        dragAngle: 12,
-        dragging: false,
-        settling: false
-    });
-    harness.frameQueue.runNext(2232);
-    assert.equal(scene.poses.at(-1).dragAngle, 12);
 });
 
 test("locks the hidden action until its intro phase begins", async () => {
@@ -637,9 +558,7 @@ test("never mutates reference title state during input or frames", async () => {
     harness.sceneDeferred.resolve(scene);
     await flushPromises();
     harness.input.emit({
-        pointer: { x: 1, y: 1 },
-        dragAngle: -1.2,
-        settling: true
+        pointer: { x: 1, y: 1 }
     });
     harness.frameQueue.runNext(400);
 

@@ -105,18 +105,22 @@ export function createHeroIntroState({
 export function createHeroPose({
     elapsedMs = 0,
     worldAngle = 0,
-    dragAngle = 0,
     pointer = { x: 0, y: 0 },
+    titleProgress = 1,
     reduceMotion = false
 } = {}) {
+    const elapsed = Math.max(0, Number(elapsedMs) || 0);
     const ambient = reduceMotion
         ? 0
-        : (elapsedMs / REFERENCE_HERO.worldRevolutionMs) * Math.PI * 2;
+        : elapsed / REFERENCE_HERO.worldRevolutionMs * Math.PI * 2;
     return {
-        worldAngle: worldAngle + ambient,
-        dragAngle,
-        pointer: reduceMotion ? { x: 0, y: 0 } : pointer,
-        elapsedMs,
+        worldAngle: (Number(worldAngle) || 0) + ambient,
+        pointer: reduceMotion ? { x: 0, y: 0 } : {
+            x: Number(pointer?.x) || 0,
+            y: Number(pointer?.y) || 0
+        },
+        titleProgress: reduceMotion ? 1 : clampUnit(titleProgress),
+        elapsedMs: elapsed,
         reduceMotion
     };
 }

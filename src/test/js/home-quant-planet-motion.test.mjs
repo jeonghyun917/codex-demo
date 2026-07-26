@@ -104,19 +104,19 @@ test("reduced motion resolves directly to the final static hero", () => {
     });
 });
 
-test("completes one reference world revolution in 96 seconds", () => {
+test("completes one reference world revolution in 36 seconds", () => {
     const start = createHeroPose({
         elapsedMs: 0,
         worldAngle: 0,
-        dragAngle: 0,
         pointer: { x: 0, y: 0 },
+        titleProgress: 1,
         reduceMotion: false
     });
     const end = createHeroPose({
         elapsedMs: REFERENCE_HERO.worldRevolutionMs,
         worldAngle: 0,
-        dragAngle: 0,
         pointer: { x: 0, y: 0 },
+        titleProgress: 1,
         reduceMotion: false
     });
     assert.ok(Math.abs(
@@ -124,30 +124,51 @@ test("completes one reference world revolution in 96 seconds", () => {
     ) < 1e-9);
 });
 
-test("preserves authored and drag angles while reduced motion removes ambience and parallax", () => {
+test("rotates a quarter turn after nine seconds", () => {
     const pose = createHeroPose({
-        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
-        worldAngle: .25,
-        dragAngle: -.7,
-        pointer: { x: .5, y: -.25 },
-        reduceMotion: false
-    });
-    const reduced = createHeroPose({
-        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
-        worldAngle: .25,
-        dragAngle: -.7,
-        pointer: { x: .5, y: -.25 },
-        reduceMotion: true
+        elapsedMs: 9000,
+        worldAngle: .25
     });
 
-    assert.ok(Math.abs(pose.worldAngle - (.25 + Math.PI)) < 1e-9);
-    assert.equal(pose.dragAngle, -.7);
-    assert.deepEqual(pose.pointer, { x: .5, y: -.25 });
-    assert.deepEqual(reduced, {
+    assert.equal(pose.worldAngle, .25 + Math.PI / 2);
+});
+
+test("advances autonomous planet yaw independently of pointer", () => {
+    const left = createHeroPose({
+        elapsedMs: 9000,
         worldAngle: .25,
-        dragAngle: -.7,
+        pointer: { x: -1, y: .8 },
+        titleProgress: .7
+    });
+    const right = createHeroPose({
+        elapsedMs: 9000,
+        worldAngle: .25,
+        pointer: { x: 1, y: -.8 },
+        titleProgress: .7
+    });
+
+    assert.equal(left.worldAngle, right.worldAngle);
+    assert.deepEqual(left.pointer, { x: -1, y: .8 });
+    assert.deepEqual(right.pointer, { x: 1, y: -.8 });
+    assert.equal(left.titleProgress, .7);
+    assert.equal(
+        left.worldAngle,
+        .25 + Math.PI * 2 * 9000 / REFERENCE_HERO.worldRevolutionMs
+    );
+});
+
+test("reduced motion freezes both autonomous and pointer targets", () => {
+    assert.deepEqual(createHeroPose({
+        elapsedMs: 9000,
+        worldAngle: .4,
+        pointer: { x: 1, y: -1 },
+        titleProgress: .3,
+        reduceMotion: true
+    }), {
+        worldAngle: .4,
         pointer: { x: 0, y: 0 },
-        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
+        titleProgress: 1,
+        elapsedMs: 9000,
         reduceMotion: true
     });
 });
