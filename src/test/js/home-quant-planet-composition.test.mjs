@@ -83,9 +83,15 @@ async function createReferenceGlyphRig(Three) {
     let disposed = false;
     return {
         group,
-        setLayout({ center, radius, aspect }) {
-            group.position.set(center.x, center.y, center.z + radius * 1.05);
+        setLayout({ center, radius, depthRadius = radius, aspect }) {
+            group.position.set(
+                center.x,
+                center.y,
+                center.z + depthRadius * 1.05
+            );
             group.scale.setScalar(radius * (aspect < 1 ? .9 : 1));
+            group.userData.layoutRadius = radius;
+            group.userData.depthRadius = depthRadius;
         },
         update({ pointer, titleProgress = 1, reduceMotion }) {
             const pointerX = reduceMotion ? 0 : Number(pointer?.x) || 0;
@@ -146,6 +152,9 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
             const planet = scene.getObjectByName("QuantPlanet");
             const glyphs = scene.getObjectByName("ReferenceGlyphRig");
             const worldPoints = collectMeshPoints(planet);
+            const bodyPoints = collectMeshPoints(
+                planet.getObjectByName("ReferencePlanetBody")
+            );
             this.scene = scene;
             frames.push({
                 aspect: camera.aspect,
@@ -164,12 +173,18 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                 worldQuaternion: planet.quaternion.clone(),
                 glyphPosition: glyphs.position.clone(),
                 glyphScale: glyphs.scale.clone(),
+                glyphLayoutRadius: glyphs.userData.layoutRadius,
+                glyphDepthRadius: glyphs.userData.depthRadius,
                 glyphQuaternions: glyphs.children.map((pivot) =>
                     pivot.quaternion.toArray()),
                 siblingRigs: planet.parent === glyphs.parent
                     && planet.parent === scene,
                 projected: worldPoints.map((point) =>
                     point.clone().project(camera)),
+                bodyProjected: bodyPoints.map((point) =>
+                    point.clone().project(camera)),
+                worldRadius: Math.max(...worldPoints.map((point) =>
+                    point.length())),
                 depths: worldPoints.map((point) =>
                     -point.clone().applyMatrix4(camera.matrixWorldInverse).z)
             });
@@ -316,35 +331,72 @@ test("refits complete world bounds after landscape and portrait resizes", async 
     assert.ok(portrait.far > Math.max(...portrait.depths));
 });
 
+test("frames the solid core densely and sizes glyphs independently of debris",
+        async (t) => {
+    const scene = await createTestScene(t, {
+        width: 969,
+        height: 969
+    });
+
+    assert.equal(scene.controller.render(pose()), true);
+    const frame = scene.frames.at(-1);
+    const bodyYs = frame.bodyProjected.map(({ y }) => y);
+    const bodyViewportRatio = (
+        Math.max(...bodyYs) - Math.min(...bodyYs)
+    ) / 2;
+    const glyphToEnvelopeRatio = frame.glyphLayoutRadius
+        / frame.worldRadius;
+
+    assert.ok(
+        bodyViewportRatio >= .6 && bodyViewportRatio <= .64,
+        `Expected body ratio 0.60-0.64, got ${bodyViewportRatio}`
+    );
+    assert.ok(
+        Math.abs(glyphToEnvelopeRatio - .504) < 1e-9,
+        `Expected glyph/envelope 0.504, got ${glyphToEnvelopeRatio}`
+    );
+    assert.ok(
+        Math.abs(frame.glyphDepthRadius / frame.worldRadius - .72) < 1e-9
+    );
+    assert.ok(frame.near < Math.min(...frame.depths));
+    assert.ok(frame.far > Math.max(...frame.depths));
+});
+
 test("pointer changes glyphs without changing planet or camera", async (t) => {
     const enabled = await createTestScene(t, {
         width: 1242,
         height: 1270,
         profile: sceneProfile({ pointerEnabled: true })
     });
-    enabled.controller.render(pose({
+    const pointers = [
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 },
+        { x: 0, y: -1 },
+        { x: 0, y: 1 }
+    ];
+    pointers.forEach((pointer, index) => enabled.controller.render(pose({
         worldAngle: .45,
-        pointer: { x: -1, y: -.5 },
-        elapsedMs: 1000
-    }));
-    enabled.controller.render(pose({
-        worldAngle: .45,
-        pointer: { x: 1, y: .5 },
-        elapsedMs: 1100
-    }));
+        pointer,
+        elapsedMs: 1000 + index * 100
+    })));
 
-    const [left, right] = enabled.frames.slice(-2);
-    assert.deepEqual(
-        left.worldQuaternion.toArray(),
-        right.worldQuaternion.toArray()
-    );
-    assert.deepEqual(
-        left.cameraPosition.toArray(),
-        right.cameraPosition.toArray()
-    );
-    assert.notDeepEqual(left.glyphQuaternions, right.glyphQuaternions);
-    assert.equal(right.glyphQuaternions.length, 9);
-    assert.equal(right.siblingRigs, true);
+    const frames = enabled.frames.slice(-pointers.length);
+    frames.forEach((frame) => {
+        assert.deepEqual(
+            frame.worldQuaternion.toArray(),
+            frames[0].worldQuaternion.toArray()
+        );
+        assert.deepEqual(
+            frame.cameraPosition.toArray(),
+            frames[0].cameraPosition.toArray()
+        );
+        assert.equal(frame.glyphQuaternions.length, 9);
+        assert.equal(frame.siblingRigs, true);
+    });
+    assert.ok(frames.slice(1).every((frame) =>
+        JSON.stringify(frame.glyphQuaternions)
+            !== JSON.stringify(frames[0].glyphQuaternions)));
 
     const disabled = await createTestScene(t, {
         width: 1440,

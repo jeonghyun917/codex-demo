@@ -19,6 +19,10 @@ const GLYPH_RESPONSE = Object.freeze([
 const COLUMN_SPACING = 1.12;
 const ROW_SPACING = 1.02;
 const TITLE_DIAMETER_RATIO = .62;
+const TITLE_DEPTH_RATIO = .98;
+const FACE_COLOR = 0xf2efe4;
+const SIDE_COLOR = 0x778279;
+const ALPHA_THRESHOLD = 32;
 const ZERO_POINTER = Object.freeze({ x: 0, y: 0 });
 
 function createShape(THREE, record) {
@@ -51,6 +55,117 @@ function triangleCount(geometry) {
         ? geometry.index.count
         : geometry.attributes.position.count;
     return primitives / 3;
+}
+
+function resolveAlphaContent(imageData) {
+    const width = Number(imageData?.width) || 0;
+    const height = Number(imageData?.height) || 0;
+    const data = imageData?.data;
+    let left = width;
+    let top = height;
+    let right = -1;
+    let bottom = -1;
+
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            if (data[(y * width + x) * 4 + 3] < ALPHA_THRESHOLD) {
+                continue;
+            }
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+        }
+    }
+    if (right < left || bottom < top) {
+        return {
+            imageData,
+            bounds: { left: 0, top: 0, width, height }
+        };
+    }
+    if (left === 0 && top === 0
+            && right === width - 1 && bottom === height - 1) {
+        return {
+            imageData,
+            bounds: { left, top, width, height }
+        };
+    }
+
+    const trimmedWidth = right - left + 1;
+    const trimmedHeight = bottom - top + 1;
+    const trimmed = new Uint8ClampedArray(
+        trimmedWidth * trimmedHeight * 4
+    );
+    for (let y = 0; y < trimmedHeight; y += 1) {
+        const sourceStart = ((top + y) * width + left) * 4;
+        const sourceEnd = sourceStart + trimmedWidth * 4;
+        trimmed.set(data.subarray(sourceStart, sourceEnd),
+            y * trimmedWidth * 4);
+    }
+    return {
+        imageData: {
+            width: trimmedWidth,
+            height: trimmedHeight,
+            data: trimmed
+        },
+        bounds: {
+            left,
+            top,
+            width: trimmedWidth,
+            height: trimmedHeight
+        }
+    };
+}
+
+function applyAtlasUvs(THREE, geometry, index, source, contentBounds) {
+    const column = index % 3;
+    const row = Math.floor(index / 3);
+    const trimmedWidth = contentBounds.width;
+    const trimmedHeight = contentBounds.height;
+    const cellLeft = Math.floor(column / 3 * trimmedWidth);
+    const cellRight = Math.floor((column + 1) / 3 * trimmedWidth);
+    const cellTop = Math.floor(row / 3 * trimmedHeight);
+    const cellBottom = Math.floor((row + 1) / 3 * trimmedHeight);
+    const positions = geometry.getAttribute("position");
+    const uvs = new Float32Array(positions.count * 2);
+    for (let vertex = 0; vertex < positions.count; vertex += 1) {
+        const x = positions.getX(vertex) + .5;
+        const y = .5 - positions.getY(vertex);
+        uvs[vertex * 2] = (
+            contentBounds.left
+            + cellLeft
+            + x * (cellRight - cellLeft)
+        ) / source.width;
+        uvs[vertex * 2 + 1] = (
+            contentBounds.top
+            + cellTop
+            + y * (cellBottom - cellTop)
+        ) / source.height;
+    }
+    geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+}
+
+function applyFaceSideColors(THREE, geometry) {
+    const positions = geometry.getAttribute("position");
+    const indices = geometry.getIndex();
+    const colors = new Float32Array(positions.count * 3);
+    const face = new THREE.Color(FACE_COLOR);
+    const side = new THREE.Color(SIDE_COLOR);
+
+    geometry.groups.forEach((group) => {
+        const color = group.materialIndex === 0 ? face : side;
+        const end = Math.min(group.start + group.count,
+            indices ? indices.count : positions.count);
+        for (let offset = group.start; offset < end; offset += 1) {
+            const vertex = indices ? indices.getX(offset) : offset;
+            color.toArray(colors, vertex * 3);
+        }
+    });
+    geometry.setAttribute(
+        "color",
+        new THREE.BufferAttribute(colors, 3)
+    );
+    geometry.clearGroups();
 }
 
 export async function createQuantGlyphRig(THREE, {
@@ -129,19 +244,39 @@ export async function createQuantGlyphRig(THREE, {
                 ? imageDataSource()
                 : imageDataSource;
         const imageData = await source;
-        const glyphContours = extractGlyphContours(imageData);
-        const faceMaterial = ownMaterial(new THREE.MeshStandardMaterial({
-            color: 0xf2efe4,
-            roughness: .76,
+        const alphaContent = resolveAlphaContent(imageData);
+        const glyphContours = extractGlyphContours(
+            alphaContent.imageData,
+            { alphaThreshold: ALPHA_THRESHOLD }
+        );
+        const atlasTexture = new THREE.DataTexture(
+            imageData.data,
+            imageData.width,
+            imageData.height,
+            THREE.RGBAFormat,
+            THREE.UnsignedByteType
+        );
+        atlasTexture.name = "ReferenceTitleAtlas";
+        atlasTexture.colorSpace = THREE.SRGBColorSpace;
+        atlasTexture.minFilter = THREE.LinearFilter;
+        atlasTexture.magFilter = THREE.LinearFilter;
+        atlasTexture.generateMipmaps = false;
+        atlasTexture.needsUpdate = true;
+        const faceSideMaterial = ownMaterial(new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            vertexColors: true,
+            roughness: .78,
             metalness: .02
-        }));
-        const sideMaterial = ownMaterial(new THREE.MeshStandardMaterial({
-            color: 0x778279,
-            roughness: .84,
-            metalness: .01
         }));
         const inkLineMaterial = ownMaterial(new THREE.LineBasicMaterial({
             color: 0x28312d
+        }));
+        const overlayMaterial = ownMaterial(new THREE.MeshBasicMaterial({
+            map: atlasTexture,
+            transparent: true,
+            alphaTest: .04,
+            depthWrite: false,
+            toneMapped: false
         }));
 
         glyphContours.forEach((records, index) => {
@@ -156,6 +291,7 @@ export async function createQuantGlyphRig(THREE, {
                 curveSegments: 1
             }));
             geometry.center();
+            applyFaceSideColors(THREE, geometry);
 
             const pivot = new THREE.Group();
             const response = GLYPH_RESPONSE[index];
@@ -174,7 +310,7 @@ export async function createQuantGlyphRig(THREE, {
 
             const mesh = new THREE.Mesh(
                 geometry,
-                [faceMaterial, sideMaterial]
+                faceSideMaterial
             );
             mesh.name = `ReferenceGlyphMesh-${index + 1}`;
             mesh.castShadow = false;
@@ -189,7 +325,27 @@ export async function createQuantGlyphRig(THREE, {
             );
             outline.name = `ReferenceGlyphOutline-${index + 1}`;
 
-            pivot.add(mesh, outline);
+            const overlayGeometry = ownGeometry(
+                new THREE.ShapeGeometry(shapes, 1)
+            );
+            applyAtlasUvs(
+                THREE,
+                overlayGeometry,
+                index,
+                imageData,
+                alphaContent.bounds
+            );
+            overlayGeometry.center();
+            geometry.computeBoundingBox();
+            const overlay = new THREE.Mesh(
+                overlayGeometry,
+                overlayMaterial
+            );
+            overlay.name = `ReferenceGlyphFaceOverlay-${index + 1}`;
+            overlay.position.z = geometry.boundingBox.max.z + .004;
+            overlay.renderOrder = 1;
+
+            pivot.add(mesh, outline, overlay);
             group.add(pivot);
             pivots.push(pivot);
         });
@@ -202,19 +358,25 @@ export async function createQuantGlyphRig(THREE, {
         function setLayout({
             center = { x: 0, y: 0, z: 0 },
             radius = 1,
+            depthRadius = radius,
             aspect = 1
         } = {}) {
             if (disposed) {
                 return;
             }
             const safeRadius = Math.max(.001, finiteOr(Number(radius), 1));
+            const safeDepthRadius = Math.max(
+                .001,
+                finiteOr(Number(depthRadius), safeRadius)
+            );
             const safeAspect = Math.max(.1, finiteOr(Number(aspect), 1));
             const portraitFactor = safeAspect < 1
                 ? .9 + safeAspect * .1
                 : 1;
             centerX = finiteOr(Number(center?.x), 0);
             centerY = finiteOr(Number(center?.y), 0);
-            finalZ = finiteOr(Number(center?.z), 0) + safeRadius * 1.05;
+            finalZ = finiteOr(Number(center?.z), 0)
+                + safeDepthRadius * TITLE_DEPTH_RATIO;
             revealDistance = safeRadius * .18;
             layoutScale = safeRadius * 2 * TITLE_DIAMETER_RATIO
                 / localLayoutWidth * portraitFactor;

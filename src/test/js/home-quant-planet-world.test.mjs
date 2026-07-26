@@ -362,6 +362,26 @@ test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     });
 });
 
+test("keeps canopy instance greens above the crushed-black floor", (t) => {
+    const world = createWorld(t);
+    const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
+    const instanceColor = new THREE.Color();
+
+    assert.equal(crowns.material.emissive.getHex(), 0x205f43);
+    assert.equal(crowns.material.emissiveIntensity, .8);
+    for (let index = 0; index < crowns.count; index += 1) {
+        crowns.getColorAt(index, instanceColor);
+        const shadedBase = crowns.material.color.clone()
+            .multiply(instanceColor);
+        assert.ok(
+            shadedBase.g >= .1,
+            `Canopy ${index} green floor ${shadedBase.g} is too dark`
+        );
+        assert.ok(shadedBase.g > shadedBase.r);
+        assert.ok(shadedBase.g > shadedBase.b);
+    }
+});
+
 test("stays within the high-profile world render budget", (t) => {
     const world = createWorld(t);
     assert.equal(typeof world.getRenderStats, "function");

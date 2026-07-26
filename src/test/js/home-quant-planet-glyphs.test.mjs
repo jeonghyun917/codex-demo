@@ -46,6 +46,36 @@ function createNineCellMask() {
     return image;
 }
 
+function createFragmentedNineCellMask() {
+    const image = createImageData(90, 90);
+    for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+            const left = column * 30;
+            const top = row * 30;
+            paintRectangle(image, left + 4, top + 6, 7, 14);
+            paintRectangle(image, left + 13, top + 6, 5, 14);
+            paintRectangle(image, left + 20, top + 6, 6, 14);
+        }
+    }
+    return image;
+}
+
+function createPaddedNineCellMask() {
+    const image = createImageData(120, 140);
+    for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+            paintRectangle(
+                image,
+                32 + column * 24,
+                22 + row * 39,
+                14,
+                18
+            );
+        }
+    }
+    return image;
+}
+
 function glyphPivots(group) {
     return group.children.filter(
         ({ name }) => name.startsWith("ReferenceGlyphPivot-")
@@ -114,12 +144,16 @@ test("builds nine independent extruded glyph pivots", async (t) => {
         const outline = pivot.getObjectByName(
             `ReferenceGlyphOutline-${index + 1}`
         );
+        const overlay = pivot.getObjectByName(
+            `ReferenceGlyphFaceOverlay-${index + 1}`
+        );
         assert.equal(mesh?.geometry?.type, "ExtrudeGeometry");
         assert.ok(mesh.geometry.parameters.options.depth > 0);
-        assert.equal(Array.isArray(mesh.material), true);
-        assert.equal(mesh.material.length, 2);
+        assert.equal(mesh?.material?.isMeshStandardMaterial, true);
         assert.equal(outline?.isLineSegments, true);
         assert.equal(outline.geometry.type, "EdgesGeometry");
+        assert.equal(overlay?.geometry?.type, "ShapeGeometry");
+        assert.equal(overlay?.material?.isMeshBasicMaterial, true);
     });
 });
 
@@ -128,28 +162,44 @@ test("keeps a hole and disconnected component in one glyph extrusion",
     const rig = await createRig(t);
     const pivot = glyphPivots(rig.group)[0];
     const meshes = pivot.children.filter(({ isMesh }) => isMesh);
+    const extrusion = pivot.getObjectByName("ReferenceGlyphMesh-1");
     const outlines = pivot.children.filter(
         ({ isLineSegments }) => isLineSegments
     );
-    const shapes = meshes[0].geometry.parameters.shapes;
+    const shapes = extrusion.geometry.parameters.shapes;
 
-    assert.equal(meshes.length, 1);
+    assert.equal(meshes.length, 2);
     assert.equal(outlines.length, 1);
     assert.equal(shapes.length, 2);
     assert.equal(
         shapes.filter((shape) => shape.holes.length === 1).length,
         1
     );
-    assert.equal(meshes[0].geometry.groups.length, 4);
+    assert.equal(extrusion.geometry.groups.length, 0);
 });
 
-test("uses the authored extrusion and face side and ink materials",
+test("maps a padded alpha-content box onto the complete glyph grid",
+        async (t) => {
+    const rig = await createRig(t, {
+        imageDataSource: createPaddedNineCellMask()
+    });
+
+    glyphPivots(rig.group).forEach((pivot, index) => {
+        const mesh = pivot.getObjectByName(
+            `ReferenceGlyphMesh-${index + 1}`
+        );
+        assert.equal(mesh.geometry.parameters.shapes.length, 1);
+    });
+});
+
+test("uses one vertex-colored face-side material and the ink outline",
         async (t) => {
     const rig = await createRig(t);
     const pivot = glyphPivots(rig.group)[0];
     const mesh = pivot.getObjectByName("ReferenceGlyphMesh-1");
     const outline = pivot.getObjectByName("ReferenceGlyphOutline-1");
-    const [face, side] = mesh.material;
+    const faceSide = mesh.material;
+    const colors = mesh.geometry.getAttribute("color");
 
     assert.equal(mesh.geometry.parameters.options.depth, .24);
     assert.equal(mesh.geometry.parameters.options.bevelEnabled, true);
@@ -158,17 +208,58 @@ test("uses the authored extrusion and face side and ink materials",
     assert.equal(mesh.geometry.parameters.options.bevelSize, .025);
     assert.equal(mesh.geometry.parameters.options.bevelThickness, .025);
     assert.equal(mesh.geometry.parameters.options.curveSegments, 1);
-    assert.equal(face.isMeshStandardMaterial, true);
-    assert.equal(face.color.getHex(), 0xf2efe4);
-    assert.equal(face.roughness, .76);
-    assert.equal(face.metalness, .02);
-    assert.equal(side.isMeshStandardMaterial, true);
-    assert.equal(side.color.getHex(), 0x778279);
-    assert.equal(side.roughness, .84);
-    assert.equal(side.metalness, .01);
+    assert.equal(faceSide.isMeshStandardMaterial, true);
+    assert.equal(faceSide.color.getHex(), 0xffffff);
+    assert.equal(faceSide.vertexColors, true);
+    assert.equal(faceSide.roughness, .78);
+    assert.equal(faceSide.metalness, .02);
+    assert.equal(colors.itemSize, 3);
+    assert.equal(colors.count, mesh.geometry.attributes.position.count);
+    assert.ok(new Set(Array.from(colors.array, (value) =>
+        value.toFixed(5))).size > 2);
     assert.equal(outline.material.isLineBasicMaterial, true);
     assert.equal(outline.material.color.getHex(), 0x28312d);
     assert.equal(outline.geometry.parameters.thresholdAngle, 28);
+});
+
+test("maps nine front overlays onto one shared local title atlas",
+        async (t) => {
+    const rig = await createRig(t, {
+        imageDataSource: createPaddedNineCellMask()
+    });
+    const overlays = glyphPivots(rig.group).map((pivot, index) =>
+        pivot.getObjectByName(`ReferenceGlyphFaceOverlay-${index + 1}`));
+    assert.ok(overlays.every(Boolean), "Missing glyph face overlay");
+    const maps = overlays.map(({ material }) => material.map);
+    const firstUvs = overlays[0].geometry.getAttribute("uv");
+    const lastUvs = overlays[8].geometry.getAttribute("uv");
+
+    assert.equal(new Set(maps).size, 1);
+    assert.equal(maps[0].isDataTexture, true);
+    assert.deepEqual(
+        [maps[0].image.width, maps[0].image.height],
+        [120, 140]
+    );
+    assert.ok(overlays.every(({ material }) =>
+        material.toneMapped === false));
+    assert.ok(Math.max(...firstUvs.array) < Math.max(...lastUvs.array));
+    glyphPivots(rig.group).forEach((pivot, index) => {
+        const extrusion = pivot.getObjectByName(
+            `ReferenceGlyphMesh-${index + 1}`
+        );
+        const overlay = overlays[index];
+        const extrusionCenter = new THREE.Box3()
+            .setFromBufferAttribute(
+                extrusion.geometry.getAttribute("position")
+            )
+            .getCenter(new THREE.Vector3());
+        const overlayCenter = new THREE.Box3()
+            .setFromBufferAttribute(
+                overlay.geometry.getAttribute("position")
+            )
+            .getCenter(new THREE.Vector3());
+        assert.ok(extrusionCenter.distanceTo(overlayCenter) < 1e-12);
+    });
 });
 
 test("pointer moves glyphs within limits and leaves the parent layout fixed",
@@ -318,7 +409,7 @@ test("lays out and reveals the title in front of the world", async (t) => {
     assert.equal(rig.group.visible, false);
     assert.equal(rig.group.position.x, 2);
     assert.equal(rig.group.position.y, 3);
-    assert.ok(Math.abs(rig.group.position.z - 8.35) < 1e-12);
+    assert.ok(Math.abs(rig.group.position.z - 8) < 1e-12);
     const hiddenScale = rig.group.scale.x;
 
     rig.update({
@@ -328,9 +419,33 @@ test("lays out and reveals the title in front of the world", async (t) => {
         reduceMotion: false
     });
     assert.equal(rig.group.visible, true);
-    assert.ok(Math.abs(rig.group.position.z - 9.25) < 1e-12);
+    assert.ok(Math.abs(rig.group.position.z - 8.9) < 1e-12);
     assert.ok(rig.group.scale.x > hiddenScale);
     assert.ok(Math.abs(rig.group.scale.x / hiddenScale - 1 / .82) < 1e-12);
+});
+
+test("keeps every settled glyph vertex behind the scene near plane",
+        async (t) => {
+    const rig = await createRig(t);
+    const center = { x: 0, y: 0, z: 4 };
+    const radius = 3.5;
+    const depthRadius = 5;
+    rig.setLayout({ center, radius, depthRadius, aspect: 1 });
+    rig.update({
+        pointer: { x: 0, y: 0 },
+        elapsedMs: 0,
+        titleProgress: 1,
+        reduceMotion: false
+    });
+    rig.group.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(rig.group);
+    const nearPlaneWorldZ = center.z + depthRadius * 1.08;
+
+    assert.ok(bounds.max.z > center.z + depthRadius);
+    assert.ok(
+        bounds.max.z < nearPlaneWorldZ,
+        `Expected nearest glyph z ${bounds.max.z} behind ${nearPlaneWorldZ}`
+    );
 });
 
 test("sizes the visible title to 62% of diameter and narrows portraits",
@@ -357,7 +472,7 @@ test("sizes the visible title to 62% of diameter and narrows portraits",
     assert.ok(portraitWidth > landscapeWidth * .9);
 });
 
-test("reports actual multi-material glyph draw calls and triangle counts",
+test("reports actual vertex-colored glyph draw calls and triangle counts",
         async (t) => {
     const rig = await createRig(t);
     const expectedTriangles = glyphPivots(rig.group).reduce((sum, pivot) => {
@@ -371,10 +486,28 @@ test("reports actual multi-material glyph draw calls and triangle counts",
     }, 0);
 
     assert.deepEqual(rig.getRenderStats(), {
-        drawCalls: 29,
+        drawCalls: 27,
         shadowCalls: 0,
         triangles: expectedTriangles
+            + glyphPivots(rig.group).reduce((sum, pivot, index) => {
+                const overlay = pivot.getObjectByName(
+                    `ReferenceGlyphFaceOverlay-${index + 1}`
+                );
+                const primitives = overlay.geometry.index
+                    ? overlay.geometry.index.count
+                    : overlay.geometry.attributes.position.count;
+                return sum + primitives / 3;
+            }, 0)
     });
+});
+
+test("bounds glyph draw calls independently of disconnected contours",
+        async (t) => {
+    const rig = await createRig(t, {
+        imageDataSource: createFragmentedNineCellMask()
+    });
+
+    assert.equal(rig.getRenderStats().drawCalls, 27);
 });
 
 test("reports zero render work when the rig or an ancestor is hidden",
@@ -433,10 +566,10 @@ test("disposes every glyph resource exactly once", async () => {
     rig.dispose();
     rig.dispose();
 
-    assert.equal(resources.geometries.size, 18);
+    assert.equal(resources.geometries.size, 27);
     assert.equal(resources.outlineGeometries.size, 9);
     assert.equal(resources.materials.size, 3);
-    assert.equal(resources.textures.size, 0);
+    assert.equal(resources.textures.size, 1);
     assert.ok([...counts.values()].every((count) => count === 1));
 });
 

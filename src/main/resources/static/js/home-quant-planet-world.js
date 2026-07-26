@@ -1050,9 +1050,13 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             canopy: ownMaterial(
                 createToonMaterial(
                     THREE,
-                    COLORS.foliage,
+                    0xffffff,
                     gradientMap,
-                    { vertexColors: true }
+                    {
+                        vertexColors: true,
+                        emissive: COLORS.foliageDark,
+                        emissiveIntensity: .8
+                    }
                 )
             ),
             rock: ownMaterial(

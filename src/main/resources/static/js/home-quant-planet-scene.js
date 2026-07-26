@@ -20,6 +20,8 @@ const BALANCED_LIMITS = Object.freeze({
     drawCalls: 65,
     triangles: 90000
 });
+const CAMERA_HERO_RADIUS_RATIO = .72;
+const GLYPH_LAYOUT_RADIUS_RATIO = .7;
 const framingMargin = (aspect) => aspect < .75 ? 1 : 1.1;
 
 const EMPTY_POSE = Object.freeze({
@@ -132,15 +134,19 @@ export async function createQuantPlanetScene({
             },
             radius: localEnvelope.radius * worldScale
         };
+        const cameraHeroRadius = envelope.radius
+            * CAMERA_HERO_RADIUS_RATIO;
+        const glyphLayoutRadius = cameraHeroRadius
+            * GLYPH_LAYOUT_RADIUS_RATIO;
         function refitCamera(aspect) {
             const next = fitPerspectiveSphere({
                 center: envelope.center,
-                radius: envelope.radius,
+                radius: cameraHeroRadius,
                 aspect,
                 verticalFovDegrees: 34,
                 margin: framingMargin(aspect)
             });
-            const clipPadding = next.radius * 1.08;
+            const clipPadding = envelope.radius * 1.08;
             camera.near = Math.max(.1, next.distance - clipPadding);
             camera.far = next.distance + clipPadding;
             camera.updateProjectionMatrix();
@@ -151,7 +157,8 @@ export async function createQuantPlanetScene({
             framing = refitCamera(aspect);
             glyphs.setLayout({
                 center: envelope.center,
-                radius: envelope.radius,
+                radius: glyphLayoutRadius,
+                depthRadius: cameraHeroRadius,
                 aspect: camera.aspect
             });
             camera.position.set(
