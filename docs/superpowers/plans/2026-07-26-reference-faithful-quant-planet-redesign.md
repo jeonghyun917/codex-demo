@@ -90,7 +90,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     PRODUCT_SCENES,
-    REFERENCE_TIMING,
     createProductSelection,
     fitPerspectiveSphere,
     resolveAdjacentProduct,
@@ -143,11 +142,6 @@ test("snaps drag selection to one of six wrapped product scenes", () => {
     assert.equal(resolveAdjacentProduct(0, -1).route, "/signals/backtest");
 });
 
-test("names reference-calibrated timing constants", () => {
-    assert.equal(REFERENCE_TIMING.introDeadlineMs, 4000);
-    assert.ok(REFERENCE_TIMING.worldRevolutionMs >= 60000);
-    assert.ok(REFERENCE_TIMING.productRevolutionMs >= 20000);
-});
 ```
 
 - [ ] **Step 2: Run the new test and verify RED**
@@ -253,8 +247,11 @@ Reuse the existing `wrapIndex` behavior rather than duplicating modulo logic.
 
 Import `REFERENCE_TIMING` from the composition module in
 `home-quant-planet-motion.js`. Replace the anonymous `28000` ring duration with
-`REFERENCE_TIMING.productRevolutionMs`. Do not change intro or lifecycle
-behavior in this task.
+`REFERENCE_TIMING.productRevolutionMs`. Extend the existing ring behavior test
+to advance `280` frames of `100ms` and assert that an unpaused ring completes
+one revolution while a paused ring remains unchanged. This tests the
+user-visible timing behavior rather than merely asserting a constant's value.
+Do not change intro or lifecycle behavior in this task.
 
 - [ ] **Step 7: Run focused and relevant suites**
 
@@ -302,9 +299,10 @@ test("exposes a complete framing envelope that includes upper landmarks", (t) =>
 });
 ```
 
-Extend the Java source contract so the scene must contain
-`fitPerspectiveSphere`, `getFramingEnvelope`, and an aspect-dependent resize
-fit, and must not contain the fixed `cameraDistance: 8.9` framing contract.
+Extend the executable composition test with portrait and landscape aspect
+fixtures, and extend the Java asset contract only to confirm the homepage still
+serves the revised scene module. Do not add source-substring assertions for
+private camera implementation details.
 
 - [ ] **Step 2: Run focused tests and verify RED**
 
