@@ -6,6 +6,9 @@ function frozenPlacement({
     id,
     districtId,
     clusterId,
+    category,
+    family,
+    sectorIndex,
     position,
     scale,
     rotation
@@ -14,6 +17,9 @@ function frozenPlacement({
         id,
         ...(districtId ? { districtId } : {}),
         ...(clusterId ? { clusterId } : {}),
+        ...(category ? { category } : {}),
+        ...(family ? { family } : {}),
+        ...(Number.isInteger(sectorIndex) ? { sectorIndex } : {}),
         position: frozenVector(position),
         scale: frozenVector(scale),
         rotation: frozenVector(rotation)
@@ -36,7 +42,70 @@ export const WORLD_DISTRICTS = Object.freeze([
     type
 })));
 
-export const TERRAIN_PATCHES = Object.freeze([
+function normalizedYawDegrees(position) {
+    const yaw = Math.atan2(position[2], position[0]) * 180 / Math.PI;
+    return (yaw + 360) % 360;
+}
+
+function sectorIndexForPosition(position) {
+    return Math.floor(
+        (normalizedYawDegrees(position) + 22.5) / 45
+    ) % WORLD_DISTRICTS.length;
+}
+
+function pointOnSurface(yawDegrees, latitude, radius) {
+    const yaw = yawDegrees * Math.PI / 180;
+    const horizontal = Math.cos(latitude);
+    return [
+        Math.cos(yaw) * horizontal * radius,
+        Math.sin(latitude) * radius,
+        Math.sin(yaw) * horizontal * radius
+    ];
+}
+
+function tagSurfacePlacement(placement, category, family) {
+    const sectorIndex = sectorIndexForPosition(placement.position);
+    return frozenPlacement({
+        ...placement,
+        districtId: placement.districtId
+            ?? WORLD_DISTRICTS[sectorIndex].id,
+        category,
+        family,
+        sectorIndex
+    });
+}
+
+function generatedPlacements({
+    prefix,
+    category,
+    family,
+    yawOffsets,
+    latitudes,
+    radius,
+    scaleForIndex,
+    rotationForIndex,
+    clusterByDistrict = false
+}) {
+    return WORLD_DISTRICTS.flatMap((district, sectorIndex) =>
+        yawOffsets.map((offset, detailIndex) => frozenPlacement({
+            id: `${prefix}-${sectorIndex}-${detailIndex}`,
+            districtId: district.id,
+            ...(clusterByDistrict ? { clusterId: district.id } : {}),
+            category,
+            family,
+            sectorIndex,
+            position: pointOnSurface(
+                district.yawDegrees + offset,
+                latitudes[detailIndex % latitudes.length],
+                radius + (detailIndex % 2) * .04
+            ),
+            scale: scaleForIndex(detailIndex, sectorIndex),
+            rotation: rotationForIndex(detailIndex, sectorIndex)
+        }))
+    );
+}
+
+const BASE_TERRAIN_PATCHES = Object.freeze([
     frozenPlacement({
         id: "summit-shoulder-a",
         districtId: "summit-shrine",
@@ -165,7 +234,33 @@ export const TERRAIN_PATCHES = Object.freeze([
     })
 ]);
 
-export const VILLAGE_PLACEMENTS = Object.freeze([
+const DENSE_TERRAIN_PATCHES = generatedPlacements({
+    prefix: "terrain-field",
+    category: "terrain",
+    family: "terrain",
+    yawOffsets: [-18, -11, -4, 4, 11, 18],
+    latitudes: [-.46, .5, -.12, .28, -.32, .08],
+    radius: 3.34,
+    scaleForIndex: (index) => [
+        .38 + index % 3 * .07,
+        .11 + index % 2 * .025,
+        .3 + (index + 1) % 3 * .055
+    ],
+    rotationForIndex: (index, sectorIndex) => [
+        (index % 2 ? -.08 : .08),
+        sectorIndex * .07,
+        (index - 2.5) * .055
+    ]
+});
+
+export const TERRAIN_PATCHES = Object.freeze([
+    ...BASE_TERRAIN_PATCHES.map((placement) =>
+        tagSurfacePlacement(placement, "terrain", "terrain")
+    ),
+    ...DENSE_TERRAIN_PATCHES
+]);
+
+const BASE_VILLAGE_PLACEMENTS = Object.freeze([
     frozenPlacement({
         id: "mountain-house-a",
         clusterId: "mountain-village",
@@ -252,6 +347,33 @@ export const VILLAGE_PLACEMENTS = Object.freeze([
     })
 ]);
 
+const DENSE_VILLAGE_PLACEMENTS = generatedPlacements({
+    prefix: "surface-house",
+    category: "structure",
+    family: "village",
+    yawOffsets: [-14, 0, 14],
+    latitudes: [-.3, .12, .42],
+    radius: 3.5,
+    scaleForIndex: (index, sectorIndex) => [
+        .22 + (index + sectorIndex) % 3 * .025,
+        .3 + index * .035,
+        .22 + (index + 1) % 2 * .025
+    ],
+    rotationForIndex: (index, sectorIndex) => [
+        index % 2 ? -.05 : .05,
+        sectorIndex * .09,
+        (index - 1) * .15
+    ],
+    clusterByDistrict: true
+});
+
+export const VILLAGE_PLACEMENTS = Object.freeze([
+    ...BASE_VILLAGE_PLACEMENTS.map((placement) =>
+        tagSurfacePlacement(placement, "structure", "village")
+    ),
+    ...DENSE_VILLAGE_PLACEMENTS
+]);
+
 const FOREST_PLACEMENTS = [
     [
         ["southern-a", [2.2, -2.46, .18], [.44, .52, .42], [.1, .14, -.08]],
@@ -295,7 +417,7 @@ const FOREST_PLACEMENTS = [
     ]
 ];
 
-export const FOREST_BELTS = Object.freeze([
+const BASE_FOREST_BELTS = Object.freeze([
     ["southern-canopy", "root-gardens", FOREST_PLACEMENTS[0]],
     ["reverse-hamlet", "forest-hamlet", FOREST_PLACEMENTS[1]],
     ["root-garden", "root-gardens", FOREST_PLACEMENTS[2]]
@@ -303,17 +425,49 @@ export const FOREST_BELTS = Object.freeze([
     id,
     districtId,
     placements: Object.freeze(placements.map(
-        ([placementId, position, scale, rotation]) => frozenPlacement({
-            id: placementId,
-            districtId,
-            position,
-            scale,
-            rotation
-        })
+        ([placementId, position, scale, rotation]) => tagSurfacePlacement(
+            frozenPlacement({
+                id: placementId,
+                districtId,
+                position,
+                scale,
+                rotation
+            }),
+            "foliageRock",
+            "canopy"
+        )
     ))
 })));
 
-export const DEBRIS_PLACEMENTS = Object.freeze([
+const DENSE_FOLIAGE_PLACEMENTS = generatedPlacements({
+    prefix: "canopy-field",
+    category: "foliageRock",
+    family: "canopy",
+    yawOffsets: [-17, -10, -3, 3, 10, 17],
+    latitudes: [-.5, .46, -.18, .18, -.34, .32],
+    radius: 3.48,
+    scaleForIndex: (index, sectorIndex) => [
+        .26 + (index + sectorIndex) % 3 * .035,
+        .31 + index % 2 * .045,
+        .25 + (index + 1) % 3 * .03
+    ],
+    rotationForIndex: (index, sectorIndex) => [
+        index % 2 ? -.08 : .08,
+        sectorIndex * .06,
+        (index - 2.5) * .07
+    ]
+});
+
+export const FOREST_BELTS = Object.freeze([
+    ...BASE_FOREST_BELTS,
+    Object.freeze({
+        id: "continuous-canopy",
+        districtId: "root-gardens",
+        placements: Object.freeze(DENSE_FOLIAGE_PLACEMENTS)
+    })
+]);
+
+const BASE_DEBRIS_PLACEMENTS = Object.freeze([
     frozenPlacement({
         id: "debris-00",
         position: [4.82, 3.84, .16],
@@ -411,3 +565,70 @@ export const DEBRIS_PLACEMENTS = Object.freeze([
         rotation: [-.18, .3, -.24]
     })
 ]);
+
+export const DEBRIS_PLACEMENTS = Object.freeze(
+    BASE_DEBRIS_PLACEMENTS.map((placement) =>
+        tagSurfacePlacement(
+            placement,
+            "utilitySilhouette",
+            "debris"
+        )
+    )
+);
+
+export const CABLE_SEGMENT_PLACEMENTS = Object.freeze(generatedPlacements({
+    prefix: "cable-segment",
+    category: "utilitySilhouette",
+    family: "cable",
+    yawOffsets: [-15, 15],
+    latitudes: [-.2, .24],
+    radius: 3.66,
+    scaleForIndex: (index) => [
+        .025,
+        .48 + index * .08,
+        .025
+    ],
+    rotationForIndex: (index, sectorIndex) => [
+        0,
+        sectorIndex * .08,
+        index ? -.82 : .82
+    ]
+}));
+
+export const PATH_FRAME_PLACEMENTS = Object.freeze(generatedPlacements({
+    prefix: "path-frame",
+    category: "utilitySilhouette",
+    family: "pathFrame",
+    yawOffsets: [-8, 8],
+    latitudes: [-.4, .38],
+    radius: 3.55,
+    scaleForIndex: (index) => [
+        .055,
+        .34 + index * .06,
+        .055
+    ],
+    rotationForIndex: (index, sectorIndex) => [
+        index ? -.08 : .08,
+        sectorIndex * .05,
+        index ? -.62 : .62
+    ]
+}));
+
+export const PIPE_POLE_PLACEMENTS = Object.freeze(generatedPlacements({
+    prefix: "pipe-pole",
+    category: "utilitySilhouette",
+    family: "pipePole",
+    yawOffsets: [0],
+    latitudes: [0],
+    radius: 3.62,
+    scaleForIndex: (_, sectorIndex) => [
+        .045 + sectorIndex % 2 * .008,
+        .5 + sectorIndex % 3 * .05,
+        .045 + sectorIndex % 2 * .008
+    ],
+    rotationForIndex: (_, sectorIndex) => [
+        0,
+        sectorIndex * .04,
+        sectorIndex % 2 ? -.12 : .12
+    ]
+}));

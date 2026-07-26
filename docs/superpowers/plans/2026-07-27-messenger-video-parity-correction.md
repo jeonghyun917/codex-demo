@@ -134,16 +134,21 @@ Commit message: `test: lock dual-rig motion invariants`.
 
 **Interfaces:**
 - Consumes: eight semantic district definitions and repeated placement arrays.
-- Produces: a `getDensityProfile()` diagnostic with eight sector records whose
+- Produces: a `getSurfaceDensity()` diagnostic with eight sector records whose
   category counts describe rendered, front-relevant detail.
 
 - [ ] **Step 1: Write the failing density test**
 
-For every sector, assert terrain count `>= 3`, architecture/mechanical count
-`>= 3`, vegetation/rock count `>= 4`, and silhouette-detail count `>= 3`.
-Also assert adjacent sectors share boundary detail so the minimum category
-total never collapses at 22.5-degree offset samples. The production change
-caught by this test is returning to one representative landmark per sector.
+For every sector, assert total detail `>= 20`, terrain count `>= 6`,
+architecture/mechanical count `>= 3`, vegetation/rock count `>= 6`, and
+utility/silhouette-detail count `>= 5`. Assert upper, middle, and lower latitude
+bands all contain authored detail, the maximum neighboring azimuth gap is
+`<= 18 degrees`, and adjacent sectors share boundary detail so the minimum
+category total never collapses at 22.5-degree offset samples. For eight yaw
+samples, assert the front hemisphere contains at least 70 details, four or more
+visible categories, and all four projected quadrants are occupied. The
+production change caught by this test is returning to one representative
+landmark per sector or counting invisible back-side geometry as foreground.
 
 - [ ] **Step 2: Verify RED**
 
@@ -155,16 +160,23 @@ representative and sparse repeated placements.
 
 - [ ] **Step 3: Implement the density diagnostic from rendered placements**
 
-Tag placement records by category and derive the eight immutable sector
-summaries from the same placement data used to create geometry. Do not create a
-second visual-only source of truth.
+Tag placement records by category and derive an immutable
+`getSurfaceDensity()` result from the same placement data used to create
+geometry. Return eight sector summaries, eight yaw-view front-hemisphere
+summaries, latitude-band counts, projected quadrant occupancy, and maximum
+azimuth gap. Do not create a second visual-only source of truth.
 
 - [ ] **Step 4: Expand existing instanced families**
 
-Add terrain, village, canopy/rock, roof, and debris placements across all eight
-sectors. Reuse existing shared box, cylinder, sphere, cone, torus, and toon
-materials; increase instance counts rather than creating per-detail meshes.
-Keep the major authored landmark groups intact.
+Add terrain, village, canopy/rock, roof, path/frame, pipe/pole, and debris
+placements across all eight sectors. Consolidate the four village
+`InstancedMesh` objects into one global building family and replace individual
+cable meshes with one instanced segment family before adding path/frame and
+pipe/pole families. Reuse existing shared box, cylinder, sphere, cone, torus,
+and toon materials; increase instance counts rather than creating per-detail
+meshes. Keep the major authored landmark groups intact. Target approximately
+39 world mesh calls plus at most 3 shadow calls, leaving total scene headroom
+below 75.
 
 - [ ] **Step 5: Verify GREEN and budgets**
 
@@ -207,7 +219,10 @@ restart only the port `8081` preview. Never stop or alter port `8080`.
 Capture desktop and `375x812` frames at center, left/up, right/down, and at
 several autonomous world timestamps. Confirm that individual glyph faces and
 depths differ while the planet phase is unchanged by pointer motion. Confirm
-there is no large bare core face at any sampled yaw.
+there is no large bare core face at any sampled yaw. Across eight 45-degree yaw
+captures, measure planet-ring foreground occupancy `>= 40%`, detail-edge
+density `>= 22%`, sector variation `<= 15%`, and largest bare connected region
+`<= 12%` of the silhouette.
 
 - [ ] **Step 4: Check runtime diagnostics**
 

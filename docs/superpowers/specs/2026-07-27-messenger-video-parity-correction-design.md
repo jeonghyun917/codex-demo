@@ -84,6 +84,15 @@ a large undressed core face.
 - Pointer return to center settles each glyph to its own rest pose.
 - Eight yaw samples at 45-degree intervals each expose dense detail from at
   least three visual categories on the front hemisphere.
+- Every authored 45-degree sector contains at least 20 surface details:
+  terrain mass, three or more structures/mechanical pieces, six or more
+  foliage/rock pieces, and five or more utility/silhouette details.
+- The maximum authored azimuth gap between neighboring surface details is at
+  most 18 degrees.
+- `getSurfaceDensity()` derives immutable sector, boundary, latitude-band, and
+  front-hemisphere summaries from the same placement arrays that populate the
+  rendered instanced families; opposite yaw samples partition, rather than
+  double-count, front and rear detail.
 - The existing yellow `ENTER` anchor remains the only navigation control and
   continues to target `/quant`.
 
@@ -101,6 +110,11 @@ At desktop and portrait mobile sizes:
   and rust machinery retain the reference's cel-ink hierarchy;
 - the planet continues rotating when the pointer is stationary and while
   glyphs react.
+
+For eight matched yaw captures, the visible planet ring must keep foreground
+occupancy at or above 40%, detail-edge density at or above 22%, density
+variation at or below 15%, and the largest bare connected region at or below
+12% of the planet silhouette.
 
 ## Performance and Fallbacks
 

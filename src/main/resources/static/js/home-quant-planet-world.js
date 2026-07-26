@@ -1,6 +1,9 @@
 import {
+    CABLE_SEGMENT_PLACEMENTS,
     DEBRIS_PLACEMENTS,
     FOREST_BELTS,
+    PATH_FRAME_PLACEMENTS,
+    PIPE_POLE_PLACEMENTS,
     TERRAIN_PATCHES,
     VILLAGE_PLACEMENTS,
     WORLD_DISTRICTS
@@ -170,24 +173,180 @@ function buildDistrictAnchors(THREE) {
     return { group, byId };
 }
 
-function addCable(THREE, parent, resources, material, points, name) {
-    const curve = new THREE.CatmullRomCurve3(
-        points.map((point) => new THREE.Vector3(...point))
-    );
-    const geometry = resources.ownGeometry(
-        new THREE.TubeGeometry(curve, 12, .026, 4, false)
-    );
-    const cable = new THREE.Mesh(geometry, material);
-    cable.name = name;
-    parent.add(cable);
-    return cable;
-}
-
 function markInstancesDirty(mesh) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) {
         mesh.instanceColor.needsUpdate = true;
     }
+}
+
+function tagSurfaceInstances(mesh, placements) {
+    mesh.userData.surfaceDetailIds = Object.freeze(
+        placements.map((placement) => placement.id)
+    );
+}
+
+const SURFACE_CATEGORIES = Object.freeze([
+    "terrain",
+    "structure",
+    "foliageRock",
+    "utilitySilhouette"
+]);
+
+function yawDegreesForPlacement(placement) {
+    const yaw = Math.atan2(
+        placement.position[2],
+        placement.position[0]
+    ) * 180 / Math.PI;
+    return (yaw + 360) % 360;
+}
+
+function signedYawDelta(yawDegrees, centerDegrees) {
+    return (
+        (yawDegrees - centerDegrees + 540) % 360
+    ) - 180;
+}
+
+function emptyCategoryCounts() {
+    return {
+        terrain: 0,
+        structure: 0,
+        foliageRock: 0,
+        utilitySilhouette: 0
+    };
+}
+
+function summarizePlacements(placements) {
+    const counts = emptyCategoryCounts();
+    placements.forEach((placement) => {
+        counts[placement.category] += 1;
+    });
+    return Object.freeze(counts);
+}
+
+function categoryTotal(counts) {
+    return SURFACE_CATEGORIES.reduce(
+        (total, category) => total + counts[category],
+        0
+    );
+}
+
+function buildSurfaceDensity(placements) {
+    const immutablePlacements = Object.freeze([...placements]);
+    const azimuths = immutablePlacements
+        .map(yawDegreesForPlacement)
+        .toSorted((left, right) => left - right);
+    let maximumAzimuthGapDegrees = 0;
+    azimuths.forEach((yaw, index) => {
+        const nextYaw = index === azimuths.length - 1
+            ? azimuths[0] + 360
+            : azimuths[index + 1];
+        maximumAzimuthGapDegrees = Math.max(
+            maximumAzimuthGapDegrees,
+            nextYaw - yaw
+        );
+    });
+
+    const sectors = Object.freeze(WORLD_DISTRICTS.map(
+        (district, index) => {
+            const sectorPlacements = immutablePlacements.filter(
+                (placement) => placement.sectorIndex === index
+            );
+            const counts = summarizePlacements(sectorPlacements);
+            return Object.freeze({
+                index,
+                districtId: district.id,
+                centerYawDegrees: district.yawDegrees,
+                counts,
+                total: categoryTotal(counts)
+            });
+        }
+    ));
+
+    const boundarySamples = Object.freeze(WORLD_DISTRICTS.map(
+        (_, index) => {
+            const yawDegrees = index * 45 + 22.5;
+            const samplePlacements = immutablePlacements.filter(
+                (placement) => {
+                    const delta = signedYawDelta(
+                        yawDegreesForPlacement(placement),
+                        yawDegrees
+                    );
+                    return delta >= -22.5 && delta < 22.5;
+                }
+            );
+            const counts = summarizePlacements(samplePlacements);
+            return Object.freeze({
+                yawDegrees,
+                counts,
+                total: categoryTotal(counts)
+            });
+        }
+    ));
+
+    const frontViews = Object.freeze(WORLD_DISTRICTS.map((_, index) => {
+        const yawDegrees = index * 45;
+        const frontCenter = yawDegrees + 90;
+        const frontPlacements = immutablePlacements.filter((placement) => {
+            const delta = signedYawDelta(
+                yawDegreesForPlacement(placement),
+                frontCenter
+            );
+            return delta > -90 && delta <= 90;
+        });
+        const counts = summarizePlacements(frontPlacements);
+        const projectedQuadrants = new Set();
+        const yawRadians = yawDegrees * Math.PI / 180;
+        frontPlacements.forEach((placement) => {
+            const [x, y, z] = placement.position;
+            const projectedX = Math.cos(yawRadians) * x
+                + Math.sin(yawRadians) * z;
+            projectedQuadrants.add(
+                `${projectedX < 0 ? "left" : "right"}-${
+                    y < 0 ? "lower" : "upper"
+                }`
+            );
+        });
+        return Object.freeze({
+            yawDegrees,
+            counts,
+            total: categoryTotal(counts),
+            visibleCategoryCount: SURFACE_CATEGORIES.filter(
+                (category) => counts[category] > 0
+            ).length,
+            projectedQuadrants: Object.freeze(
+                [...projectedQuadrants].toSorted()
+            )
+        });
+    }));
+
+    const latitudeBands = {
+        upper: 0,
+        middle: 0,
+        lower: 0
+    };
+    immutablePlacements.forEach((placement) => {
+        const [x, y, z] = placement.position;
+        const latitude = Math.asin(y / Math.hypot(x, y, z));
+        const band = latitude > .25
+            ? "upper"
+            : latitude < -.25
+                ? "lower"
+                : "middle";
+        latitudeBands[band] += 1;
+    });
+
+    return Object.freeze({
+        detailIds: Object.freeze(
+            immutablePlacements.map((placement) => placement.id)
+        ),
+        totalDetails: immutablePlacements.length,
+        sectors,
+        boundarySamples,
+        frontViews,
+        latitudeBands: Object.freeze(latitudeBands),
+        maximumAzimuthGapDegrees
+    });
 }
 
 function buildPlanetCore(THREE, resources, palette) {
@@ -227,6 +386,7 @@ function buildPlanetCore(THREE, resources, palette) {
         terrain.setMatrixAt(index, matrix);
     });
     markInstancesDirty(terrain);
+    tagSurfaceInstances(terrain, TERRAIN_PATCHES);
     group.add(terrain);
 
     const rockPositions = TERRAIN_PATCHES.filter((_, index) => index % 2);
@@ -542,31 +702,6 @@ function buildIndustrialCluster(THREE, resources, palette) {
     markInstancesDirty(braces);
     group.add(braces);
 
-    addCable(
-        THREE,
-        group,
-        resources,
-        palette.ink,
-        [
-            [-4.9, 1.18, 1.12],
-            [-4.42, .44, 2],
-            [-3.72, -.42, 1.92],
-            [-3.08, -1.38, 1.24]
-        ],
-        "ReferenceIndustrialCableA"
-    );
-    addCable(
-        THREE,
-        group,
-        resources,
-        palette.ink,
-        [
-            [-4.72, -.12, .74],
-            [-4.35, -1.02, .62],
-            [-3.72, -1.88, .84]
-        ],
-        "ReferenceIndustrialCableB"
-    );
     return group;
 }
 
@@ -695,30 +830,6 @@ function buildUtilityCluster(THREE, resources, palette) {
     );
     group.add(utilityRotor);
 
-    addCable(
-        THREE,
-        group,
-        resources,
-        palette.ink,
-        [
-            [3.7, 1.74, 1.22],
-            [4.18, 1.18, 1.58],
-            [4.48, .38, 1.18]
-        ],
-        "ReferenceUtilityCableA"
-    );
-    addCable(
-        THREE,
-        group,
-        resources,
-        palette.ink,
-        [
-            [3.68, 1.68, 1.2],
-            [3.22, .7, 1.86],
-            [2.84, -.4, 1.52]
-        ],
-        "ReferenceUtilityCableB"
-    );
     return { group, utilityRotor };
 }
 
@@ -734,20 +845,106 @@ function buildVillageClusters(THREE, resources, palette) {
         const cluster = new THREE.Group();
         cluster.name = name;
         cluster.userData.villageCluster = clusterId;
-        const placements = VILLAGE_PLACEMENTS.filter(
-            (placement) => placement.clusterId === clusterId
+        clusters.set(clusterId, cluster);
+    });
+
+    const buildings = new THREE.InstancedMesh(
+        resources.geometry.box,
+        palette.village,
+        VILLAGE_PLACEMENTS.length * 3
+    );
+    buildings.name = "ReferenceVillageBuildingFamily";
+    const matrix = new THREE.Matrix4();
+    const architectureColor = new THREE.Color(COLORS.architecture);
+    const roofColor = new THREE.Color(COLORS.coralShade);
+    VILLAGE_PLACEMENTS.forEach((placement, placementIndex) => {
+        const instanceIndex = placementIndex * 3;
+        orientSurfaceInstance(
+            THREE,
+            matrix,
+            placement.position,
+            placement.scale,
+            placement.rotation
         );
-        const buildings = new THREE.InstancedMesh(
-            resources.geometry.box,
-            palette.village,
-            placements.length * 3
+        buildings.setMatrixAt(instanceIndex, matrix);
+        buildings.setColorAt(instanceIndex, architectureColor);
+
+        const normal = new THREE.Vector3(...placement.position).normalize();
+        const tangent = new THREE.Vector3(
+            -normal.z,
+            0,
+            normal.x
+        ).normalize();
+        for (const side of [-1, 1]) {
+            const roofPosition = new THREE.Vector3(...placement.position)
+                .addScaledVector(normal, placement.scale[1] * .72)
+                .addScaledVector(
+                    tangent,
+                    side * placement.scale[0] * .28
+                )
+                .toArray();
+            orientSurfaceInstance(
+                THREE,
+                matrix,
+                roofPosition,
+                [
+                    placement.scale[0] * .7,
+                    placement.scale[1] * .13,
+                    placement.scale[2] * 1.18
+                ],
+                [
+                    placement.rotation[0],
+                    placement.rotation[1],
+                    placement.rotation[2] + side * .42
+                ]
+            );
+            buildings.setMatrixAt(
+                instanceIndex + (side === -1 ? 1 : 2),
+                matrix
+            );
+            buildings.setColorAt(
+                instanceIndex + (side === -1 ? 1 : 2),
+                roofColor
+            );
+        }
+    });
+    markInstancesDirty(buildings);
+    tagSurfaceInstances(buildings, VILLAGE_PLACEMENTS);
+    return { clusters, buildings };
+}
+
+function buildSurfaceUtilityFamilies(THREE, resources, palette) {
+    const group = new THREE.Group();
+    group.name = "ReferenceSurfaceUtilityFamilies";
+    const matrix = new THREE.Matrix4();
+    const families = [
+        {
+            name: "ReferenceCableSegmentFamily",
+            geometry: resources.geometry.cylinder,
+            material: palette.ink,
+            placements: CABLE_SEGMENT_PLACEMENTS
+        },
+        {
+            name: "ReferencePathFrameFamily",
+            geometry: resources.geometry.box,
+            material: palette.rock,
+            placements: PATH_FRAME_PLACEMENTS
+        },
+        {
+            name: "ReferencePipePoleFamily",
+            geometry: resources.geometry.cylinder,
+            material: palette.coralShade,
+            placements: PIPE_POLE_PLACEMENTS
+        }
+    ];
+    families.forEach((family) => {
+        const mesh = new THREE.InstancedMesh(
+            family.geometry,
+            family.material,
+            family.placements.length
         );
-        buildings.name = `${name}Buildings`;
-        const matrix = new THREE.Matrix4();
-        const architectureColor = new THREE.Color(COLORS.architecture);
-        const roofColor = new THREE.Color(COLORS.coralShade);
-        placements.forEach((placement, placementIndex) => {
-            const instanceIndex = placementIndex * 3;
+        mesh.name = family.name;
+        family.placements.forEach((placement, index) => {
             orientSurfaceInstance(
                 THREE,
                 matrix,
@@ -755,63 +952,20 @@ function buildVillageClusters(THREE, resources, palette) {
                 placement.scale,
                 placement.rotation
             );
-            buildings.setMatrixAt(instanceIndex, matrix);
-            buildings.setColorAt(instanceIndex, architectureColor);
-
-            const normal = new THREE.Vector3(...placement.position).normalize();
-            const tangent = new THREE.Vector3(
-                -normal.z,
-                0,
-                normal.x
-            ).normalize();
-            for (const side of [-1, 1]) {
-                const roofPosition = new THREE.Vector3(...placement.position)
-                    .addScaledVector(normal, placement.scale[1] * .72)
-                    .addScaledVector(
-                        tangent,
-                        side * placement.scale[0] * .28
-                    )
-                    .toArray();
-                orientSurfaceInstance(
-                    THREE,
-                    matrix,
-                    roofPosition,
-                    [
-                        placement.scale[0] * .7,
-                        placement.scale[1] * .13,
-                        placement.scale[2] * 1.18
-                    ],
-                    [
-                        placement.rotation[0],
-                        placement.rotation[1],
-                        placement.rotation[2] + side * .42
-                    ]
-                );
-                buildings.setMatrixAt(instanceIndex + (side === -1 ? 1 : 2), matrix);
-                buildings.setColorAt(
-                    instanceIndex + (side === -1 ? 1 : 2),
-                    roofColor
-                );
-            }
+            mesh.setMatrixAt(index, matrix);
         });
-        markInstancesDirty(buildings);
-        cluster.add(buildings);
-        clusters.set(clusterId, cluster);
+        markInstancesDirty(mesh);
+        tagSurfaceInstances(mesh, family.placements);
+        group.add(mesh);
     });
-    return clusters;
+    return group;
 }
 
-function buildLowerCanopy(THREE, resources, palette, count) {
+function buildLowerCanopy(THREE, resources, palette, placements) {
     const group = new THREE.Group();
     group.name = "ReferenceLowerCanopy";
-    const canopyCount = Math.max(0, Math.floor(count));
+    const canopyCount = placements.length;
     const matrix = new THREE.Matrix4();
-    const placements = [];
-    for (let index = 0; index < canopyCount; index += 1) {
-        const belt = FOREST_BELTS[index % FOREST_BELTS.length];
-        const beltIndex = Math.floor(index / FOREST_BELTS.length);
-        placements.push(belt.placements[beltIndex % belt.placements.length]);
-    }
 
     const trunks = new THREE.InstancedMesh(
         resources.geometry.cylinder,
@@ -861,16 +1015,18 @@ function buildLowerCanopy(THREE, resources, palette, count) {
     }
     markInstancesDirty(trunks);
     markInstancesDirty(crowns);
+    tagSurfaceInstances(trunks, placements);
+    tagSurfaceInstances(crowns, placements);
     trunks.castShadow = Boolean(resources.shadows);
     crowns.castShadow = Boolean(resources.shadows);
     group.add(trunks, crowns);
     return group;
 }
 
-function buildFloatingDebris(THREE, resources, palette, count) {
+function buildFloatingDebris(THREE, resources, palette, placements) {
     const group = new THREE.Group();
     group.name = "ReferenceFloatingDebris";
-    const debrisCount = Math.max(0, Math.floor(count));
+    const debrisCount = placements.length;
     const matrix = new THREE.Matrix4();
 
     const pieces = new THREE.InstancedMesh(
@@ -886,19 +1042,11 @@ function buildFloatingDebris(THREE, resources, palette, count) {
     );
     flecks.name = "ReferenceDebrisFlecks";
     for (let index = 0; index < debrisCount; index += 1) {
-        const placement = DEBRIS_PLACEMENTS[
-            index % DEBRIS_PLACEMENTS.length
-        ];
-        const cycle = Math.floor(index / DEBRIS_PLACEMENTS.length);
-        const offsetPosition = [
-            placement.position[0],
-            placement.position[1] + cycle * .16,
-            placement.position[2] - cycle * .24
-        ];
+        const placement = placements[index];
         orientInstance(
             THREE,
             matrix,
-            offsetPosition,
+            placement.position,
             placement.scale,
             placement.rotation
         );
@@ -906,7 +1054,11 @@ function buildFloatingDebris(THREE, resources, palette, count) {
         orientInstance(
             THREE,
             matrix,
-            [offsetPosition[0] + .16, offsetPosition[1] + .14, offsetPosition[2]],
+            [
+                placement.position[0] + .16,
+                placement.position[1] + .14,
+                placement.position[2]
+            ],
             [
                 placement.scale[0] * .42,
                 placement.scale[1] * .72,
@@ -922,6 +1074,8 @@ function buildFloatingDebris(THREE, resources, palette, count) {
     }
     markInstancesDirty(pieces);
     markInstancesDirty(flecks);
+    tagSurfaceInstances(pieces, placements);
+    tagSurfaceInstances(flecks, placements);
     group.add(pieces, flecks);
     return group;
 }
@@ -1077,20 +1231,45 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         const industrial = buildIndustrialCluster(THREE, resources, palette);
         const utility = buildUtilityCluster(THREE, resources, palette);
         const villages = buildVillageClusters(THREE, resources, palette);
+        const allFoliagePlacements = FOREST_BELTS.flatMap(
+            (belt) => belt.placements
+        );
+        const foliagePlacements = profile.name === "high"
+            ? allFoliagePlacements
+            : allFoliagePlacements.slice(
+                0,
+                Math.max(0, Math.floor(profile.foliageCount ?? 18))
+            );
         const canopy = buildLowerCanopy(
             THREE,
             resources,
             palette,
-            profile.foliageCount ?? 18
+            foliagePlacements
         );
+        const debrisCount = profile.name === "high"
+            ? DEBRIS_PLACEMENTS.length
+            : Math.max(0, Math.floor(profile.cloudCount ?? 8));
+        const debrisPlacements = DEBRIS_PLACEMENTS.slice(0, debrisCount);
         const debris = buildFloatingDebris(
             THREE,
             resources,
             palette,
-            profile.name === "high"
-                ? Math.max(16, profile.cloudCount ?? 16)
-                : profile.cloudCount ?? 8
+            debrisPlacements
         );
+        const surfaceUtilities = buildSurfaceUtilityFamilies(
+            THREE,
+            resources,
+            palette
+        );
+        const surfaceDensity = buildSurfaceDensity([
+            ...TERRAIN_PATCHES,
+            ...VILLAGE_PLACEMENTS,
+            ...foliagePlacements,
+            ...CABLE_SEGMENT_PLACEMENTS,
+            ...PATH_FRAME_PLACEMENTS,
+            ...PIPE_POLE_PLACEMENTS,
+            ...debrisPlacements
+        ]);
         const districts = buildDistrictAnchors(THREE);
         temple.rotation.y = Math.PI / 2;
         temple.position.x = 1.55;
@@ -1102,28 +1281,30 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             temple,
             industrial,
             utility.group,
-            ...villages.values(),
+            villages.buildings,
+            ...villages.clusters.values(),
             canopy,
             debris,
+            surfaceUtilities,
             districts.group
         );
         content.updateMatrixWorld(true);
         districts.byId.get("summit-shrine").attach(temple);
         districts.byId.get("mountain-village").attach(
-            villages.get("mountain-village")
+            villages.clusters.get("mountain-village")
         );
         districts.byId.get("utility-ridge").attach(utility.group);
         districts.byId.get("forest-hamlet").attach(
-            villages.get("forest-hamlet")
+            villages.clusters.get("forest-hamlet")
         );
         districts.byId.get("root-gardens").attach(canopy);
         districts.byId.get("backside-houses").attach(
-            villages.get("backside-houses")
+            villages.clusters.get("backside-houses")
         );
         districts.byId.get("industrial-yard").attach(industrial);
         const waterDistrict = districts.byId.get("water-works");
         waterDistrict.attach(waterBand.group);
-        waterDistrict.attach(villages.get("water-works"));
+        waterDistrict.attach(villages.clusters.get("water-works"));
         planet.add(content);
 
         const framingBox = new THREE.Box3();
@@ -1246,6 +1427,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             update,
             getFramingEnvelope,
             getRenderStats,
+            getSurfaceDensity: () => surfaceDensity,
             dispose
         };
     } catch (error) {

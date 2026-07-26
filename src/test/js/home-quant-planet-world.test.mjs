@@ -49,81 +49,23 @@ function collectMeshPoints(root) {
     return points;
 }
 
-function collectRenderedCenters(root) {
-    const points = [];
-    const instanceMatrix = new THREE.Matrix4();
-    const worldMatrix = new THREE.Matrix4();
-    const center = new THREE.Vector3();
+function authoredDistrictOccupancy(root) {
     root.updateMatrixWorld(true);
-    root.traverse((object) => {
-        if (!object.isMesh || object.visible === false) {
-            return;
-        }
-        object.geometry.computeBoundingBox();
-        object.geometry.boundingBox.getCenter(center);
-        if (object.isInstancedMesh) {
-            for (let index = 0; index < object.count; index += 1) {
-                object.getMatrixAt(index, instanceMatrix);
-                worldMatrix.multiplyMatrices(
-                    object.matrixWorld,
-                    instanceMatrix
-                );
-                points.push(center.clone().applyMatrix4(worldMatrix));
-            }
-            return;
-        }
-        points.push(center.clone().applyMatrix4(object.matrixWorld));
-    });
-    return points;
-}
-
-function authoredLandmarkOccupancy(root) {
-    root.updateMatrixWorld(true);
-    const landmarkCenters = [];
     const representatives = [];
-    const anchorPosition = new THREE.Vector3();
     root.traverse((object) => {
         if (!object.userData?.landmarkAnchor) {
             return;
         }
-        const centers = collectRenderedCenters(object);
-        landmarkCenters.push(...centers);
-        object.getWorldPosition(anchorPosition);
-        const closest = centers.toSorted(
-            (left, right) => left.distanceToSquared(anchorPosition)
-                - right.distanceToSquared(anchorPosition)
-        )[0];
-        if (closest) {
-            representatives.push(closest);
-        }
+        representatives.push(object.getWorldPosition(new THREE.Vector3()));
     });
-    if (landmarkCenters.length === 0) {
+    if (representatives.length === 0) {
         return {
-            landmarkCount: 0,
-            widthToHeight: 0,
-            occupiedQuadrants: 0,
+            districtCount: 0,
             occupiedAzimuthSectors: 0
         };
     }
-    const points = landmarkCenters;
-    const bounds = new THREE.Box3().setFromPoints(points);
-    const center = bounds.getCenter(new THREE.Vector3());
-    const width = bounds.max.x - bounds.min.x;
-    const height = bounds.max.y - bounds.min.y;
-    const quadrants = new Set();
-    points.forEach((point) => {
-        if (Math.abs(point.x - center.x) < 1e-6
-                || Math.abs(point.y - center.y) < 1e-6) {
-            return;
-        }
-        quadrants.add(`${point.x < center.x ? "left" : "right"}-${
-            point.y < center.y ? "lower" : "upper"
-        }`);
-    });
     return {
-        landmarkCount: representatives.length,
-        widthToHeight: width / height,
-        occupiedQuadrants: quadrants.size,
+        districtCount: representatives.length,
         occupiedAzimuthSectors: new Set(representatives.map((point) => {
             const angle = Math.atan2(point.z, point.x);
             return (Math.round(angle / (Math.PI * 2) * 8) + 8) % 8;
@@ -147,8 +89,13 @@ test("builds every authored reference silhouette group", (t) => {
     }
 });
 
-test("each authored district owns rendered landmark geometry", (t) => {
+test("each authored district maps to dense rendered surface geometry", (t) => {
     const world = createWorld(t);
+    const sectors = new Map(
+        world.getSurfaceDensity().sectors.map(
+            (sector) => [sector.districtId, sector]
+        )
+    );
     const districts = [];
     world.group.traverse((object) => {
         if (!object.userData?.landmarkAnchor) {
@@ -159,14 +106,15 @@ test("each authored district owns rendered landmark geometry", (t) => {
 
     assert.equal(districts.length, 8);
     districts.forEach((district) => {
+        const sector = sectors.get(district.userData.districtId);
         assert.ok(
-            collectRenderedCenters(district).length > 0,
-            `${district.name} must own rendered landmark geometry`
+            sector?.total >= 20,
+            `${district.name} must map to dense rendered geometry`
         );
     });
 });
 
-test("each village cluster contains its own instanced buildings", (t) => {
+test("villages share one rendered building instance family", (t) => {
     const world = createWorld(t);
     [
         "ReferenceMountainVillage",
@@ -176,18 +124,13 @@ test("each village cluster contains its own instanced buildings", (t) => {
     ].forEach((name) => {
         const village = world.group.getObjectByName(name);
         assert.ok(village, `Missing ${name}`);
-        const meshes = [];
-        village.traverse((object) => {
-            if (object.isMesh) {
-                meshes.push(object);
-            }
-        });
-        assert.ok(meshes.length > 0, `${name} must contain rendered geometry`);
-        assert.ok(
-            meshes.every((mesh) => mesh.isInstancedMesh && mesh.count >= 3),
-            `${name} must instance its authored buildings`
-        );
+        assert.ok(village.userData.villageCluster);
     });
+    const buildings = world.group.getObjectByName(
+        "ReferenceVillageBuildingFamily"
+    );
+    assert.equal(buildings?.isInstancedMesh, true);
+    assert.ok(buildings.count >= 72);
 });
 
 test("uses only the world angle for deterministic primary yaw", (t) => {
@@ -240,7 +183,7 @@ test("planet yaw is unaffected by pointer-shaped extra input", (t) => {
     assert.deepEqual(world.group.quaternion.toArray(), first.toArray());
 });
 
-test("keeps rendered landmark content occupied through eight yaw samples", (t) => {
+test("keeps semantic districts distributed through eight yaw samples", (t) => {
     const world = createWorld(t);
     for (let index = 0; index < 8; index += 1) {
         world.update({
@@ -248,12 +191,117 @@ test("keeps rendered landmark content occupied through eight yaw samples", (t) =
             elapsedMs: index * 1000,
             reduceMotion: false
         });
-        const coverage = authoredLandmarkOccupancy(world.group);
-        assert.equal(coverage.landmarkCount, 8);
+        const coverage = authoredDistrictOccupancy(world.group);
+        assert.equal(coverage.districtCount, 8);
         assert.equal(coverage.occupiedAzimuthSectors, 8);
-        assert.ok(coverage.widthToHeight >= .72);
-        assert.ok(coverage.widthToHeight <= 1.28);
-        assert.ok(coverage.occupiedQuadrants >= 4);
+    }
+});
+
+test("derives dense front-only coverage from rendered surface placements", (t) => {
+    const world = createWorld(t);
+    assert.equal(typeof world.getSurfaceDensity, "function");
+    const density = world.getSurfaceDensity();
+    const categories = [
+        "terrain",
+        "structure",
+        "foliageRock",
+        "utilitySilhouette"
+    ];
+    const minimums = {
+        terrain: 6,
+        structure: 3,
+        foliageRock: 6,
+        utilitySilhouette: 5
+    };
+    const renderedDetailIds = new Set();
+    world.group.traverse((object) => {
+        object.userData?.surfaceDetailIds?.forEach((id) => {
+            renderedDetailIds.add(id);
+        });
+    });
+
+    assert.ok(Object.isFrozen(density));
+    assert.ok(Object.isFrozen(density.detailIds));
+    assert.deepEqual(
+        [...renderedDetailIds].toSorted(),
+        [...density.detailIds].toSorted(),
+        "the diagnostic must describe the same placements used by meshes"
+    );
+    assert.equal(density.totalDetails, density.detailIds.length);
+    assert.equal(new Set(density.detailIds).size, density.totalDetails);
+    assert.equal(density.sectors.length, 8);
+    density.sectors.forEach((sector, index) => {
+        assert.ok(Object.isFrozen(sector));
+        assert.ok(Object.isFrozen(sector.counts));
+        assert.equal(sector.index, index);
+        assert.equal(
+            sector.total,
+            categories.reduce(
+                (total, category) => total + sector.counts[category],
+                0
+            )
+        );
+        assert.ok(sector.total >= 20, `sector ${index} is sparse`);
+        categories.forEach((category) => {
+            assert.ok(
+                sector.counts[category] >= minimums[category],
+                `sector ${index} ${category} collapsed`
+            );
+        });
+    });
+
+    for (const band of ["upper", "middle", "lower"]) {
+        assert.ok(
+            density.latitudeBands[band] > 0,
+            `${band} latitude band is empty`
+        );
+    }
+    assert.ok(density.maximumAzimuthGapDegrees <= 18);
+
+    assert.equal(density.boundarySamples.length, 8);
+    density.boundarySamples.forEach((sample, index) => {
+        assert.equal(sample.yawDegrees, index * 45 + 22.5);
+        categories.forEach((category) => {
+            assert.ok(
+                sample.counts[category] >= minimums[category],
+                `boundary ${sample.yawDegrees} ${category} collapsed`
+            );
+        });
+    });
+
+    assert.equal(density.frontViews.length, 8);
+    density.frontViews.forEach((view, index) => {
+        assert.equal(view.yawDegrees, index * 45);
+        assert.equal(
+            view.total,
+            categories.reduce(
+                (total, category) => total + view.counts[category],
+                0
+            )
+        );
+        assert.ok(view.total >= 70, `yaw ${view.yawDegrees} is sparse`);
+        assert.ok(
+            view.total < density.totalDetails,
+            `yaw ${view.yawDegrees} counted rear geometry as foreground`
+        );
+        assert.ok(view.visibleCategoryCount >= 4);
+        assert.deepEqual(
+            [...view.projectedQuadrants].toSorted(),
+            [
+                "left-lower",
+                "left-upper",
+                "right-lower",
+                "right-upper"
+            ]
+        );
+    });
+    for (let index = 0; index < 4; index += 1) {
+        assert.equal(
+            density.frontViews[index].total
+                + density.frontViews[index + 4].total,
+            density.totalDetails,
+            `opposite yaw ${index} double-counted rear placements`
+        );
     }
 });
 
