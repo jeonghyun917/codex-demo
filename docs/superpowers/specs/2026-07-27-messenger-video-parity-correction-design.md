@@ -86,6 +86,12 @@ debris meshes remain above the mapped core to provide real silhouette,
 parallax, side depth, and shadows. Their outlines are restrained so they do not
 become black blocks over the detailed map.
 
+The panorama is rendered with an unlit, non-tone-mapped material so its authored
+cream, teal, rust, and forest palette is not crushed into brown by scene
+lighting. Village outlines remain transparent with opacity at or below 0.35,
+and high-profile canopy crowns use at most 75% of their authored scale so the
+surface drawing remains visible between protruding silhouettes.
+
 ## Behavioral Contracts
 
 - Planet yaw is a pure function of elapsed time and never consumes pointer,

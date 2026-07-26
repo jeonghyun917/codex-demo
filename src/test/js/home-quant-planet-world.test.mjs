@@ -4,6 +4,9 @@ import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     createQuantPlanetWorld
 } from "../../main/resources/static/js/home-quant-planet-world.js";
+import {
+    FOREST_BELTS
+} from "../../main/resources/static/js/home-quant-planet-world-layout.js";
 
 const profile = {
     name: "high",
@@ -531,15 +534,48 @@ test("maps an injected panorama onto the core with one owned texture disposal", 
     });
     const body = world.group.getObjectByName("ReferencePlanetBody");
 
+    assert.equal(body.material.isMeshBasicMaterial, true);
     assert.equal(body.material.map, texture);
     assert.equal(texture.colorSpace, THREE.SRGBColorSpace);
     assert.equal(texture.wrapS, THREE.RepeatWrapping);
     assert.equal(texture.wrapT, THREE.ClampToEdgeWrapping);
     assert.equal(body.material.color.getHex(), 0xffffff);
+    assert.equal(body.material.toneMapped, false);
 
     world.dispose();
     world.dispose();
     assert.equal(disposeCalls, 1);
+});
+
+test("keeps panorama overlays thin and canopy crowns below their authored scale", () => {
+    const texture = new THREE.Texture();
+    const world = createQuantPlanetWorld(THREE, {
+        profile,
+        surfaceTexture: texture
+    });
+    const outlines = world.group.getObjectByName(
+        "ReferenceVillageOutlineFamily"
+    );
+    const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
+    const authoredCrownPlacements = FOREST_BELTS.flatMap(
+        (belt) => belt.placements
+    );
+
+    assert.equal(outlines.material.transparent, true);
+    assert.ok(outlines.material.opacity <= .35);
+    assert.ok(outlines.geometry.parameters.width <= 1.04);
+    assert.equal(crowns.count, authoredCrownPlacements.length);
+    instanceTransforms(crowns).forEach(({ scale }, index) => {
+        const authoredScale = authoredCrownPlacements[index].scale;
+        ["x", "y", "z"].forEach((axis, axisIndex) => {
+            assert.ok(
+                scale[axis] <= authoredScale[axisIndex] * .75 + 1e-7,
+                `crown ${index} ${axis} exceeds the visible-surface cap`
+            );
+        });
+    });
+
+    world.dispose();
 });
 
 test("uses the local panorama URL only in browser-capable worlds", () => {

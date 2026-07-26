@@ -47,20 +47,23 @@ function createToonMaterial(THREE, color, gradientMap, options = {}) {
     return new THREE.MeshToonMaterial({ color, gradientMap, ...options });
 }
 
-function applySurfaceTexture(THREE, body, texture) {
+function applySurfaceTexture(THREE, body, texture, material) {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.needsUpdate = true;
-    body.material.map = texture;
-    body.material.color.setHex(0xffffff);
-    body.material.needsUpdate = true;
+    material.map = texture;
+    material.color.setHex(0xffffff);
+    material.toneMapped = false;
+    material.needsUpdate = true;
+    body.material = material;
 }
 
-function restorePlainSurface(body) {
-    body.material.map = null;
-    body.material.color.setHex(COLORS.ground);
-    body.material.needsUpdate = true;
+function restorePlainSurface(body, plainMaterial) {
+    plainMaterial.map = null;
+    plainMaterial.color.setHex(COLORS.ground);
+    plainMaterial.needsUpdate = true;
+    body.material = plainMaterial;
 }
 
 function loadBrowserSurfaceTexture(THREE, textureLoader, onError) {
@@ -1126,7 +1129,7 @@ function buildLowerCanopy(THREE, resources, palette, placements) {
             THREE,
             matrix,
             crownPosition,
-            placement.scale,
+            placement.scale.map((axis) => axis * .72),
             placement.rotation
         );
         crowns.setMatrixAt(index, matrix);
@@ -1240,7 +1243,10 @@ export function createQuantPlanetWorld(THREE, {
             : null;
         const villageOutline = ownMaterial(new THREE.MeshBasicMaterial({
             color: COLORS.ink,
-            side: THREE.BackSide
+            side: THREE.BackSide,
+            transparent: true,
+            opacity: .3,
+            depthWrite: false
         }));
         const resources = {
             ownGeometry,
@@ -1361,6 +1367,7 @@ export function createQuantPlanetWorld(THREE, {
         content.name = "ReferencePlanetMiniature";
         const core = buildPlanetCore(THREE, resources, palette);
         const body = core.getObjectByName("ReferencePlanetBody");
+        const plainSurfaceMaterial = body.material;
         let browserTexture = null;
         let browserTextureFailed = false;
         if (!surfaceTexture && documentTarget) {
@@ -1369,7 +1376,7 @@ export function createQuantPlanetWorld(THREE, {
                 textureLoader,
                 () => {
                     browserTextureFailed = true;
-                    restorePlainSurface(body);
+                    restorePlainSurface(body, plainSurfaceMaterial);
                 }
             );
         }
@@ -1377,7 +1384,16 @@ export function createQuantPlanetWorld(THREE, {
             ?? (browserTextureFailed ? null : browserTexture);
         if (resolvedSurfaceTexture) {
             textures.add(resolvedSurfaceTexture);
-            applySurfaceTexture(THREE, body, resolvedSurfaceTexture);
+            applySurfaceTexture(
+                THREE,
+                body,
+                resolvedSurfaceTexture,
+                ownMaterial(new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    map: resolvedSurfaceTexture,
+                    toneMapped: false
+                }))
+            );
         }
         const waterBand = buildWaterBand(THREE, resources, palette);
         const temple = buildTemplePeak(THREE, resources, palette);

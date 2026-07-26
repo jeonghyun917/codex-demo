@@ -257,6 +257,13 @@ continuous illustrated world, use the approved hybrid surface-art correction:
 7. rebuild 8081 and visually compare the mapped core at several autonomous yaw
    timestamps before accepting the task.
 
+The browser gate also requires the mapped core to use an unlit
+`MeshBasicMaterial` with `toneMapped: false`, the village outline material to
+be transparent with opacity `<= 0.35`, and canopy crown matrices to apply at
+most `0.75` of the authored crown scale. These contracts prevent a correctly
+loaded panorama from being crushed into a brown field or covered by a black
+outline/tree ring.
+
 - [ ] **Step 4: Check runtime diagnostics**
 
 Read the page's diagnostic object and confirm draw calls plus shadows `<= 75`,
