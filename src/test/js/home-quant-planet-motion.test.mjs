@@ -23,7 +23,7 @@ test("selects bounded planet quality profiles", () => {
         reduceMotion: false, webgl: true, mobile: true, cores: 8, dpr: 3
     }), {
         name: "balanced", webgl: true, pixelRatio: 1.25,
-        pointerEnabled: false, shadows: false, outlineLevel: 1,
+        pointerEnabled: true, shadows: false, outlineLevel: 1,
         foliageCount: 18, cloudCount: 5, planetScale: 0.82
     });
     assert.equal(selectPlanetQualityProfile({

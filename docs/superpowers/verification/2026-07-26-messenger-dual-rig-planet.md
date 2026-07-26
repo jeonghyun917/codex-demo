@@ -4,7 +4,7 @@
 
 - Branch/worktree: `codex/quant-planet-homepage` at
   `C:\dev\codex-demo\.worktrees\quant-planet-homepage`.
-- Preview: `http://127.0.0.1:8081/`, PID `11996`, HTTP `200`.
+- Preview: `http://127.0.0.1:8081/`, PID `9460`, HTTP `200`.
 - Port isolation: the Task 7 preview was the only process stopped or restarted;
   no port `8080` listener was stopped, replaced, or otherwise modified.
 - Real-browser observations were captured in the root task's in-app browser
@@ -14,13 +14,18 @@
 
 ## Automated verification
 
-The complete seven-file JavaScript command passed `97/97` tests with `0`
-failures, `0` cancelled, `0` skipped, and `0` todo in `492.7243 ms`.
+The complete seven-file JavaScript command passed `98/98` tests with `0`
+failures, `0` cancelled, `0` skipped, and `0` todo in `513.5208 ms`.
+
+The focused composition/input/motion command passed `36/36` tests with `0`
+failures in `415.2512 ms`. Its mobile regression composes the production
+primary-touch controller, mobile-selected balanced profile, scene controller,
+and real nine-glyph rig rather than asserting source text or a glyph mock.
 
 The complete Maven command
 `mvn.cmd "-Dmaven.repo.local=C:\dev\codex-demo\.m2\repository" test` passed
 `38/38` tests with `0` failures, `0` errors, and `0` skipped; Maven reported
-`BUILD SUCCESS` in `26.356 s`.
+`BUILD SUCCESS` in `26.961 s`.
 
 The Task 7 regression coverage includes:
 
@@ -38,6 +43,11 @@ The Task 7 regression coverage includes:
 - center, left, right, upper, and lower pointer poses retaining one identical
   planet quaternion and camera position while the nine glyph quaternions
   change;
+- a `390x844` primary touch moving from center to normalized
+  `{x: 0.8, y: -0.8}` changes all `9` real glyph poses under the balanced
+  profile, release resets the controller target to `{x: 0, y: 0}`, and the
+  following frame moves every glyph closer to its authored rest pose while
+  planet quaternion and camera position remain numerically identical;
 - every canopy instance retaining a green authored base and the canopy
   material retaining a dark-green emissive floor of `0x205f43` at intensity
   `0.8`.
@@ -132,7 +142,7 @@ the unique `[data-enter-quant]` anchor only. Its behavioral contract records
 `0` prevent-default calls and `0` navigations, while Enter produces `1`
 prevent-default call and exactly one navigation to `/quant`.
 
-Fresh browser verification on preview PID `11996` found exactly `1`
+Fresh browser verification on the Task 7 preview found exactly `1`
 `a[data-enter-quant][href="/quant"]` in the live DOM. With that locator
 focused, `.press("Enter")` inside an awaited navigation completed at the exact
 URL `http://localhost:8081/quant`; the destination title was
@@ -157,6 +167,16 @@ The `ENTER` action rectangle was `x=137`, `y=749.375`, `116x44 px`, meeting
 the `44 px` minimum target height. The balanced mobile profile measured `69`
 draw calls, `10,135` triangles, and `0.69 ms` average render time. Fallback
 title opacity was `0` under WebGL ownership.
+
+Post-fix root-browser verification on preview PID `9460` repeated the exact
+`390x844` viewport. The browser-control pointer is mouse-type rather than
+touch-type: moving it from `x=55` to `x=335` visibly changed the glyph
+side-face orientation while autonomous planet yaw continued. The document
+remained exactly `390x844` with no scroll, the canvas cursor was `default`,
+the root retained WebGL-ready and intro-ready ownership, and diagnostics were
+`69` draw calls, `10,135` triangles, and `0.61 ms`. This is the live visual
+pointer check; the direct primary-touch proof is the production-controller
+balanced integration recorded in Automated verification above.
 
 ## Reduced-motion and static/WebGL-failure evidence
 

@@ -2,11 +2,63 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import * as composition from "../../main/resources/static/js/home-quant-planet-composition.js";
+import {
+    createQuantGlyphRig
+} from "../../main/resources/static/js/home-quant-planet-glyphs.js";
+import {
+    createHeroInputController
+} from "../../main/resources/static/js/home-quant-planet-input.js";
+import {
+    selectPlanetQualityProfile
+} from "../../main/resources/static/js/home-quant-planet-motion.js";
 
 const {
     REFERENCE_HERO,
     fitPerspectiveSphere
 } = composition;
+
+function createNineCellMask() {
+    const width = 90;
+    const height = 90;
+    const image = {
+        width,
+        height,
+        data: new Uint8ClampedArray(width * height * 4)
+    };
+    for (let row = 0; row < 3; row += 1) {
+        for (let column = 0; column < 3; column += 1) {
+            for (let y = row * 30 + 8; y < row * 30 + 22; y += 1) {
+                for (let x = column * 30 + 6;
+                    x < column * 30 + 24;
+                    x += 1) {
+                    image.data[(y * width + x) * 4 + 3] = 255;
+                }
+            }
+        }
+    }
+    return image;
+}
+
+function createPointerTarget(width, height) {
+    const listeners = new Map();
+    return {
+        addEventListener(type, listener) {
+            const group = listeners.get(type) || new Set();
+            group.add(listener);
+            listeners.set(type, group);
+        },
+        removeEventListener(type, listener) {
+            listeners.get(type)?.delete(listener);
+        },
+        emit(type, event = {}) {
+            [...(listeners.get(type) || [])].forEach((listener) =>
+                listener({ type, ...event }));
+        },
+        getBoundingClientRect() {
+            return { left: 0, top: 0, width, height };
+        }
+    };
+}
 
 function collectMeshPoints(root) {
     const points = [];
@@ -413,6 +465,109 @@ test("pointer changes glyphs without changing planet or camera", async (t) => {
         disabledLeft.glyphQuaternions,
         disabledRight.glyphQuaternions
     );
+});
+
+test("balanced mobile touch moves all glyphs and release returns them toward rest",
+        async (t) => {
+    const width = 390;
+    const height = 844;
+    const profile = selectPlanetQualityProfile({
+        reduceMotion: false,
+        webgl: true,
+        mobile: true,
+        cores: 8,
+        dpr: 3
+    });
+    const scene = await createTestScene(t, {
+        width,
+        height,
+        profile,
+        glyphFactory: (Three, options) => createQuantGlyphRig(Three, {
+            ...options,
+            imageDataSource: createNineCellMask()
+        })
+    });
+    const surface = createPointerTarget(width, height);
+    const windowTarget = createPointerTarget(width, height);
+    let inputState = {
+        pointer: { x: 0, y: 0 },
+        touching: false
+    };
+    const input = createHeroInputController({
+        surface,
+        windowTarget,
+        onStateChange(state) {
+            inputState = state;
+        }
+    });
+    t.after(() => input.destroy());
+
+    const renderTouchState = (elapsedMs) => scene.controller.render(pose({
+        worldAngle: .45,
+        pointer: inputState.pointer,
+        elapsedMs
+    }));
+    renderTouchState(0);
+    surface.emit("pointerdown", {
+        pointerId: 7,
+        isPrimary: true,
+        pointerType: "touch",
+        button: 0,
+        clientX: width / 2,
+        clientY: height / 2
+    });
+    surface.emit("pointermove", {
+        pointerId: 7,
+        isPrimary: true,
+        pointerType: "touch",
+        clientX: width * .9,
+        clientY: height * .1
+    });
+    assert.deepEqual(inputState, {
+        pointer: { x: .8, y: -.8 },
+        touching: true
+    });
+    renderTouchState(50);
+    surface.emit("pointerup", {
+        pointerId: 7,
+        isPrimary: true,
+        pointerType: "touch",
+        clientX: width * .9,
+        clientY: height * .1
+    });
+    assert.deepEqual(inputState, {
+        pointer: { x: 0, y: 0 },
+        touching: false
+    });
+    renderTouchState(100);
+
+    const [rest, moved, released] = scene.frames.slice(-3);
+    const rotations = (frame) => frame.glyphQuaternions.map(
+        (values) => new THREE.Quaternion(...values)
+    );
+    const restRotations = rotations(rest);
+    const movedRotations = rotations(moved);
+    const releasedRotations = rotations(released);
+
+    assert.equal(profile.name, "balanced");
+    assert.equal(restRotations.length, 9);
+    movedRotations.forEach((rotation, index) => {
+        const movedFromRest = rotation.angleTo(restRotations[index]);
+        const releasedFromRest = releasedRotations[index]
+            .angleTo(restRotations[index]);
+        assert.ok(movedFromRest > 1e-6);
+        assert.ok(releasedFromRest < movedFromRest);
+    });
+    [moved, released].forEach((frame) => {
+        assert.deepEqual(
+            frame.worldQuaternion.toArray(),
+            rest.worldQuaternion.toArray()
+        );
+        assert.deepEqual(
+            frame.cameraPosition.toArray(),
+            rest.cameraPosition.toArray()
+        );
+    });
 });
 
 test("combines renderer-real rig diagnostics within the scene budget", async (t) => {
