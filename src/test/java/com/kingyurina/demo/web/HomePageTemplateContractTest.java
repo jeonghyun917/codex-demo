@@ -130,12 +130,13 @@ class HomePageTemplateContractTest {
                 List.of("STRATEGY", "ATELIER"),
                 List.of("SIGNAL", "LAB"));
         List<String> expectedSupporting = List.of(
-                "Observe 쨌 Resolve 쨌 Act",
+                "Observe · Resolve · Act",
                 "Market field",
                 "S&P 500 field",
                 "Allocation field",
                 "Research field",
                 "Backtest field");
+        assertFalse(response.body().contains("Observe 쨌 Resolve 쨌 Act"));
 
         for (int index = 0; index < titles.size(); index++) {
             Element title = titles.get(index);

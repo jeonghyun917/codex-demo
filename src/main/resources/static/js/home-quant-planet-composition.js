@@ -12,7 +12,7 @@ export const PRODUCT_SCENES = Object.freeze([
     Object.freeze({
         route: "/quant",
         lines: Object.freeze(["QUANT", "INTELLIGENCE"]),
-        supporting: "Observe 쨌 Resolve 쨌 Act"
+        supporting: "Observe · Resolve · Act"
     }),
     Object.freeze({
         route: "/stocks",
