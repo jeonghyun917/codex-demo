@@ -157,8 +157,8 @@ export function createHeroInputController({
         notify();
     }
 
-    function handlePointerLeave() {
-        if (destroyed || dragging) {
+    function handlePointerLeave(event) {
+        if (destroyed || dragging || event?.isPrimary !== true) {
             return;
         }
         pointer = { x: 0, y: 0 };

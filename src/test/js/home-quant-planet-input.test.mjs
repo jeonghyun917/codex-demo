@@ -141,8 +141,26 @@ test("primary pointer movement changes only pointer parallax", () => {
         settling: false
     });
 
-    surface.emit("pointerleave");
+    surface.emit("pointerleave", primaryPointer(7, 500, -30));
     assert.deepEqual(controller.getState().pointer, { x: 0, y: 0 });
+});
+
+test("secondary pointer leave preserves primary parallax and drag angle", () => {
+    const { controller, surface } = createController();
+    controller.setBaseAngle(.37);
+    surface.emit("pointermove", primaryPointer(9, 350, 75));
+
+    surface.emit("pointerleave", {
+        ...primaryPointer(10, 0, 300),
+        isPrimary: false
+    });
+
+    assert.deepEqual(controller.getState(), {
+        pointer: { x: .75, y: -.5 },
+        dragAngle: .37,
+        dragging: false,
+        settling: false
+    });
 });
 
 test("horizontal primary drag accumulates only the exact reference angle", () => {
