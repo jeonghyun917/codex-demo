@@ -65,4 +65,4 @@ and motion-invariant coverage.
 
 ## Commit
 
-Commit SHA: pending amendment
+Implementation commit SHA: `3d7cc3a`
