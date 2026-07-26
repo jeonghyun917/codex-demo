@@ -192,10 +192,11 @@ class HomePageTemplateContractTest {
     }
 
     @Test
-    void homepageBuildsAnOriginalLocalQuantPlanetWorld() throws IOException {
+    void homepageBuildsAnOriginalLocalQuantPlanetWorld() throws Exception {
         String world = resource("static/js/home-quant-planet-world.js");
         String scene = resource("static/js/home-quant-planet-scene.js");
 
+        assertEquals(200, get("/js/home-quant-planet-scene.js").statusCode());
         assertTrue(world.contains("createQuantPlanetWorld"));
         assertTrue(world.contains("ObserveStation"));
         assertTrue(world.contains("ResolveWorks"));

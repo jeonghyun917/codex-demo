@@ -172,24 +172,24 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     courier.name = "QuantCourier";
 
     const routeCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-2.5, 2.65, .4),
-        new THREE.Vector3(-1.05, 3.02, 1.4),
-        new THREE.Vector3(.7, 2.92, 1.55),
-        new THREE.Vector3(2.25, 2.52, .62)
+        new THREE.Vector3(-2.35, 2.62, .78),
+        new THREE.Vector3(-1.02, 3.02, 1.48),
+        new THREE.Vector3(.72, 2.9, 1.62),
+        new THREE.Vector3(2.32, 2.5, .84)
     ], false, "catmullrom", .38);
 
-    observe.position.set(-2.1, 2.45, .1);
-    resolve.position.set(.1, 2.65, 1.15);
-    act.position.set(2.15, 2.22, .28);
+    observe.position.set(-2.02, 2.42, .48);
+    resolve.position.set(.06, 2.62, 1.24);
+    act.position.set(2.14, 2.18, .62);
     landmarks.add(observe, resolve, act);
     planet.add(landmarks, courier);
 
     const land = addOutlinedMesh(THREE, planet, geometry.detailedSphere, material.ground, heroOutline, {
-        scale: [3.2, 2.78, 3.02], rotation: [0, -.18, -.07], name: "FacetedLand"
+        scale: [2.82, 2.82, 2.82], rotation: [0, -.18, -.07], name: "FacetedLand"
     });
     land.receiveShadow = Boolean(profile.shadows);
     const water = addOutlinedMesh(THREE, planet, geometry.detailedSphere, material.water, null, {
-        scale: [3.25, 2.82, 3.07], rotation: [0, -.18, -.07],
+        scale: [2.86, 2.86, 2.86], rotation: [0, -.18, -.07],
         outlined: false, name: "ShallowWaterShell"
     });
     water.renderOrder = -1;
@@ -330,23 +330,40 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     foliageCanopies.instanceMatrix.needsUpdate = true;
     planet.add(foliageTrunks, foliageCanopies);
 
-    const rockCount = 14;
-    const rocks = new THREE.InstancedMesh(geometry.sphere, material.rock, rockCount);
-    rocks.name = "InstancedRockClusters";
-    for (let index = 0; index < rockCount; index += 1) {
-        const angle = 1.2 + index * 1.43;
+    const perimeterUtilityModules = new THREE.InstancedMesh(
+        geometry.box, material.rock, 8
+    );
+    perimeterUtilityModules.name = "PerimeterUtilityModules";
+    for (let index = 0; index < perimeterUtilityModules.count; index += 1) {
+        const angle = .4 + index * Math.PI * 2 / perimeterUtilityModules.count;
+        const radius = 3.08 + (index % 3) * .2;
         orientInstance(THREE, instanceMatrix, [
-            Math.sin(angle) * 2.7,
-            1.05 + (index % 3) * .18,
-            Math.cos(angle) * 2.65
-        ], [.12 + (index % 4) * .035, .09, .14], [index * .2, angle, 0]);
-        rocks.setMatrixAt(index, instanceMatrix);
+            Math.sin(angle) * radius,
+            -.15 + Math.sin(angle * 2) * .32,
+            Math.cos(angle) * radius
+        ], [.17, .11 + (index % 2) * .05, .13], [angle * .3, angle, angle * .12]);
+        perimeterUtilityModules.setMatrixAt(index, instanceMatrix);
     }
-    rocks.instanceMatrix.needsUpdate = true;
-    planet.add(rocks);
+    perimeterUtilityModules.instanceMatrix.needsUpdate = true;
+    planet.add(perimeterUtilityModules);
 
-    const utilityPoles = new THREE.InstancedMesh(geometry.cylinder, material.ink, 7);
-    utilityPoles.name = "InstancedRouteUtilityPoles";
+    const atmosphericSpecks = new THREE.InstancedMesh(
+        geometry.sphere, material.paper, 10
+    );
+    atmosphericSpecks.name = "AtmosphericSpecks";
+    for (let index = 0; index < atmosphericSpecks.count; index += 1) {
+        const angle = .72 + index * 2.17;
+        const radius = 3.42 + (index % 3) * .14;
+        const elevation = -.34 + (index % 5) * .17;
+        const horizontalRadius = Math.cos(elevation) * radius;
+        orientInstance(THREE, instanceMatrix, [
+            Math.sin(angle) * horizontalRadius,
+            Math.sin(elevation) * radius,
+            Math.cos(angle) * horizontalRadius
+        ], [.035 + (index % 3) * .012, .035, .035], [angle, 0, 0]);
+        atmosphericSpecks.setMatrixAt(index, instanceMatrix);
+    }
+    atmosphericSpecks.instanceMatrix.needsUpdate = true;
     const routeLights = new THREE.InstancedMesh(geometry.sphere, material.routeLamp, 10);
     routeLights.name = "InstancedRouteLamps";
     const lampDim = new THREE.Color(0x425866);
@@ -358,15 +375,9 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             [point.x, point.y + .15, point.z], [.07, .07, .07]);
         routeLights.setMatrixAt(index, instanceMatrix);
         routeLights.setColorAt(index, lampDim);
-        if (index < 7) {
-            orientInstance(THREE, instanceMatrix,
-                [point.x, point.y - .06, point.z - .16], [.025, .2, .025]);
-            utilityPoles.setMatrixAt(index, instanceMatrix);
-        }
     }
-    utilityPoles.instanceMatrix.needsUpdate = true;
     routeLights.instanceMatrix.needsUpdate = true;
-    planet.add(utilityPoles, routeLights);
+    planet.add(atmosphericSpecks, routeLights);
 
     const cloudCount = Math.max(0, Math.floor(profile.cloudCount ?? 5));
     const clouds = new THREE.InstancedMesh(geometry.sphere, material.cloud, cloudCount);
@@ -383,18 +394,22 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     clouds.instanceMatrix.needsUpdate = true;
     planet.add(clouds);
 
-    const distantSilhouettes = new THREE.InstancedMesh(
-        geometry.cone, material.groundShade, 4
+    const contourSignalFragments = new THREE.InstancedMesh(
+        geometry.cone, material.groundShade, 12
     );
-    distantSilhouettes.name = "InstancedDistantLandmarkSilhouettes";
-    for (let index = 0; index < 4; index += 1) {
-        orientInstance(THREE, instanceMatrix,
-            [-2.2 + index * 1.45, -.55 - (index % 2) * .2, -2.55],
-            [.34, .85 + index * .12, .38], [0, index * .17, 0]);
-        distantSilhouettes.setMatrixAt(index, instanceMatrix);
+    contourSignalFragments.name = "ContourSignalFragments";
+    for (let index = 0; index < contourSignalFragments.count; index += 1) {
+        const angle = .18 + index * Math.PI * 2 / contourSignalFragments.count;
+        const radius = 3.05 + (index % 4) * .16;
+        orientInstance(THREE, instanceMatrix, [
+            Math.cos(angle) * radius,
+            Math.sin(angle) * radius,
+            .3 + (index % 3) * .16
+        ], [.08 + (index % 3) * .025, .2, .08], [0, 0, angle - Math.PI / 2]);
+        contourSignalFragments.setMatrixAt(index, instanceMatrix);
     }
-    distantSilhouettes.instanceMatrix.needsUpdate = true;
-    planet.add(distantSilhouettes);
+    contourSignalFragments.instanceMatrix.needsUpdate = true;
+    planet.add(contourSignalFragments);
 
     const courierBody = addOutlinedMesh(THREE, courier, geometry.box, material.coral, outline, {
         scale: [.23, .3, .18], name: "QuantCourierBody"
@@ -459,6 +474,22 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     const right = createLimb("Right", .27);
     courier.scale.setScalar(.72);
     courier.castShadow = Boolean(profile.shadows);
+
+    const framingBox = new THREE.Box3().setFromObject(planet);
+    const framingSphere = framingBox.getBoundingSphere(new THREE.Sphere());
+
+    function getFramingEnvelope() {
+        return {
+            center: {
+                x: framingSphere.center.x,
+                y: framingSphere.center.y,
+                z: framingSphere.center.z
+            },
+            radius: framingSphere.radius,
+            top: framingBox.max.y,
+            bottom: framingBox.min.y
+        };
+    }
 
     const normal = new THREE.Vector3();
     const routePoint = new THREE.Vector3();
@@ -533,6 +564,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
 
     return {
         group: planet,
+        getFramingEnvelope,
         update,
         dispose
     };

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     PRODUCT_SCENES,
     createProductSelection,
@@ -8,6 +9,12 @@ import {
     resolveAdjacentProduct,
     resolveSelectedProduct
 } from "../../main/resources/static/js/home-quant-planet-composition.js";
+import {
+    createQuantPlanetScene
+} from "../../main/resources/static/js/home-quant-planet-scene.js";
+import {
+    createQuantPlanetWorld
+} from "../../main/resources/static/js/home-quant-planet-world.js";
 
 const localImports = (source) => Array.from(
     source.matchAll(/^import\s+[\s\S]*?\s+from\s+["']([^"']+)["'];?$/gm),
@@ -73,6 +80,89 @@ test("fits a complete sphere against the stricter viewport field of view", () =>
     assert.deepEqual(landscape.target, { x: 0, y: .4, z: 0 });
     assert.ok(landscape.distance > 3.8);
     assert.ok(portrait.distance > landscape.distance);
+});
+
+test("refits the complete world after landscape and portrait resizes", async (t) => {
+    const renderedCameras = [];
+    class InspectableCamera extends THREE.PerspectiveCamera {
+        lookAt(...values) {
+            const [first] = values;
+            this.lookAtTarget = first?.isVector3
+                ? first.clone()
+                : new THREE.Vector3(...values);
+            super.lookAt(...values);
+        }
+    }
+    class TestRenderer {
+        constructor() {
+            this.shadowMap = {};
+            this.info = { render: { calls: 0, triangles: 0 } };
+        }
+        setPixelRatio() {}
+        setSize() {}
+        render(scene, camera) {
+            scene.updateMatrixWorld(true);
+            renderedCameras.push({
+                aspect: camera.aspect,
+                position: camera.position.clone(),
+                target: camera.lookAtTarget.clone()
+            });
+        }
+        dispose() {}
+    }
+    const testThree = {
+        ...THREE,
+        PerspectiveCamera: InspectableCamera,
+        WebGLRenderer: TestRenderer
+    };
+    const profile = {
+        name: "high",
+        webgl: true,
+        outlineLevel: 0,
+        foliageCount: 0,
+        cloudCount: 0,
+        shadows: false,
+        pixelRatio: 1,
+        planetScale: 1
+    };
+    const canvas = { clientWidth: 1440, clientHeight: 900 };
+    const world = createQuantPlanetWorld(THREE, { profile });
+    const envelope = world.getFramingEnvelope();
+    world.dispose();
+    const controller = await createQuantPlanetScene({
+        canvas,
+        profile,
+        three: testThree
+    });
+    t.after(() => controller.dispose());
+
+    controller.resize();
+    assert.equal(controller.render(0), true);
+    canvas.clientWidth = 375;
+    canvas.clientHeight = 812;
+    controller.resize();
+    assert.equal(controller.render(0), true);
+
+    const [landscape, portrait] = renderedCameras;
+    assert.equal(landscape.aspect, 1440 / 900);
+    assert.equal(portrait.aspect, 375 / 812);
+    [landscape, portrait].forEach(({ target }) => {
+        assert.deepEqual(target.toArray(), [
+            envelope.center.x,
+            envelope.center.y,
+            envelope.center.z
+        ]);
+    });
+    const landscapeDistance = landscape.position.distanceTo(landscape.target);
+    const portraitDistance = portrait.position.distanceTo(portrait.target);
+    assert.ok(portraitDistance > landscapeDistance);
+    const verticalFov = 34 * Math.PI / 180;
+    const portraitHorizontalFov = 2 * Math.atan(
+        Math.tan(verticalFov / 2) * portrait.aspect
+    );
+    const framedRadius = portraitDistance
+        * Math.sin(Math.min(verticalFov, portraitHorizontalFov) / 2);
+    assert.ok(framedRadius >= envelope.radius * 1.18);
 });
 
 test("snaps drag selection to one of six wrapped product scenes", () => {

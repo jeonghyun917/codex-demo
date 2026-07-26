@@ -3,6 +3,7 @@ import {
     createOrbitPose,
     shouldRenderFrame
 } from "./home-quant-planet-motion.js";
+import { fitPerspectiveSphere } from "./home-quant-planet-composition.js";
 import { createQuantPlanetWorld } from "./home-quant-planet-world.js";
 
 const HIGH_LIMITS = Object.freeze({ drawCalls: 75, triangles: 140000 });
@@ -27,7 +28,7 @@ function createStaticSceneController() {
     };
 }
 
-export async function createQuantPlanetScene({ canvas, profile } = {}) {
+export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
     if (!canvas || !profile?.webgl || profile.name === "static") {
         return createStaticSceneController();
     }
@@ -49,7 +50,7 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
     }
 
     try {
-        const THREE = await import("/js/vendor/three.module.js");
+        const THREE = three || await import("/js/vendor/three.module.js");
         renderer = new THREE.WebGLRenderer({
             canvas,
             alpha: true,
@@ -69,6 +70,14 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
         world = createQuantPlanetWorld(THREE, { profile });
         world.group.scale.setScalar(profile.planetScale || 1);
         scene.add(world.group);
+        const envelope = world.getFramingEnvelope();
+        let framing = fitPerspectiveSphere({
+            center: envelope.center,
+            radius: envelope.radius,
+            aspect: 1,
+            verticalFovDegrees: 34,
+            margin: 1.18
+        });
 
         const hemisphere = new THREE.HemisphereLight(0xfff9ea, 0x71847e, 1.7);
         hemisphere.name = "SkyHemisphereFill";
@@ -112,6 +121,13 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
             const height = Math.max(1, canvas.clientHeight);
             camera.aspect = width / height;
             camera.updateProjectionMatrix();
+            framing = fitPerspectiveSphere({
+                center: envelope.center,
+                radius: envelope.radius,
+                aspect: camera.aspect,
+                verticalFovDegrees: 34,
+                margin: 1.18
+            });
             renderer.setSize(width, height, false);
             markDirty();
         }
@@ -159,14 +175,20 @@ export async function createQuantPlanetScene({ canvas, profile } = {}) {
                 const courierPose = createCourierLoopPose(time, false);
                 world.update({ orbitPose, courierPose, time });
 
-                const distance = orbitPose.cameraDistance;
                 const cosPitch = Math.cos(orbitPose.cameraPitch);
                 camera.position.set(
-                    Math.sin(orbitPose.cameraYaw) * cosPitch * distance,
-                    Math.sin(orbitPose.cameraPitch) * distance + .35,
-                    Math.cos(orbitPose.cameraYaw) * cosPitch * distance
+                    framing.target.x + Math.sin(orbitPose.cameraYaw)
+                        * cosPitch * framing.distance,
+                    framing.target.y + Math.sin(orbitPose.cameraPitch)
+                        * framing.distance,
+                    framing.target.z + Math.cos(orbitPose.cameraYaw)
+                        * cosPitch * framing.distance
                 );
-                camera.lookAt(0, .35, 0);
+                camera.lookAt(
+                    framing.target.x,
+                    framing.target.y,
+                    framing.target.z
+                );
                 renderer.render(scene, camera);
                 dirty = false;
                 return true;

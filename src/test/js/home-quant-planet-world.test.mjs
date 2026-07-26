@@ -115,6 +115,65 @@ test("moves the courier continuously and lights its nearest landmark", (t) => {
     assert.ok(portal.scale.x > inactivePortalScale);
 });
 
+test("exposes a complete framing envelope that includes upper landmarks", (t) => {
+    const world = createWorld(t);
+    const envelope = world.getFramingEnvelope();
+
+    assert.ok(envelope.radius >= 3.6);
+    assert.ok(envelope.center.y > 0);
+    assert.ok(envelope.top >= 3.2);
+    assert.ok(envelope.bottom <= -2.4);
+});
+
+test("builds a rounded world body instead of an oblate front plate", (t) => {
+    const world = createWorld(t);
+    const land = world.group.getObjectByName("FacetedLand");
+    world.group.updateMatrixWorld(true);
+    const center = land.localToWorld(new THREE.Vector3());
+    const positions = land.geometry.attributes.position;
+    const radii = Array.from({ length: positions.count }, (_, index) =>
+        new THREE.Vector3().fromBufferAttribute(positions, index)
+            .applyMatrix4(land.matrixWorld)
+            .distanceTo(center));
+
+    assert.ok(Math.max(...radii) / Math.min(...radii) <= 1.01);
+});
+
+test("adds the complete contour density in three shared instanced draws", (t) => {
+    const world = createWorld(t);
+    const expectedCounts = new Map([
+        ["ContourSignalFragments", 12],
+        ["PerimeterUtilityModules", 8],
+        ["AtmosphericSpecks", 10]
+    ]);
+
+    expectedCounts.forEach((count, name) => {
+        const mesh = world.group.getObjectByName(name);
+        assert.equal(mesh?.isInstancedMesh, true, `${name} must be instanced`);
+        assert.equal(mesh.count, count);
+    });
+});
+
+test("places contour density inside the world perimeter band", (t) => {
+    const world = createWorld(t);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+
+    [
+        "ContourSignalFragments",
+        "PerimeterUtilityModules",
+        "AtmosphericSpecks"
+    ].forEach((name) => {
+        const mesh = world.group.getObjectByName(name);
+        for (let index = 0; index < mesh.count; index += 1) {
+            mesh.getMatrixAt(index, matrix);
+            position.setFromMatrixPosition(matrix);
+            assert.ok(position.length() >= 3);
+            assert.ok(position.length() <= 3.75);
+        }
+    });
+});
+
 test("stays within the high-profile world render budget", (t) => {
     const world = createWorld(t);
     let drawCalls = 0;
