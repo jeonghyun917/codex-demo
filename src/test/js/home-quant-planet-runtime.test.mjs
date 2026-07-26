@@ -484,6 +484,32 @@ test("does not pre-rotate a scene that resolves at the intro deadline", async ()
     ) < 1e-9);
 });
 
+test("anchors ambient time when a scene resolves seconds after the deadline", async () => {
+    const timers = createTimerHarness();
+    const harness = createRuntimeHarness({ timers });
+    const scene = createScene();
+
+    harness.frameQueue.runNext(1000);
+    harness.frameQueue.runNext(3998);
+    timers.advance(REFERENCE_HERO.introDeadlineMs);
+    assertCompleteFallback(harness);
+
+    harness.frameQueue.runNext(5000);
+    harness.frameQueue.runNext(7000);
+    assert.equal(scene.poses.length, 0);
+
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(8000);
+    assert.equal(scene.poses.at(-1).worldAngle, 0);
+
+    harness.frameQueue.runNext(8100);
+    assert.ok(Math.abs(
+        scene.poses.at(-1).worldAngle
+        - Math.PI * 2 * 100 / REFERENCE_HERO.worldRevolutionMs
+    ) < 1e-9);
+});
+
 test("forwards pointer and drag state through the Task 3 pose unchanged", async () => {
     const harness = createRuntimeHarness();
     const scene = createScene();

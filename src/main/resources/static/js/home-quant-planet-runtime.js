@@ -370,7 +370,7 @@ export function createQuantPlanetRuntime({
         updateIntro(deltaTime);
 
         let ambientDeltaTime = 0;
-        if (introReady) {
+        if (introReady && sceneReady) {
             if (ambientFrameTime !== null) {
                 ambientDeltaTime = Math.max(
                     0,
@@ -510,6 +510,7 @@ export function createQuantPlanetRuntime({
         }
         scene = createdScene;
         sceneReady = true;
+        ambientFrameTime = null;
         scene.resize?.();
         scene.setVisible?.(!documentTarget.hidden);
         root.classList.remove("planet-webgl-failed");
