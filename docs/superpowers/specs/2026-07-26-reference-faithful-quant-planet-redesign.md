@@ -21,6 +21,32 @@ The first stable frame must read in this order:
 The result must not look like a website with a 3D background. It must look like
 one intentional, centered interactive title artwork.
 
+## Reference Parity Contract
+
+The supplied Messenger experience is the behavioral and compositional
+reference. The Quant homepage must match its perceived:
+
+- first-entry staging and reveal rhythm;
+- complete centered-world scale and surrounding negative space;
+- slow continuous world rotation;
+- central title scale, depth, and selection behavior;
+- lower-center primary-button size and placement;
+- drag response, selection snapping, and idle-resume rhythm.
+
+Parity is evaluated by synchronized side-by-side recordings, not by the
+presence of similarly named CSS classes. Over a ten-second comparison:
+
+- world angular displacement should remain within approximately `8%` of the
+  reference;
+- the complete world silhouette should remain within approximately `5%` of the
+  reference's viewport-relative width and height;
+- central title and lower button bounding boxes should remain within
+  approximately `5%` of the reference's viewport-relative placement.
+
+Quant AI uses original geometry, lettering, colors, copy, and routes. No
+reference code, model, texture, sound, logo, or other proprietary asset is
+copied.
+
 ## Diagnosis of the Rejected Composition
 
 The rejected implementation fails for structural reasons:
@@ -154,6 +180,8 @@ selected route.
 - Reveal the central title as the world settles.
 - The loader must dismiss within `4000ms` under every runtime outcome.
 - BFCache return must not replay the intro.
+- Final intro phase durations are calibrated against a synchronized reference
+  recording; the `4000ms` ceiling remains absolute even if the reference stalls.
 
 ### Continuous Motion
 
@@ -162,6 +190,8 @@ selected route.
 - Small clouds, signal fragments, and peripheral props create subtle secondary
   motion.
 - Product selection advances slowly and automatically when the user is idle.
+- World and product-selection angular velocities are calibrated against the
+  reference recording and stored as named timing constants.
 - Automatic product rotation pauses on hover, focus, press, drag, or reduced
   motion.
 
