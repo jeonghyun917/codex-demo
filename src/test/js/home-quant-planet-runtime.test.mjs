@@ -938,3 +938,106 @@ test("bootstrap fallback writes progress at the experience cascade boundary", as
     assert.equal(root.classList.contains("planet-webgl-failed"), true);
     assert.equal(root.classList.contains("planet-webgl-ready"), false);
 });
+
+test("bootstrap binds Enter navigation only to the unique quant action",
+        async () => {
+    const root = createEventTarget();
+    const experience = createEventTarget();
+    const action = createEventTarget({
+        href: "/quant",
+        textContent: "ENTER"
+    });
+    const elements = new Map([
+        ["[data-home-experience]", experience],
+        ["[data-intro-loader]", null],
+        ["[data-home-scene]", null],
+        ["[data-home-canvas]", null],
+        ["[data-planet-fallback]", null],
+        ["[data-reference-title]", null],
+        ["[data-enter-quant]", action]
+    ]);
+    const navigations = [];
+    const documentTarget = createEventTarget({
+        documentElement: root,
+        querySelector(selector) {
+            return elements.get(selector);
+        },
+        createElement() {
+            return {
+                getContext() {
+                    return null;
+                }
+            };
+        }
+    });
+    const windowTarget = createEventTarget({
+        location: {
+            hostname: "example.com",
+            search: "",
+            assign(destination) {
+                navigations.push(destination);
+            }
+        },
+        matchMedia() {
+            return { matches: false };
+        },
+        devicePixelRatio: 1
+    });
+    const descriptors = new Map(
+        ["document", "window", "navigator"].map((name) => [
+            name,
+            Object.getOwnPropertyDescriptor(globalThis, name)
+        ])
+    );
+
+    Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: documentTarget
+    });
+    Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: windowTarget
+    });
+    Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: { hardwareConcurrency: 8 }
+    });
+
+    try {
+        await import(
+            "../../main/resources/static/js/home-quant-planet.js"
+            + `?keyboard=${Date.now()}`
+        );
+    } finally {
+        descriptors.forEach((descriptor, name) => {
+            if (descriptor) {
+                Object.defineProperty(globalThis, name, descriptor);
+            } else {
+                Reflect.deleteProperty(globalThis, name);
+            }
+        });
+    }
+
+    assert.equal(action.listenerCount("keydown"), 1);
+    assert.equal(documentTarget.listenerCount("keydown"), 0);
+    assert.equal(windowTarget.listenerCount("keydown"), 0);
+
+    let prevented = 0;
+    action.emit("keydown", {
+        key: " ",
+        preventDefault() {
+            prevented += 1;
+        }
+    });
+    assert.deepEqual(navigations, []);
+    assert.equal(prevented, 0);
+
+    action.emit("keydown", {
+        key: "Enter",
+        preventDefault() {
+            prevented += 1;
+        }
+    });
+    assert.deepEqual(navigations, ["/quant"]);
+    assert.equal(prevented, 1);
+});

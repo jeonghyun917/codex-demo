@@ -23,6 +23,14 @@ const canvas = document.querySelector("[data-home-canvas]");
 const fallback = document.querySelector("[data-planet-fallback]");
 const title = document.querySelector("[data-reference-title]");
 const action = document.querySelector("[data-enter-quant]");
+const actionLocation = window.location;
+action?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+        return;
+    }
+    event.preventDefault();
+    actionLocation.assign("/quant");
+});
 const overrides = resolveLocalTestOverrides({
     hostname: window.location.hostname,
     search: window.location.search
