@@ -1,9 +1,10 @@
+import { REFERENCE_TIMING } from "./home-quant-planet-composition.js";
+
 export function clampUnit(value) {
     return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
 }
 
 const TAU = Math.PI * 2;
-const RING_DURATION = 28000;
 const clamp = (value, min, max) =>
     Math.min(Math.max(Number(value) || 0, min), max);
 
@@ -74,7 +75,7 @@ export function advanceRingAngle(
     const current = Number.isFinite(angle) ? angle : 0;
     if (paused || reduceMotion) return current;
     const delta = clamp(deltaMs, 0, 100);
-    return current + delta / RING_DURATION * TAU;
+    return current + delta / REFERENCE_TIMING.productRevolutionMs * TAU;
 }
 
 export function createNavigationRingState({
@@ -150,8 +151,8 @@ export function createOrbitPose({
     const pointerY = reduceMotion ? 0 : clamp(pointer?.y, -1, 1);
     const drag = clamp(dragAngle, -TAU * 2, TAU * 2);
     const ambient = reduceMotion ? 0
-        : (Math.max(0, Number(time) || 0) % RING_DURATION)
-            / RING_DURATION * TAU;
+        : (Math.max(0, Number(time) || 0) % REFERENCE_TIMING.productRevolutionMs)
+            / REFERENCE_TIMING.productRevolutionMs * TAU;
     return {
         cameraDistance: 8.9,
         cameraYaw: clamp(drag * .18 + pointerX * .0698, -TAU, TAU),

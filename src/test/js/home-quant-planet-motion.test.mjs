@@ -106,7 +106,11 @@ test("wraps six product links and brings the selected item forward", () => {
 });
 
 test("advances one 28-second revolution only while unpaused", () => {
-    assert.equal(advanceRingAngle(1, 1000, true, false), 1);
+    const advanceFrames = (paused) => Array.from({ length: 280 }).reduce(
+        (angle) => advanceRingAngle(angle, 100, paused, false), 0
+    );
+    assert.ok(Math.abs(advanceFrames(false) - Math.PI * 2) < 1e-9);
+    assert.equal(advanceFrames(true), 0);
     assert.equal(advanceRingAngle(1, 1000, false, true), 1);
     assert.ok(Math.abs(
         advanceRingAngle(0, 100, false, false) - Math.PI * 2 / 280
