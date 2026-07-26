@@ -4,16 +4,142 @@ import {
 } from "./home-quant-planet-glyph-contours.js";
 import { REFERENCE_HERO } from "./home-quant-planet-composition.js";
 
-const GLYPH_RESPONSE = Object.freeze([
-    [.96, .94, -.018, .92, -.018],
-    [1.02, .98, .012, 1.04, .012],
-    [.94, 1.04, -.01, .96, -.01],
-    [1.04, .96, .014, 1.06, .014],
-    [1, 1, 0, 1, 0],
-    [.97, 1.03, -.014, .94, -.014],
-    [.95, 1.02, .01, .98, .01],
-    [1.03, .95, -.012, 1.03, -.012],
-    [.98, .97, .018, .9, .018]
+const GLYPH_PROFILES = Object.freeze([
+    Object.freeze({
+        yawFromX: .72, yawFromY: -.46,
+        pitchFromX: .64, pitchFromY: -.92,
+        rollFromX: .78, rollFromY: -.5,
+        responseSpeed: .94,
+        restPitch: .035, restYaw: -.018, restRoll: -.045, restDepth: -.018,
+        translateXFromX: .14, translateXFromY: -.05,
+        translateYFromX: .04, translateYFromY: -.12,
+        translateZFromX: .04, translateZFromY: -.07,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.55,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 1.72,
+        phaseSpeed: Math.PI / 6,
+        phaseOffset: -5 * Math.PI / 6
+    }),
+    Object.freeze({
+        yawFromX: -.34, yawFromY: -1.08,
+        pitchFromX: -.72, pitchFromY: -1.08,
+        rollFromX: -.64, rollFromY: -.58,
+        responseSpeed: 1.08,
+        restPitch: -.02, restYaw: .012, restRoll: .05, restDepth: .012,
+        translateXFromX: -.11, translateXFromY: -.08,
+        translateYFromX: -.06, translateYFromY: -.14,
+        translateZFromX: -.03, translateZFromY: -.08,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.55,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 3.5,
+        phaseSpeed: Math.PI / 6,
+        phaseOffset: -3 * Math.PI / 2
+    }),
+    Object.freeze({
+        yawFromX: .48, yawFromY: .82,
+        pitchFromX: .52, pitchFromY: -.96,
+        rollFromX: .48, rollFromY: .68,
+        responseSpeed: .96,
+        restPitch: .03, restYaw: -.01, restRoll: -.04, restDepth: -.01,
+        translateXFromX: .12, translateXFromY: .06,
+        translateYFromX: .05, translateYFromY: -.11,
+        translateZFromX: .05, translateZFromY: -.06,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.55,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 2.1,
+        phaseSpeed: Math.PI / 6,
+        phaseOffset: -3 * Math.PI / 2
+    }),
+    Object.freeze({
+        yawFromX: -1.02, yawFromY: .56,
+        pitchFromX: -.86, pitchFromY: -.68,
+        rollFromX: .76, rollFromY: .38,
+        responseSpeed: 1.12,
+        restPitch: -.05, restYaw: .014, restRoll: .07, restDepth: .014,
+        translateXFromX: -.13, translateXFromY: .04,
+        translateYFromX: -.06, translateYFromY: -.1,
+        translateZFromX: -.06, translateZFromY: -.04,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.3,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 1.5,
+        phaseSpeed: Math.PI / 4,
+        phaseOffset: Math.PI / 4
+    }),
+    Object.freeze({
+        yawFromX: .38, yawFromY: -.66,
+        pitchFromX: 1.12, pitchFromY: -.88,
+        rollFromX: -.62, rollFromY: .52,
+        responseSpeed: 1,
+        restPitch: .01, restYaw: 0, restRoll: 0, restDepth: 0,
+        translateXFromX: .1, translateXFromY: -.07,
+        translateYFromX: .07, translateYFromY: -.13,
+        translateZFromX: .03, translateZFromY: -.07,
+        rotationLimitPitch: .72, rotationLimitYaw: 1.75,
+        rotationLimitRoll: .72,
+        yawPulseRadians: .8,
+        phaseSpeed: Math.PI / 5,
+        phaseOffset: Math.PI / 3
+    }),
+    Object.freeze({
+        yawFromX: .66, yawFromY: -1.2,
+        pitchFromX: -.68, pitchFromY: -.74,
+        rollFromX: .54, rollFromY: -.72,
+        responseSpeed: .9,
+        restPitch: .04, restYaw: -.014, restRoll: -.07, restDepth: -.014,
+        translateXFromX: .14, translateXFromY: -.04,
+        translateYFromX: .05, translateYFromY: -.12,
+        translateZFromX: .07, translateZFromY: -.08,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.55,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 2.9,
+        phaseSpeed: Math.PI / 4,
+        phaseOffset: Math.PI / 4
+    }),
+    Object.freeze({
+        yawFromX: -.84, yawFromY: .42,
+        pitchFromX: .98, pitchFromY: -1.18,
+        rollFromX: -.82, rollFromY: .48,
+        responseSpeed: 1.16,
+        restPitch: -.03, restYaw: .01, restRoll: .06, restDepth: .01,
+        translateXFromX: -.12, translateXFromY: .07,
+        translateYFromX: -.05, translateYFromY: -.13,
+        translateZFromX: -.05, translateZFromY: -.06,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.3,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 1.6,
+        phaseSpeed: Math.PI / 4,
+        phaseOffset: Math.PI / 4
+    }),
+    Object.freeze({
+        yawFromX: .54, yawFromY: 1.06,
+        pitchFromX: -.58, pitchFromY: -.78,
+        rollFromX: .72, rollFromY: -.64,
+        responseSpeed: .86,
+        restPitch: .05, restYaw: -.012, restRoll: -.08, restDepth: -.012,
+        translateXFromX: .13, translateXFromY: .05,
+        translateYFromX: .06, translateYFromY: -.14,
+        translateZFromX: .08, translateZFromY: -.05,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.55,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 2.4,
+        phaseSpeed: Math.PI / 2,
+        phaseOffset: -Math.PI / 2
+    }),
+    Object.freeze({
+        yawFromX: .9, yawFromY: -.52,
+        pitchFromX: .76, pitchFromY: -.9,
+        rollFromX: -.56, rollFromY: -.52,
+        responseSpeed: 1.04,
+        restPitch: -.02, restYaw: .018, restRoll: .04, restDepth: .018,
+        translateXFromX: .11, translateXFromY: -.06,
+        translateYFromX: .04, translateYFromY: -.11,
+        translateZFromX: .04, translateZFromY: -.07,
+        rotationLimitPitch: .72, rotationLimitYaw: 2.3,
+        rotationLimitRoll: .72,
+        yawPulseRadians: 1.7,
+        phaseSpeed: Math.PI / 4,
+        phaseOffset: Math.PI / 4
+    })
 ]);
 
 const COLUMN_SPACING = 1.12;
@@ -48,6 +174,34 @@ function finiteOr(value, fallback) {
 
 function clamp(value, minimum, maximum) {
     return Math.min(maximum, Math.max(minimum, value));
+}
+
+function damp(current, target, responseSpeed, deltaSeconds) {
+    const alpha = 1 - Math.exp(-responseSpeed * deltaSeconds);
+    return current + (target - current) * alpha;
+}
+
+function dampSineWave(current, target, amplitude, phaseSpeed,
+        phaseOffset, startSeconds, endSeconds, responseSpeed) {
+    if (amplitude === 0 || phaseSpeed === 0) {
+        return damp(current, target, responseSpeed, endSeconds - startSeconds);
+    }
+    const responseSquared = responseSpeed * responseSpeed;
+    const phaseSquared = phaseSpeed * phaseSpeed;
+    const denominator = responseSquared + phaseSquared;
+    const coefficient = amplitude * responseSpeed / denominator;
+    const startPhase = phaseSpeed * startSeconds + phaseOffset;
+    const endPhase = phaseSpeed * endSeconds + phaseOffset;
+    const startResponse = coefficient * (
+        responseSpeed * Math.sin(startPhase) - phaseSpeed * Math.cos(startPhase)
+    );
+    const endResponse = coefficient * (
+        responseSpeed * Math.sin(endPhase) - phaseSpeed * Math.cos(endPhase)
+    );
+    const decay = Math.exp(-responseSpeed * (endSeconds - startSeconds));
+    return target + endResponse + (
+        current - target - startResponse
+    ) * decay;
 }
 
 function triangleCount(geometry) {
@@ -182,6 +336,7 @@ export async function createQuantGlyphRig(THREE, {
     const pivots = [];
     let disposed = false;
     let previousElapsedMs = 0;
+    let phaseElapsedSeconds = 0;
     let titleProgress = 1;
     let layoutScale = 1;
     let centerX = 0;
@@ -294,19 +449,32 @@ export async function createQuantGlyphRig(THREE, {
             applyFaceSideColors(THREE, geometry);
 
             const pivot = new THREE.Group();
-            const response = GLYPH_RESPONSE[index];
-            const restYaw = response[2];
-            const depthOffset = response[4];
+            const profile = GLYPH_PROFILES[index];
+            const layoutAnchor = Object.freeze({
+                x: (index % 3 - 1) * COLUMN_SPACING,
+                y: (1 - Math.floor(index / 3)) * ROW_SPACING,
+                z: profile.restDepth,
+                normalizedX: index % 3 - 1,
+                normalizedY: 1 - Math.floor(index / 3)
+            });
             pivot.name = `ReferenceGlyphPivot-${index + 1}`;
             pivot.userData.glyphIndex = index;
-            pivot.userData.restPitch = 0;
-            pivot.userData.restYaw = restYaw;
+            pivot.userData.profile = profile;
+            pivot.userData.layoutAnchor = layoutAnchor;
+            pivot.userData.restPitch = profile.restPitch;
+            pivot.userData.restYaw = profile.restYaw;
+            pivot.userData.restRoll = profile.restRoll;
+            pivot.userData.rotationLimitYaw = profile.rotationLimitYaw;
             pivot.position.set(
-                (index % 3 - 1) * COLUMN_SPACING,
-                (1 - Math.floor(index / 3)) * ROW_SPACING,
-                depthOffset
+                layoutAnchor.x,
+                layoutAnchor.y,
+                layoutAnchor.z
             );
-            pivot.rotation.set(0, restYaw, 0);
+            pivot.rotation.set(
+                profile.restPitch,
+                profile.restYaw,
+                profile.restRoll
+            );
 
             const mesh = new THREE.Mesh(
                 geometry,
@@ -398,44 +566,121 @@ export async function createQuantGlyphRig(THREE, {
                 Math.max(0, elapsed - previousElapsedMs) / 1000
             );
             previousElapsedMs = elapsed;
+            const previousPhaseSeconds = phaseElapsedSeconds;
+            phaseElapsedSeconds += deltaSeconds;
             const pointerX = reduceMotion
                 ? 0
                 : clamp(finiteOr(Number(pointer?.x), 0), -1, 1);
             const pointerY = reduceMotion
                 ? 0
                 : clamp(finiteOr(Number(pointer?.y), 0), -1, 1);
-            const targetYaw = pointerX * REFERENCE_HERO.glyphYawRadians;
-            const targetPitch = -pointerY
-                * REFERENCE_HERO.glyphPitchRadians;
+            const pointerMagnitude = Math.max(
+                Math.abs(pointerX),
+                Math.abs(pointerY)
+            );
 
             for (let index = 0; index < pivots.length; index += 1) {
                 const pivot = pivots[index];
-                const response = GLYPH_RESPONSE[index];
-                const yawGain = response[0];
-                const pitchGain = response[1];
-                const restYaw = response[2];
-                const responseGain = response[3];
-                const depthOffset = response[4];
+                const profile = pivot.userData.profile;
+                const anchor = pivot.userData.layoutAnchor;
                 if (reduceMotion) {
-                    pivot.rotation.y = restYaw;
-                    pivot.rotation.x = pivot.userData.restPitch;
-                    pivot.position.z = depthOffset;
+                    pivot.rotation.x = profile.restPitch;
+                    pivot.rotation.y = profile.restYaw;
+                    pivot.rotation.z = profile.restRoll;
+                    pivot.position.x = anchor.x;
+                    pivot.position.y = anchor.y;
+                    pivot.position.z = anchor.z;
                     continue;
                 }
-                const alpha = 1 - Math.exp(
-                    -REFERENCE_HERO.glyphResponsePerSecond
-                        * responseGain * deltaSeconds
+                const localPointerX = pointerX - anchor.normalizedX;
+                const localPointerY = -pointerY - anchor.normalizedY;
+                const distanceSquared = localPointerX * localPointerX
+                    + localPointerY * localPointerY;
+                const influence = 1 / (1 + distanceSquared * 1.5);
+                const localX = influence * (
+                    pointerX + localPointerX * pointerMagnitude * .18
                 );
-                pivot.rotation.y += (
-                    restYaw + targetYaw * yawGain - pivot.rotation.y
-                ) * alpha;
-                pivot.rotation.x += (
-                    pivot.userData.restPitch + targetPitch * pitchGain
-                        - pivot.rotation.x
-                ) * alpha;
-                pivot.position.z += (
-                    depthOffset - pivot.position.z
-                ) * alpha;
+                const localY = influence * (
+                    pointerY - localPointerY * pointerMagnitude * .18
+                );
+                const responseSpeed = REFERENCE_HERO.glyphResponsePerSecond
+                    * profile.responseSpeed;
+                const yawTarget = clamp(
+                    profile.restYaw
+                    + localX * REFERENCE_HERO.glyphYawRadians
+                        * profile.yawFromX
+                    + localY * REFERENCE_HERO.glyphPitchRadians
+                        * profile.yawFromY
+                    + pointerMagnitude * influence * profile.yawPulseRadians / 2,
+                    -profile.rotationLimitYaw,
+                    profile.rotationLimitYaw
+                );
+                const yawAmplitude = pointerMagnitude * influence
+                    * profile.yawPulseRadians / 2;
+                const pitchTarget = clamp(
+                    profile.restPitch
+                    + localX * REFERENCE_HERO.glyphYawRadians
+                        * profile.pitchFromX
+                    + localY * REFERENCE_HERO.glyphPitchRadians
+                        * profile.pitchFromY,
+                    -profile.rotationLimitPitch,
+                    profile.rotationLimitPitch
+                );
+                const rollTarget = clamp(
+                    profile.restRoll + (localX * profile.rollFromX
+                        + localY * profile.rollFromY) * Math.PI / 5,
+                    -profile.rotationLimitRoll,
+                    profile.rotationLimitRoll
+                );
+                const positionXTarget = anchor.x + localX
+                    * profile.translateXFromX + localY
+                    * profile.translateXFromY;
+                const positionYTarget = anchor.y + localX
+                    * profile.translateYFromX + localY
+                    * profile.translateYFromY;
+                const positionZTarget = anchor.z + localX
+                    * profile.translateZFromX + localY
+                    * profile.translateZFromY;
+                pivot.rotation.y = clamp(dampSineWave(
+                    pivot.rotation.y,
+                    yawTarget,
+                    yawAmplitude,
+                    profile.phaseSpeed,
+                    profile.phaseOffset,
+                    previousPhaseSeconds,
+                    phaseElapsedSeconds,
+                    responseSpeed
+                ), -profile.rotationLimitYaw, profile.rotationLimitYaw);
+                pivot.rotation.x = damp(
+                    pivot.rotation.x,
+                    pitchTarget,
+                    responseSpeed,
+                    deltaSeconds
+                );
+                pivot.rotation.z = damp(
+                    pivot.rotation.z,
+                    rollTarget,
+                    responseSpeed,
+                    deltaSeconds
+                );
+                pivot.position.x = damp(
+                    pivot.position.x,
+                    positionXTarget,
+                    responseSpeed,
+                    deltaSeconds
+                );
+                pivot.position.y = damp(
+                    pivot.position.y,
+                    positionYTarget,
+                    responseSpeed,
+                    deltaSeconds
+                );
+                pivot.position.z = damp(
+                    pivot.position.z,
+                    positionZTarget,
+                    responseSpeed,
+                    deltaSeconds
+                );
             }
 
             titleProgress = reduceMotion

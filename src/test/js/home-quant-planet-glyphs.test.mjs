@@ -6,18 +6,6 @@ import { REFERENCE_HERO } from
 import { createQuantGlyphRig } from
     "../../main/resources/static/js/home-quant-planet-glyphs.js";
 
-const GLYPH_RESPONSE = Object.freeze([
-    [.96, .94, -.018, .92, -.018],
-    [1.02, .98, .012, 1.04, .012],
-    [.94, 1.04, -.01, .96, -.01],
-    [1.04, .96, .014, 1.06, .014],
-    [1, 1, 0, 1, 0],
-    [.97, 1.03, -.014, .94, -.014],
-    [.95, 1.02, .01, .98, .01],
-    [1.03, .95, -.012, 1.03, -.012],
-    [.98, .97, .018, .9, .018]
-]);
-
 function createImageData(width, height) {
     return {
         width,
@@ -102,6 +90,23 @@ async function createRig(t, options = {}) {
     });
     t?.after(() => rig.dispose());
     return rig;
+}
+
+function advanceRig(rig, pointer, elapsedMs = 1000) {
+    rig.update({
+        pointer,
+        elapsedMs: 0,
+        titleProgress: 1,
+        reduceMotion: false
+    });
+    for (let elapsed = 50; elapsed <= elapsedMs; elapsed += 50) {
+        rig.update({
+            pointer,
+            elapsedMs: elapsed,
+            titleProgress: 1,
+            reduceMotion: false
+        });
+    }
 }
 
 function collectResources(group) {
@@ -283,48 +288,76 @@ test("pointer moves glyphs within limits and leaves the parent layout fixed",
     assert.deepEqual(rig.group.matrix.elements, parentBefore.elements);
     const pivots = glyphPivots(rig.group);
     assert.ok(pivots.every((pivot) =>
-        Math.abs(pivot.rotation.y) <= REFERENCE_HERO.glyphYawRadians
-            + REFERENCE_HERO.glyphVariationRadians + 1e-6));
+        Math.abs(pivot.rotation.y) <= pivot.userData.rotationLimitYaw
+            + 1e-6));
     assert.ok(pivots.some((pivot) => Math.abs(pivot.rotation.y) > .01));
 });
 
-test("applies every authored response rest angle and depth offset",
+test("articulates nine distinct glyph poses across direct and cross axes",
         async (t) => {
+    const pointer = { x: .9, y: -.7 };
     const rig = await createRig(t);
-    const pointer = { x: .5, y: -.25 };
-    glyphPivots(rig.group).forEach((pivot) => {
-        pivot.position.z = .4;
-    });
-    rig.update({
-        pointer,
-        elapsedMs: 50,
-        titleProgress: 1,
-        reduceMotion: false
-    });
+    const pivots = glyphPivots(rig.group);
+    const anchors = pivots.map(({ position }) => position.clone());
 
-    glyphPivots(rig.group).forEach((pivot, index) => {
-        const [
-            yawGain,
-            pitchGain,
-            restYaw,
-            responseGain,
-            depthOffset
-        ] = GLYPH_RESPONSE[index];
-        const alpha = 1 - Math.exp(
-            -REFERENCE_HERO.glyphResponsePerSecond * responseGain * .05
-        );
-        const expectedYaw = restYaw
-            + pointer.x * REFERENCE_HERO.glyphYawRadians * yawGain * alpha;
-        const expectedPitch = -pointer.y
-            * REFERENCE_HERO.glyphPitchRadians * pitchGain * alpha;
-        const expectedDepth = .4 + (depthOffset - .4) * alpha;
+    advanceRig(rig, pointer);
+    const signatures = pivots.map((pivot, index) => [
+        pivot.rotation.x,
+        pivot.rotation.y,
+        pivot.rotation.z,
+        pivot.position.x - anchors[index].x,
+        pivot.position.y - anchors[index].y,
+        pivot.position.z
+    ].map((value) => Number(value.toFixed(3))).join(","));
 
-        assert.equal(pivot.userData.restYaw, restYaw);
-        assert.equal(pivot.userData.restPitch, 0);
-        assertNear(pivot.rotation.y, expectedYaw);
-        assertNear(pivot.rotation.x, expectedPitch);
-        assertNear(pivot.position.z, expectedDepth);
-    });
+    assert.equal(new Set(signatures).size, 9);
+    assert.ok(pivots.filter((pivot) =>
+        Math.abs(pivot.rotation.z) > .05).length >= 3);
+    assert.ok(pivots.filter((pivot) =>
+        Math.abs(pivot.rotation.y) >= 70 * Math.PI / 180).length >= 3);
+    assert.ok(pivots.some((pivot, index) =>
+        Math.abs(pivot.position.x - anchors[index].x) > .01));
+    assert.ok(pivots.some((pivot, index) =>
+        Math.abs(pivot.position.y - anchors[index].y) > .01));
+
+    const crossAxisRig = await createRig(t);
+    advanceRig(crossAxisRig, { x: 0, y: pointer.y });
+    const crossAxisPivots = glyphPivots(crossAxisRig.group);
+    assert.ok(crossAxisPivots.filter((pivot) =>
+        Math.abs(pivot.rotation.y - pivot.userData.restYaw) > .05
+    ).length >= 3);
+
+    const directAxisRig = await createRig(t);
+    advanceRig(directAxisRig, { x: pointer.x, y: 0 });
+    const directAxisPivots = glyphPivots(directAxisRig.group);
+    assert.ok(directAxisPivots.filter((pivot) =>
+        Math.abs(pivot.rotation.x - pivot.userData.restPitch) > .05
+    ).length >= 3);
+});
+
+test("weights glyph articulation by each anchor's local pointer distance",
+        async (t) => {
+    const topRig = await createRig(t);
+    const bottomRig = await createRig(t);
+    advanceRig(topRig, { x: 0, y: -.9 });
+    advanceRig(bottomRig, { x: 0, y: .9 });
+
+    const response = (pivot) => Math.abs(
+        pivot.rotation.x - pivot.userData.restPitch
+    ) + Math.abs(
+        pivot.rotation.y - pivot.userData.restYaw
+    ) + Math.abs(
+        pivot.rotation.z - pivot.userData.restRoll
+    );
+    const rowAverage = (pivots, start) => pivots
+        .slice(start, start + 3)
+        .reduce((total, pivot) => total + response(pivot), 0) / 3;
+    const topPivots = glyphPivots(topRig.group);
+    const bottomPivots = glyphPivots(bottomRig.group);
+
+    assert.ok(rowAverage(topPivots, 0) >= rowAverage(topPivots, 6) * 2);
+    assert.ok(rowAverage(bottomPivots, 6)
+        >= rowAverage(bottomPivots, 0) * 2);
 });
 
 test("uses frame-rate-independent damping for glyph motion", async (t) => {
@@ -346,6 +379,9 @@ test("uses frame-rate-independent damping for glyph motion", async (t) => {
         const other = glyphPivots(twoSteps.group)[index];
         assert.ok(Math.abs(pivot.rotation.x - other.rotation.x) < 1e-12);
         assert.ok(Math.abs(pivot.rotation.y - other.rotation.y) < 1e-12);
+        assert.ok(Math.abs(pivot.rotation.z - other.rotation.z) < 1e-12);
+        assert.ok(Math.abs(pivot.position.x - other.position.x) < 1e-12);
+        assert.ok(Math.abs(pivot.position.y - other.position.y) < 1e-12);
         assert.ok(Math.abs(pivot.position.z - other.position.z) < 1e-12);
     });
 });
@@ -366,6 +402,9 @@ test("caps a large elapsed-time jump to one 50ms response step", async (t) => {
         const other = glyphPivots(longFrame.group)[index];
         assertNear(pivot.rotation.x, other.rotation.x);
         assertNear(pivot.rotation.y, other.rotation.y);
+        assertNear(pivot.rotation.z, other.rotation.z);
+        assertNear(pivot.position.x, other.position.x);
+        assertNear(pivot.position.y, other.position.y);
         assertNear(pivot.position.z, other.position.z);
     });
 });
@@ -384,10 +423,13 @@ test("reduced motion restores all glyphs to authored rest poses", async (t) => {
         titleProgress: .2,
         reduceMotion: true
     });
-    glyphPivots(rig.group).forEach((pivot, index) => {
+    glyphPivots(rig.group).forEach((pivot) => {
         assert.equal(pivot.rotation.x, pivot.userData.restPitch);
         assert.equal(pivot.rotation.y, pivot.userData.restYaw);
-        assert.equal(pivot.position.z, GLYPH_RESPONSE[index][4]);
+        assert.equal(pivot.rotation.z, pivot.userData.restRoll);
+        assert.equal(pivot.position.x, pivot.userData.layoutAnchor.x);
+        assert.equal(pivot.position.y, pivot.userData.layoutAnchor.y);
+        assert.equal(pivot.position.z, pivot.userData.layoutAnchor.z);
     });
     assert.equal(rig.group.visible, true);
 });
