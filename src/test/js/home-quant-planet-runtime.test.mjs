@@ -71,8 +71,13 @@ function createClassList() {
 
 function createEventTarget(extra = {}) {
     const listeners = new Map();
+    const attributes = new Map(
+        Object.entries(extra.attributes || {})
+            .map(([name, value]) => [name, String(value)])
+    );
     return {
         ...extra,
+        attributes,
         classList: extra.classList || createClassList(),
         dataset: extra.dataset || {},
         style: extra.style || createStyle(),
@@ -91,6 +96,18 @@ function createEventTarget(extra = {}) {
         },
         listenerCount(type) {
             return listeners.get(type)?.size || 0;
+        },
+        getAttribute(name) {
+            return attributes.get(name) ?? null;
+        },
+        hasAttribute(name) {
+            return attributes.has(name);
+        },
+        removeAttribute(name) {
+            attributes.delete(name);
+        },
+        setAttribute(name, value) {
+            attributes.set(name, String(value));
         }
     };
 }
@@ -348,6 +365,11 @@ function assertCompleteFallback(harness) {
     assert.deepEqual(harness.root.style.entries(), []);
     assert.equal(harness.root.classList.contains("planet-intro-ready"), true);
     assert.equal(
+        harness.root.classList.contains("planet-action-locked"),
+        false
+    );
+    assert.equal(harness.action.hasAttribute("tabindex"), false);
+    assert.equal(
         harness.title.src,
         "/img/home-messenger-reference-title.png"
     );
@@ -419,19 +441,62 @@ test("forces the final composition at an independent 3999ms deadline", () => {
     assert.equal(harness.frameQueue.frames.size, 1);
 });
 
+test("holds ambient revolution at the frontal pose until intro ready", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+
+    for (const time of [650, 1200, 1700, 2200]) {
+        harness.frameQueue.runNext(time);
+    }
+
+    assertCompleteFallback(harness);
+    assert.equal(scene.poses.at(-1).worldAngle, 0);
+
+    harness.frameQueue.runNext(2300);
+    assert.ok(Math.abs(
+        scene.poses.at(-1).worldAngle
+        - Math.PI * 2 * 100 / REFERENCE_HERO.worldRevolutionMs
+    ) < 1e-9);
+});
+
+test("does not pre-rotate a scene that resolves at the intro deadline", async () => {
+    const timers = createTimerHarness();
+    const harness = createRuntimeHarness({ timers });
+    const scene = createScene();
+
+    harness.frameQueue.runNext(1000);
+    harness.frameQueue.runNext(3998);
+    timers.advance(REFERENCE_HERO.introDeadlineMs);
+    assertCompleteFallback(harness);
+
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(REFERENCE_HERO.introDeadlineMs);
+
+    assert.equal(scene.poses.at(-1).worldAngle, 0);
+
+    harness.frameQueue.runNext(REFERENCE_HERO.introDeadlineMs + 100);
+    assert.ok(Math.abs(
+        scene.poses.at(-1).worldAngle
+        - Math.PI * 2 * 100 / REFERENCE_HERO.worldRevolutionMs
+    ) < 1e-9);
+});
+
 test("forwards pointer and drag state through the Task 3 pose unchanged", async () => {
     const harness = createRuntimeHarness();
     const scene = createScene();
     harness.sceneDeferred.resolve(scene);
     await flushPromises();
-    harness.frameQueue.runNext(0);
+    harness.frameQueue.runNext(2200);
 
     harness.input.emit({
         pointer: { x: .65, y: -.4 },
         dragAngle: .72,
         dragging: true
     });
-    harness.frameQueue.runNext(100);
+    harness.frameQueue.runNext(2300);
 
     const forwarded = scene.poses.at(-1);
     assert.deepEqual(forwarded.pointer, { x: .65, y: -.4 });
@@ -440,8 +505,100 @@ test("forwards pointer and drag state through the Task 3 pose unchanged", async 
         forwarded.worldAngle
         - Math.PI * 2 * 100 / REFERENCE_HERO.worldRevolutionMs
     ) < 1e-9);
-    assert.equal(forwarded.elapsedMs, 100);
+    assert.equal(forwarded.elapsedMs, 2300);
     assert.equal(forwarded.reduceMotion, false);
+});
+
+test("renders a bounded final-delta release offset for exactly 720ms", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(2200);
+
+    harness.input.emit({
+        dragAngle: .12,
+        dragging: true
+    });
+    harness.frameQueue.runNext(2216);
+    harness.input.emit({
+        dragAngle: .18,
+        dragging: true
+    });
+    harness.frameQueue.runNext(2232);
+    harness.input.emit({
+        dragAngle: .18,
+        dragging: false,
+        settling: true
+    });
+
+    harness.frameQueue.runNext(2248);
+    const initialOffset = scene.poses.at(-1).dragAngle - .18;
+    assert.ok(initialOffset > 0);
+    assert.ok(initialOffset < .06);
+
+    harness.frameQueue.runNext(2592);
+    const midpointOffset = scene.poses.at(-1).dragAngle - .18;
+    assert.ok(midpointOffset > 0);
+    assert.ok(midpointOffset < initialOffset);
+
+    harness.frameQueue.runNext(2952);
+    assert.equal(scene.poses.at(-1).dragAngle, .18);
+});
+
+test("bounds a large release impulse without snapping the committed angle", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(2200);
+
+    harness.input.emit({
+        dragAngle: 0,
+        dragging: true
+    });
+    harness.input.emit({
+        dragAngle: 12,
+        dragging: true
+    });
+    harness.input.emit({
+        dragAngle: 12,
+        dragging: false,
+        settling: true
+    });
+    harness.frameQueue.runNext(2216);
+
+    const renderedAngle = scene.poses.at(-1).dragAngle;
+    assert.ok(renderedAngle > 12);
+    assert.ok(renderedAngle - 12 <= Math.PI / 18);
+
+    harness.input.emit({
+        dragAngle: 12,
+        dragging: false,
+        settling: false
+    });
+    harness.frameQueue.runNext(2232);
+    assert.equal(scene.poses.at(-1).dragAngle, 12);
+});
+
+test("locks the hidden action until its intro phase begins", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+
+    assert.equal(harness.root.classList.contains("planet-action-locked"), true);
+    assert.equal(harness.action.getAttribute("tabindex"), "-1");
+
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(1200);
+    assert.equal(harness.root.dataset.introPhase, "title");
+    assert.equal(harness.root.classList.contains("planet-action-locked"), true);
+    assert.equal(harness.action.getAttribute("tabindex"), "-1");
+
+    harness.frameQueue.runNext(1700);
+    assert.equal(harness.root.dataset.introPhase, "action");
+    assert.equal(harness.root.classList.contains("planet-action-locked"), false);
+    assert.equal(harness.action.hasAttribute("tabindex"), false);
 });
 
 test("never mutates reference title state during input or frames", async () => {

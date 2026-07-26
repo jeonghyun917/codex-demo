@@ -79,6 +79,13 @@ class HomePageTemplateContractTest {
                 "image/png",
                 title.headers().firstValue("Content-Type").orElse(""));
         assertTrue(title.body().length > 0);
+        HttpResponse<byte[]> fallback = getBytes(
+                "/img/home-quant-planet-fallback.svg");
+        assertEquals(200, fallback.statusCode());
+        assertEquals(
+                "image/svg+xml",
+                fallback.headers().firstValue("Content-Type").orElse(""));
+        assertTrue(fallback.body().length > 0);
         assertEquals(403, get("/admin").statusCode());
 
         assertTrue(resource("static/vendor/motion/LICENSE.md")
@@ -157,6 +164,7 @@ class HomePageTemplateContractTest {
         assertEquals("/quant", actions.getFirst().getAttribute("href"));
         assertEquals("ENTER", actions.getFirst().getTextContent().strip());
         assertFalse(actions.getFirst().hasAttribute("hidden"));
+        assertFalse(actions.getFirst().hasAttribute("tabindex"));
     }
 
     @Test
@@ -207,6 +215,8 @@ class HomePageTemplateContractTest {
         String experience = cssRule(css, ".planet-experience");
         String title = cssRule(css, ".reference-title");
         String action = cssRule(css, ".planet-primary-action");
+        String lockedAction = cssRule(
+                css, ".planet-action-locked .planet-primary-action");
 
         assertTrue(normalized.contains("height: 100dvh"));
         assertTrue(normalized.contains("overflow: hidden"));
@@ -237,6 +247,9 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(".reference-title"));
         assertTrue(css.contains(".planet-primary-action"));
         assertTrue(css.contains(".home-semantic-summary"));
+        assertEquals(
+                1,
+                occurrences(css, "/img/home-quant-planet-fallback.svg"));
 
         assertEquals("50%", cssDeclaration(title, "left"));
         assertEquals(
@@ -253,6 +266,9 @@ class HomePageTemplateContractTest {
                 cssDeclaration(action, "min-width"));
         assertEquals("44px", cssDeclaration(action, "min-height"));
         assertTrue(action.contains("var(--reference-action-yellow)"));
+        assertEquals(
+                "none",
+                cssDeclaration(lockedAction, "pointer-events"));
         assertTrue(css.contains(":focus-visible"));
         assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
 
@@ -262,6 +278,41 @@ class HomePageTemplateContractTest {
         assertFalse(css.contains(".home-brand"));
         assertFalse(css.contains(".planet-status"));
         assertFalse(css.contains(".planet-interaction-hint"));
+    }
+
+    @Test
+    void homepageFallbackIllustrationMapsEveryAuthoredWorldLandmark()
+            throws Exception {
+        ClassPathResource resource = new ClassPathResource(
+                "static/img/home-quant-planet-fallback.svg");
+        assertTrue(resource.exists());
+
+        Document illustration = parseXml(
+                resource.getContentAsString(StandardCharsets.UTF_8));
+        Element svg = illustration.getDocumentElement();
+        assertEquals("svg", svg.getNodeName());
+        assertEquals("0 0 800 800", svg.getAttribute("viewBox"));
+        assertEquals(0, elementsWithTag(svg, "image").size());
+
+        for (String landmark : List.of(
+                "fallback-planet-core",
+                "fallback-water-band",
+                "fallback-temple",
+                "fallback-industrial-machinery",
+                "fallback-utility-antenna",
+                "fallback-lower-canopy",
+                "fallback-exterior-debris")) {
+            assertNotNull(
+                    elementWithId(svg, landmark),
+                    () -> "Missing fallback landmark: " + landmark);
+        }
+
+        String css = resource("static/css/home-quant-planet.css");
+        String fallbackRule = cssRule(css, ".planet-fallback");
+        assertEquals(
+                "url(\"/img/home-quant-planet-fallback.svg\")",
+                cssDeclaration(fallbackRule, "background-image"));
+        assertEquals("contain", cssDeclaration(fallbackRule, "background-size"));
     }
 
     @Test
@@ -441,6 +492,33 @@ class HomePageTemplateContractTest {
                 false);
         return factory.newDocumentBuilder().parse(
                 new InputSource(new StringReader(xhtml)));
+    }
+
+    private static Document parseXml(String xml) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(
+                "http://apache.org/xml/features/disallow-doctype-decl",
+                true);
+        factory.setFeature(
+                "http://xml.org/sax/features/external-general-entities",
+                false);
+        factory.setFeature(
+                "http://xml.org/sax/features/external-parameter-entities",
+                false);
+        return factory.newDocumentBuilder().parse(
+                new InputSource(new StringReader(xml)));
+    }
+
+    private static Element elementWithId(Element root, String id) {
+        NodeList descendants = root.getElementsByTagName("*");
+        for (int index = 0; index < descendants.getLength(); index++) {
+            Node node = descendants.item(index);
+            if (node instanceof Element element
+                    && id.equals(element.getAttribute("id"))) {
+                return element;
+            }
+        }
+        return null;
     }
 
     private static List<Element> elementsWithAttribute(

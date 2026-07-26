@@ -113,56 +113,14 @@ body {
 }
 
 .planet-fallback {
-    overflow: hidden;
-    border: clamp(3px, .45vw, 7px) solid var(--reference-ink);
-    border-radius: 44% 51% 47% 53% / 50% 43% 56% 47%;
     opacity: 1;
-    background:
-        radial-gradient(ellipse at 52% 8%, #efe5c6 0 9%, transparent 9.5%),
-        radial-gradient(circle at 27% 31%, #db6b4d 0 8%, transparent 8.5%),
-        radial-gradient(circle at 73% 32%, #d7c69d 0 9%, transparent 9.5%),
-        linear-gradient(171deg, transparent 0 44%, #78b5b4 44% 56%, transparent 56%),
-        radial-gradient(ellipse at 50% 78%, #3f7258 0 39%, transparent 40%),
-        radial-gradient(circle at 50% 48%, #b8ab76 0 54%, #817354 55% 58%, transparent 59%);
-    box-shadow:
-        inset 0 -2.2rem 0 rgba(38, 68, 58, .2),
-        0 1.2rem 0 rgba(37, 50, 56, .26);
+    background-color: transparent;
+    background-image: url("/img/home-quant-planet-fallback.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    filter: drop-shadow(0 1.2rem 0 rgba(37, 50, 56, .2));
     transition: opacity 180ms linear;
-}
-
-.planet-fallback::before,
-.planet-fallback::after {
-    position: absolute;
-    content: "";
-    pointer-events: none;
-}
-
-.planet-fallback::before {
-    left: 13%;
-    right: 13%;
-    bottom: 8%;
-    height: 36%;
-    background:
-        radial-gradient(circle at 8% 86%, #315843 0 7%, transparent 7.5%),
-        radial-gradient(circle at 18% 62%, #4d805d 0 10%, transparent 10.5%),
-        radial-gradient(circle at 31% 80%, #315843 0 12%, transparent 12.5%),
-        radial-gradient(circle at 48% 57%, #598b65 0 11%, transparent 11.5%),
-        radial-gradient(circle at 62% 78%, #315843 0 13%, transparent 13.5%),
-        radial-gradient(circle at 78% 55%, #4d805d 0 12%, transparent 12.5%),
-        radial-gradient(circle at 91% 80%, #315843 0 9%, transparent 9.5%);
-}
-
-.planet-fallback::after {
-    top: 16%;
-    right: 13%;
-    width: 3px;
-    height: 25%;
-    background: var(--reference-ink);
-    box-shadow:
-        -4px 0 0 rgba(248, 242, 219, .8),
-        13px 7px 0 -1px var(--reference-ink),
-        -280px 68px 0 5px #d95d43;
-    transform: rotate(5deg);
 }
 
 [data-home-canvas] {
@@ -275,6 +233,10 @@ body {
     opacity: var(--intro-action-progress);
     transform:
         translate(-50%, calc(20px * (1 - var(--intro-action-progress))));
+}
+
+.planet-action-locked .planet-primary-action {
+    pointer-events: none;
 }
 
 .planet-webgl-ready [data-home-canvas] {

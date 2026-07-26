@@ -75,7 +75,11 @@ export function createQuantPlanetRuntime({
     let introElapsedMs = 0;
     let introReady = false;
     let lastFrameTime = startedAt;
+    let ambientFrameTime = null;
+    let lastDragDelta = 0;
     let lifecycle = null;
+    let releaseElapsedMs = REFERENCE_HERO.settleMs;
+    let releaseImpulse = 0;
     let runtimeFailed = false;
     let scene = null;
     let sceneReady = false;
@@ -87,6 +91,23 @@ export function createQuantPlanetRuntime({
     }
     if (motionDisabled) {
         root.classList.add("planet-reduced-motion");
+    }
+
+    const actionTabIndex = action.getAttribute?.("tabindex") ?? null;
+
+    function applyActionAvailability(available) {
+        if (available) {
+            root.classList.remove("planet-action-locked");
+        } else {
+            root.classList.add("planet-action-locked");
+        }
+        if (!available) {
+            action.setAttribute?.("tabindex", "-1");
+        } else if (actionTabIndex === null) {
+            action.removeAttribute?.("tabindex");
+        } else {
+            action.setAttribute?.("tabindex", actionTabIndex);
+        }
     }
 
     function applyIntroState(state) {
@@ -103,6 +124,7 @@ export function createQuantPlanetRuntime({
             "--intro-action-progress",
             String(state.action)
         );
+        applyActionAvailability(state.action > 0);
     }
 
     function cancelMotionAnimations() {
@@ -127,6 +149,7 @@ export function createQuantPlanetRuntime({
     function revealFinal({ failed = false } = {}) {
         if (!introReady) {
             introReady = true;
+            ambientFrameTime = null;
             applyIntroState(createHeroIntroState({
                 elapsedMs: REFERENCE_HERO.introDeadlineMs,
                 sceneReady: true,
@@ -211,6 +234,7 @@ export function createQuantPlanetRuntime({
 
     function pauseRuntime() {
         lastFrameTime = null;
+        ambientFrameTime = null;
         scene?.setVisible?.(false);
     }
 
@@ -287,6 +311,52 @@ export function createQuantPlanetRuntime({
         }
     }
 
+    function updateInputState(state) {
+        const nextState = {
+            ...DEFAULT_INPUT_STATE,
+            ...state,
+            pointer: {
+                ...DEFAULT_INPUT_STATE.pointer,
+                ...state?.pointer
+            }
+        };
+        if (nextState.dragging) {
+            lastDragDelta = inputState.dragging
+                ? nextState.dragAngle - inputState.dragAngle
+                : 0;
+            releaseElapsedMs = REFERENCE_HERO.settleMs;
+            releaseImpulse = 0;
+        } else if (inputState.dragging && nextState.settling) {
+            releaseElapsedMs = 0;
+            releaseImpulse = clamp(
+                lastDragDelta * RELEASE_IMPULSE_SCALE,
+                -MAX_RELEASE_OFFSET_RADIANS,
+                MAX_RELEASE_OFFSET_RADIANS
+            );
+        } else if (!nextState.settling) {
+            releaseElapsedMs = REFERENCE_HERO.settleMs;
+            releaseImpulse = 0;
+        }
+        inputState = nextState;
+    }
+
+    function advanceReleaseOffset(deltaTime) {
+        if (
+            !inputState.settling
+            || releaseImpulse === 0
+            || releaseElapsedMs >= REFERENCE_HERO.settleMs
+        ) {
+            return 0;
+        }
+        releaseElapsedMs = Math.min(
+            REFERENCE_HERO.settleMs,
+            releaseElapsedMs + deltaTime
+        );
+        const remaining = 1
+            - releaseElapsedMs / REFERENCE_HERO.settleMs;
+        return releaseImpulse * remaining * remaining;
+    }
+
     function tick(time) {
         if (destroyed || runtimeFailed) {
             return;
@@ -299,10 +369,21 @@ export function createQuantPlanetRuntime({
         activeElapsedMs += deltaTime;
         updateIntro(deltaTime);
 
+        let ambientDeltaTime = 0;
+        if (introReady) {
+            if (ambientFrameTime !== null) {
+                ambientDeltaTime = Math.max(
+                    0,
+                    frameTime - ambientFrameTime
+                );
+            }
+            ambientFrameTime = frameTime;
+        }
+        const releaseOffset = advanceReleaseOffset(deltaTime);
         const incrementalPose = createHeroPose({
-            elapsedMs: deltaTime,
+            elapsedMs: ambientDeltaTime,
             worldAngle,
-            dragAngle: inputState.dragAngle,
+            dragAngle: inputState.dragAngle + releaseOffset,
             pointer: inputState.pointer,
             reduceMotion: false
         });
@@ -397,16 +478,7 @@ export function createQuantPlanetRuntime({
         inputController = createInput({
             surface: canvas,
             windowTarget,
-            onStateChange(state) {
-                inputState = {
-                    ...DEFAULT_INPUT_STATE,
-                    ...state,
-                    pointer: {
-                        ...DEFAULT_INPUT_STATE.pointer,
-                        ...state?.pointer
-                    }
-                };
-            }
+            onStateChange: updateInputState
         });
         scheduleIntroDeadline();
         lifecycle.start();
@@ -459,3 +531,10 @@ const DEFAULT_INPUT_STATE = Object.freeze({
     dragging: false,
     settling: false
 });
+
+const MAX_RELEASE_OFFSET_RADIANS = Math.PI / 18;
+const RELEASE_IMPULSE_SCALE = .5;
+
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
+}
