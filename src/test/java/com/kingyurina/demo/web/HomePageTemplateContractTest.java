@@ -5,16 +5,28 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.io.ClassPathResource;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class HomePageTemplateContractTest {
@@ -65,6 +77,7 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("data-home-semantic-summary"));
         assertTrue(template.contains("data-interaction-hint"));
         assertEquals(6, occurrences(template, "data-product-orbit-link"));
+        assertEquals(6, occurrences(template, "data-product-title-link"));
         assertEquals(1, occurrences(template, "<h1"));
         assertTrue(template.contains("Market intelligence, in motion."));
         assertTrue(template.contains(
@@ -76,15 +89,7 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains(
                 "<dt>Risk</dt><dd>Medium</dd>"));
         assertTrue(template.contains("Illustrative model view"));
-        assertEquals(1, occurrences(template, ">Enter Quant</a>"));
-        assertTrue(template.contains("href=\"/quant\">QUANT</a>"));
-        assertTrue(template.contains("href=\"/stocks\">STOCKS</a>"));
-        assertTrue(template.contains(
-                "href=\"/stocks/heatmap?index=SP500\">HEATMAP</a>"));
-        assertTrue(template.contains("href=\"/etfs\">ETF</a>"));
-        assertTrue(template.contains("href=\"/atelier\">ATELIER</a>"));
-        assertTrue(template.contains(
-                "href=\"/signals/backtest\">SIGNAL</a>"));
+        assertEquals(1, occurrences(template, "data-enter-quant"));
         assertFalse(template.contains("/vendor/lenis/"));
         assertFalse(template.contains("data-home-chapter"));
         assertFalse(template.contains("home-product-list"));
@@ -94,51 +99,171 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains("overflow: hidden"));
         assertTrue(css.contains("--planet-size: min(82vh, 72vw)"));
         assertTrue(css.contains("--planet-size: min(92vw, 68vh)"));
-        assertTrue(css.contains(".product-orbit__link"));
+        assertTrue(css.contains(".product-title"));
         assertTrue(css.contains("min-height: 44px"));
         assertTrue(css.contains(":focus-visible"));
         assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
     }
 
     @Test
-    void homepageFallbackNavigationOwnsAnUnobstructedTopBand() throws IOException {
+    void homepageUsesDominantReferenceProductTitles() throws Exception {
+        HttpResponse<String> response = getBody("/");
+        assertEquals(200, response.statusCode());
+        Document homepage = parseRenderedHtml(response.body());
+        Element root = homepage.getDocumentElement();
+
+        List<Element> titles = elementsWithAttribute(
+                root, "a", "data-product-title-link");
+        assertEquals(6, titles.size());
+        List<String> expectedRoutes = List.of(
+                "/quant",
+                "/stocks",
+                "/stocks/heatmap?index=SP500",
+                "/etfs",
+                "/atelier",
+                "/signals/backtest");
+        List<List<String>> expectedLines = List.of(
+                List.of("QUANT", "INTELLIGENCE"),
+                List.of("STOCK", "SIGNALS"),
+                List.of("MARKET", "HEATMAP"),
+                List.of("ETF", "RADAR"),
+                List.of("STRATEGY", "ATELIER"),
+                List.of("SIGNAL", "LAB"));
+        List<String> expectedSupporting = List.of(
+                "Observe 쨌 Resolve 쨌 Act",
+                "Market field",
+                "S&P 500 field",
+                "Allocation field",
+                "Research field",
+                "Backtest field");
+
+        for (int index = 0; index < titles.size(); index++) {
+            Element title = titles.get(index);
+            assertEquals(expectedRoutes.get(index), title.getAttribute("href"));
+            List<Element> lines = elementsWithAttribute(
+                    title, "span", "data-title-line");
+            assertEquals(2, lines.size());
+            assertEquals(expectedLines.get(index), lines.stream()
+                    .map(line -> line.getTextContent().strip())
+                    .toList());
+            for (Element line : lines) {
+                assertEquals(
+                        line.getTextContent().strip(),
+                        line.getAttribute("data-extrude"));
+            }
+            List<Element> supporting = elementsWithAttribute(
+                    title, "span", "data-title-supporting");
+            assertEquals(1, supporting.size());
+            assertEquals(
+                    expectedSupporting.get(index),
+                    supporting.getFirst().getTextContent().strip());
+        }
+
+        assertEquals(0, elementsWithClass(root, "product-orbit__link").size());
+        List<Element> enterQuant = elementsWithAttribute(
+                root, "a", "data-enter-quant");
+        assertEquals(1, enterQuant.size());
+        assertEquals("ENTER QUANT", enterQuant.getFirst().getTextContent().strip());
+        assertEquals("/quant", enterQuant.getFirst().getAttribute("href"));
+        assertEquals("main", enterQuant.getFirst().getParentNode().getNodeName());
+
+        Element header = homepage.getElementsByTagName("header")
+                .item(0) instanceof Element element ? element : null;
+        assertTrue(header != null);
+        assertEquals(
+                0,
+                elementsWithAttribute(header, "a", "data-enter-quant").size());
+        Element semanticSummary = elementsWithAttribute(
+                root, "*", "data-home-semantic-summary").getFirst();
+        assertEquals(
+                0,
+                elementsWithAttribute(
+                        semanticSummary, "a", "data-product-title-link").size());
+
+        String css = resource("static/css/home-quant-planet.css");
+        String titleRule = cssRule(css, ".product-title");
+        String titleLineRule = cssRule(
+                css, ".product-title [data-title-line]");
+        String activeTitleRule = cssRule(
+                css, ".product-title[data-product-position=\"active\"]");
+        assertEquals(
+                "clamp(2.7rem, 7.2vw, 7.6rem)",
+                cssDeclaration(titleLineRule, "font-size"));
+        assertEquals(
+                "var(--planet-paper)",
+                cssDeclaration(titleLineRule, "color"));
+        assertTrue(cssDeclaration(titleLineRule, "-webkit-text-stroke")
+                .contains("var(--planet-ink)"));
+        assertTrue(occurrences(
+                cssDeclaration(titleLineRule, "text-shadow"),
+                "var(--planet-ink)") >= 3);
+        assertEquals("1", cssDeclaration(activeTitleRule, "opacity"));
+        assertFalse(titleRule.contains("border-radius"));
+        assertFalse(css.contains(".product-orbit__link"));
+        assertFalse(css.contains(".planet-webgl-ready .product-title"));
+
+        String actionRule = cssRule(css, ".planet-primary-action");
+        assertEquals("absolute", cssDeclaration(actionRule, "position"));
+        assertEquals("50%", cssDeclaration(actionRule, "left"));
+        assertTrue(cssDeclaration(actionRule, "top").startsWith("calc("));
+        assertEquals("44px", cssDeclaration(actionRule, "min-height"));
+        assertEquals(
+                "var(--planet-action)",
+                cssDeclaration(actionRule, "background"));
+        assertTrue(cssDeclaration(actionRule, "clip-path").startsWith("polygon("));
+        assertTrue(cssDeclaration(actionRule, "transform")
+                .contains("translateX(-50%)"));
+        assertTrue(cssDeclaration(actionRule, "transform")
+                .contains("perspective("));
+    }
+
+    @Test
+    void homepageFallbackNavigationKeepsDepthTitlesKeyboardReachable()
+            throws IOException {
         String template = resource("templates/index.html")
                 .replaceAll("\\s+", " ");
-        String css = resource("static/css/home-quant-planet.css")
-                .replaceAll("\\s+", " ");
+        String css = resource("static/css/home-quant-planet.css");
+        String normalizedCss = css.replaceAll("\\s+", " ");
 
         assertTrue(template.contains(
-                ".product-orbit { position: absolute !important; "
-                        + "z-index: calc(var(--layer-content) + 1) !important; "
-                        + "inset: 5rem 0 auto !important; display: grid !important; "
-                        + "grid-template-columns: repeat(3, minmax(5rem, 1fr)); "
-                        + "align-content: start;"));
-        assertTrue(template.contains(
-                ".product-orbit__link { position: relative !important; "
-                        + "inset: auto !important; transform: none !important; "
-                        + "opacity: 1 !important; }"));
+                ".planet-intro-loader { display: none !important; }"));
+        assertFalse(template.contains(".product-orbit__link"));
 
-        assertTrue(css.contains(
+        assertTrue(normalizedCss.contains(
                 "html, body { width: 100%; height: 100%; height: 100dvh; "
                         + "margin: 0; overflow: hidden; overscroll-behavior: none; }"));
-        assertTrue(css.contains(
+        assertTrue(normalizedCss.contains(
                 ".planet-experience { --planet-size: min(82vh, 72vw); "
                         + "position: fixed; inset: 0; min-height: 100dvh; "
                         + "overflow: hidden; isolation: isolate;"));
-        assertTrue(css.contains(
+        assertTrue(normalizedCss.contains(
                 "@media (prefers-reduced-motion: reduce)"));
-        assertTrue(css.contains(
-                ".product-orbit { position: absolute; "
-                        + "z-index: calc(var(--layer-content) + 1); "
-                        + "inset: 0; display: block; padding: 0; "
-                        + "perspective: none;"));
-        assertTrue(css.contains(
-                ".product-orbit__link { position: absolute; left: 50%; "
-                        + "top: 50%; transform: translate(-50%, -50%) "
-                        + "translate3d(var(--orbit-x), var(--orbit-y), "
-                        + "var(--orbit-z)) scale(var(--orbit-scale)); "
-                        + "opacity: var(--orbit-opacity); "
-                        + "z-index: var(--orbit-z-index); will-change: auto;"));
+
+        String previousRule = cssRule(
+                css,
+                ".product-title[data-product-position=\"previous\"]");
+        String nextRule = cssRule(
+                css,
+                ".product-title[data-product-position=\"next\"]");
+        assertTrue(cssDeclaration(previousRule, "left").contains("min("));
+        assertTrue(cssDeclaration(nextRule, "left").contains("min("));
+        assertTrue(Double.parseDouble(
+                cssDeclaration(previousRule, "opacity")) > 0);
+        assertTrue(Double.parseDouble(
+                cssDeclaration(nextRule, "opacity")) > 0);
+
+        String hiddenRule = cssRule(
+                css,
+                ".product-title[data-product-position=\"hidden\"]:not(:focus)");
+        assertEquals("-100vw", cssDeclaration(hiddenRule, "left"));
+        assertEquals("1px", cssDeclaration(hiddenRule, "width"));
+        assertEquals("hidden", cssDeclaration(hiddenRule, "overflow"));
+        assertFalse(hiddenRule.contains("display: none"));
+        assertFalse(hiddenRule.contains("visibility: hidden"));
+
+        String focusRule = cssRule(css, ".product-title:focus");
+        assertEquals("50%", cssDeclaration(focusRule, "left"));
+        assertEquals("1", cssDeclaration(focusRule, "opacity"));
     }
 
     @Test
@@ -295,11 +420,95 @@ class HomePageTemplateContractTest {
                 .replace('\r', '\n');
     }
 
+    private static Document parseRenderedHtml(String html) throws Exception {
+        String xhtml = html
+                .replaceFirst("(?is)<!doctype html>", "")
+                .replaceAll(
+                        "\\s(data-[\\w-]+)(?=\\s|/?>)",
+                        " $1=\"\"")
+                .replaceAll(
+                        "(?i)<(meta|link)([^>]*?)(?<!/)>",
+                        "<$1$2/>");
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(
+                "http://apache.org/xml/features/disallow-doctype-decl",
+                true);
+        factory.setFeature(
+                "http://xml.org/sax/features/external-general-entities",
+                false);
+        factory.setFeature(
+                "http://xml.org/sax/features/external-parameter-entities",
+                false);
+        return factory.newDocumentBuilder().parse(
+                new InputSource(new StringReader(xhtml)));
+    }
+
+    private static List<Element> elementsWithAttribute(
+            Element root,
+            String tagName,
+            String attribute) {
+        List<Element> matches = new ArrayList<>();
+        NodeList descendants = root.getElementsByTagName(tagName);
+        for (int index = 0; index < descendants.getLength(); index++) {
+            Node node = descendants.item(index);
+            if (node instanceof Element element
+                    && element.hasAttribute(attribute)) {
+                matches.add(element);
+            }
+        }
+        return matches;
+    }
+
+    private static List<Element> elementsWithClass(
+            Element root,
+            String className) {
+        List<Element> matches = new ArrayList<>();
+        NodeList descendants = root.getElementsByTagName("*");
+        for (int index = 0; index < descendants.getLength(); index++) {
+            Node node = descendants.item(index);
+            if (node instanceof Element element
+                    && List.of(element.getAttribute("class").split("\\s+"))
+                            .contains(className)) {
+                matches.add(element);
+            }
+        }
+        return matches;
+    }
+
+    private static String cssRule(String css, String selector) {
+        Matcher matcher = Pattern.compile(
+                "(?s)(?:^|})\\s*" + Pattern.quote(selector)
+                        + "\\s*\\{([^}]*)}")
+                .matcher(css);
+        assertTrue(matcher.find(), () -> "Missing CSS rule: " + selector);
+        return matcher.group(1);
+    }
+
+    private static String cssDeclaration(String rule, String property) {
+        Matcher matcher = Pattern.compile(
+                "(?s)(?:^|;)\\s*" + Pattern.quote(property)
+                        + "\\s*:\\s*([^;]+)")
+                .matcher(rule);
+        assertTrue(matcher.find(), () -> "Missing CSS property: " + property);
+        return matcher.group(1).strip().replaceAll("\\s+", " ");
+    }
+
     private HttpResponse<Void> get(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://127.0.0.1:" + port + path))
                 .GET()
                 .build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.discarding());
+    }
+
+    private HttpResponse<String> getBody(String path)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .GET()
+                .build();
+        return HttpClient.newHttpClient().send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     }
 }

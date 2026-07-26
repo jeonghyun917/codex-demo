@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#9ed9d5">
     <title>King Yurina | Quant Intelligence</title>
     <link rel="stylesheet"
-          th:href="@{/css/home-quant-planet.css(v='2026072607')}"
-          href="../static/css/home-quant-planet.css?v=2026072607">
+          th:href="@{/css/home-quant-planet.css(v='2026072608')}"
+          href="../static/css/home-quant-planet.css?v=2026072608">
 </head>
 <body class="home-page home-quant-planet home-quant-fullscreen">
 <a class="home-skip" href="#product-orbit">Skip to product navigation</a>
@@ -16,7 +16,6 @@
     <a class="home-brand" href="/" aria-label="King Yurina home">
         <span>King Yurina</span><small>QUANT FIELD</small>
     </a>
-    <a class="planet-primary-action" href="/quant">Enter Quant</a>
 </header>
 
 <main id="main-content" class="planet-experience"
@@ -38,21 +37,80 @@
 
     <nav id="product-orbit" class="product-orbit"
          data-product-orbit aria-label="Product navigation">
-        <a class="product-orbit__link" data-product-orbit-link
-           aria-label="Open Quant Intelligence" href="/quant">QUANT</a>
-        <a class="product-orbit__link" data-product-orbit-link
-           aria-label="Open Stocks" href="/stocks">STOCKS</a>
-        <a class="product-orbit__link" data-product-orbit-link
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="active"
+           aria-current="page"
+           aria-label="Open Quant Intelligence" href="/quant">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line data-extrude="QUANT">QUANT</span>
+                <span data-title-line
+                      data-extrude="INTELLIGENCE">INTELLIGENCE</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>Observe 쨌 Resolve 쨌 Act</span>
+        </a>
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="next"
+           aria-label="Open Stock Signals" href="/stocks">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line data-extrude="STOCK">STOCK</span>
+                <span data-title-line data-extrude="SIGNALS">SIGNALS</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>Market field</span>
+        </a>
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="hidden"
            aria-label="Open Market Heatmap"
-           href="/stocks/heatmap?index=SP500">HEATMAP</a>
-        <a class="product-orbit__link" data-product-orbit-link
-           aria-label="Open ETF Radar" href="/etfs">ETF</a>
-        <a class="product-orbit__link" data-product-orbit-link
-           aria-label="Open Strategy Atelier" href="/atelier">ATELIER</a>
-        <a class="product-orbit__link" data-product-orbit-link
-           aria-label="Open Signal Backtest"
-           href="/signals/backtest">SIGNAL</a>
+           href="/stocks/heatmap?index=SP500">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line data-extrude="MARKET">MARKET</span>
+                <span data-title-line data-extrude="HEATMAP">HEATMAP</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>S&amp;P 500 field</span>
+        </a>
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="hidden"
+           aria-label="Open ETF Radar" href="/etfs">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line data-extrude="ETF">ETF</span>
+                <span data-title-line data-extrude="RADAR">RADAR</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>Allocation field</span>
+        </a>
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="hidden"
+           aria-label="Open Strategy Atelier" href="/atelier">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line
+                      data-extrude="STRATEGY">STRATEGY</span>
+                <span data-title-line data-extrude="ATELIER">ATELIER</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>Research field</span>
+        </a>
+        <a class="product-title"
+           data-product-title-link data-product-orbit-link
+           data-product-position="previous"
+           aria-label="Open Signal Lab" href="/signals/backtest">
+            <span class="product-title__lines" aria-hidden="true">
+                <span data-title-line data-extrude="SIGNAL">SIGNAL</span>
+                <span data-title-line data-extrude="LAB">LAB</span>
+            </span>
+            <span class="product-title__supporting"
+                  data-title-supporting>Backtest field</span>
+        </a>
     </nav>
+
+    <a class="planet-primary-action"
+       data-enter-quant href="/quant">ENTER QUANT</a>
 
     <section class="home-semantic-summary" data-home-semantic-summary>
         <h1 id="home-title">Market intelligence, in motion.</h1>
@@ -75,23 +133,6 @@
     <style>
         .planet-intro-loader { display: none !important; }
         .home-semantic-summary { visibility: visible !important; }
-        .product-orbit {
-            position: absolute !important;
-            z-index: calc(var(--layer-content) + 1) !important;
-            inset: 5rem 0 auto !important;
-            display: grid !important;
-            grid-template-columns: repeat(3, minmax(5rem, 1fr));
-            align-content: start;
-            justify-content: space-between;
-            gap: .5rem;
-            padding: .5rem 1rem;
-        }
-        .product-orbit__link {
-            position: relative !important;
-            inset: auto !important;
-            transform: none !important;
-            opacity: 1 !important;
-        }
     </style>
 </noscript>
 <script th:src="@{/vendor/motion/motion.js(v='12.29.2')}"
