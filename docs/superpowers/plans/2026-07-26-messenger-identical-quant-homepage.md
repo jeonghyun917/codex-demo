@@ -679,6 +679,8 @@ git commit -m "feat: cut over to the messenger reference homepage"
 - Modify:
   `src/main/resources/static/js/home-quant-planet-runtime.js`
 - Modify:
+  `src/main/java/com/kingyurina/demo/config/SecurityConfig.java`
+- Modify:
   `src/test/js/home-quant-planet-runtime.test.mjs`
 - Modify:
   `src/test/java/com/kingyurina/demo/web/HomePageTemplateContractTest.java`
@@ -698,10 +700,15 @@ Add tests proving:
 - static and reduced classes force all three intro progress variables to `1`;
 - fallback composition uses the same world/title/action bounding tokens;
 - title `alt=""` and the semantic `<h1>` prevent duplicate announcements;
+- the decorative title explicitly has an `alt` attribute, rather than merely
+  resolving a missing attribute to an empty value;
 - action remains at least `44x44px`;
 - no `wheel` listener or scroll container exists;
 - no `PRODUCT_SCENES`, `createProductSelection`, `data-product-*`, or
   `product-title` string remains in production homepage files.
+- anonymous `GET /img/home-messenger-reference-title.png` returns `200`,
+  `Content-Type: image/png`, and a non-empty body while protected routes remain
+  protected.
 
 - [ ] **Step 2: Run focused tests and verify RED**
 
@@ -725,6 +732,10 @@ world. Ensure the same title PNG and native action remain visible in:
 - WebGL context loss.
 
 Do not introduce a second visible action or a hidden route list.
+
+Permit `/img/**` alongside the existing public static-resource matchers in
+`SecurityConfig`. Do not broaden any application or administrative route
+matcher.
 
 - [ ] **Step 4: Verify all regression and budget contracts**
 
@@ -751,6 +762,7 @@ git add `
   src/main/resources/templates/index.html `
   src/main/resources/static/css/home-quant-planet.css `
   src/main/resources/static/js/home-quant-planet-runtime.js `
+  src/main/java/com/kingyurina/demo/config/SecurityConfig.java `
   src/test/js/home-quant-planet-runtime.test.mjs `
   src/test/java/com/kingyurina/demo/web/HomePageTemplateContractTest.java
 git commit -m "fix: complete the messenger reference fallbacks"
