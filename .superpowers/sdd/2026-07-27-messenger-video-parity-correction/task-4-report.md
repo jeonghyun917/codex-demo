@@ -90,3 +90,49 @@ Verification:
 The root reviewer must repeat the browser visual comparison against the video;
 the automated exposure contract now prevents regression to a broad core with
 buried or tiny village and terrain instances.
+
+## Fix round 2: Original panoramic surface art
+
+Code commit: `cf6108c` (`fix: map original quant planet panorama`).
+
+### Asset and RED
+
+- Asset: `src/main/resources/static/images/quant-planet-panorama-v1.png`
+  (built-in imagegen original panorama).
+- `node --test src/test/js/home-quant-planet-world.test.mjs` initially had
+  18 passing and 2 failing tests. The injected real `THREE.Texture` remained
+  absent from `ReferencePlanetBody.material.map`, and the browser-capable
+  loader made no request for the exact local panorama URL.
+- A second RED then covered a loader that invokes its error callback before
+  returning its placeholder texture. The core incorrectly retained that
+  placeholder instead of restoring the plain ground fallback.
+
+### GREEN and budget
+
+- `surfaceTexture` accepts an injected texture for deterministic tests. In a
+  browser-capable world, the only default loader URL is
+  `/images/quant-planet-panorama-v1.png`; Node/document-less worlds do not
+  create a loader and retain the original plain ground material.
+- A loaded texture is configured for `SRGBColorSpace`, horizontal
+  `RepeatWrapping`, vertical `ClampToEdgeWrapping`, a neutral white core tint,
+  and exactly-once world disposal. Loader throws and callback failures leave
+  the same plain ground fallback without aborting construction.
+- The local map applies only to `ReferencePlanetBody`; the rotating core still
+  keeps all protruding terrain, village, shrine, industrial, utility, canopy,
+  and debris meshes. Village outline geometry was reduced from 1.12 to 1.035
+  so it reads as a thin graphite edge.
+- No mesh topology changed: renderer-real diagnostics remain `69` calls and
+  `23,337` triangles, within `75` calls and `140,000` triangles.
+
+| Check | Result |
+| --- | --- |
+| Texture/world GREEN | `node --test src/test/js/home-quant-planet-world.test.mjs`: 20 passing, 0 failing |
+| Full Node regression | `node --test src/test/js/*.test.mjs`: 106 passing, 0 failing |
+| Maven verification | 38 tests, 0 failures/errors/skips, `BUILD SUCCESS` |
+| Replacement 8081 preview | Only the old 8081 preview was replaced. New worktree preview PID 24752 returned HTTP 200 for `/` and HTTP 200 for the panorama asset (3,858,423 bytes). Port 8080 was not modified. |
+
+### Follow-up
+
+The root reviewer must perform the final browser visual comparison at multiple
+autonomous yaw timestamps. Existing static, reduced-motion, and WebGL-failure
+fallback contracts remain covered by the regression suite.
