@@ -371,6 +371,86 @@ const circularDistance = (left, right) => Math.abs(Math.atan2(
     Math.cos(left - right)
 ));
 
+test("stages the complete world before the title and lower action", async () => {
+    const harness = createRuntimeHarness();
+
+    assert.equal(harness.root.dataset.introPhase, "boot");
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-world-scale"),
+        "0.88"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "0"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "0"
+    );
+
+    harness.sceneDeferred.resolve(createScene());
+    await flushPromises();
+    harness.frameQueue.runNext(200);
+
+    assert.equal(harness.root.dataset.introPhase, "split");
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "0"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "0"
+    );
+
+    harness.frameQueue.runNext(500);
+    const titleProgress = Number(
+        harness.root.style.getPropertyValue("--intro-title-progress")
+    );
+    const actionProgress = Number(
+        harness.root.style.getPropertyValue("--intro-action-progress")
+    );
+    assert.equal(harness.root.dataset.introPhase, "reveal");
+    assert.ok(titleProgress > 0);
+    assert.equal(actionProgress, 0);
+
+    harness.frameQueue.runNext(850);
+    assert.equal(harness.root.dataset.introPhase, "ready");
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-world-scale"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
+});
+
+test("forces the complete composition before the four second deadline", () => {
+    const harness = createRuntimeHarness();
+
+    harness.frameQueue.runNext(3998);
+    assert.notEqual(harness.root.dataset.introPhase, "ready");
+    harness.frameQueue.runNext(3999);
+
+    assert.equal(harness.root.dataset.introPhase, "ready");
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-world-scale"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
+});
+
 test("dismisses the intro at 4000ms when the scene resolves just before it", async () => {
     const harness = createRuntimeHarness();
     const scene = createScene();
@@ -450,6 +530,14 @@ test("pauses and resumes one loop from BFCache without replaying the intro", () 
     harness.windowTarget.emit("pageshow", { persisted: true });
     harness.frameQueue.runNext(5000);
     assert.equal(harness.root.dataset.introPhase, "ready");
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
     assert.equal(harness.frameQueue.frames.size, 1);
 });
 
@@ -486,6 +574,55 @@ test("maps missing Motion to a connected six-route static fallback", () => {
     assert.equal(harness.sceneConstructionCalls(), 0);
     assert.equal(harness.frameQueue.frames.size, 0);
     assert.equal(harness.root.classList.contains("planet-intro-ready"), true);
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-world-scale"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        harness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
+});
+
+test("maps reduced motion and WebGL failure to the complete composition", async () => {
+    const reducedHarness = createRuntimeHarness({
+        profile: STATIC_PROFILE,
+        motionDisabled: true
+    });
+    assert.equal(reducedHarness.root.dataset.introPhase, "ready");
+    assert.equal(
+        reducedHarness.root.style.getPropertyValue("--intro-world-scale"),
+        "1"
+    );
+    assert.equal(
+        reducedHarness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        reducedHarness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
+
+    const failedHarness = createRuntimeHarness();
+    failedHarness.sceneDeferred.reject(new Error("WebGL unavailable"));
+    await flushPromises();
+    assert.equal(failedHarness.root.dataset.introPhase, "ready");
+    assert.equal(
+        failedHarness.root.style.getPropertyValue("--intro-world-scale"),
+        "1"
+    );
+    assert.equal(
+        failedHarness.root.style.getPropertyValue("--intro-title-progress"),
+        "1"
+    );
+    assert.equal(
+        failedHarness.root.style.getPropertyValue("--intro-action-progress"),
+        "1"
+    );
 });
 
 test("applies active, adjacent, and hidden title states from one selection", () => {

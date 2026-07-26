@@ -1,5 +1,6 @@
 import {
     advanceRingAngle,
+    clampUnit,
     createIntroState,
     createPageLifecycle,
     selectPlanetQualityProfile
@@ -12,7 +13,7 @@ import {
     REFERENCE_TIMING
 } from "./home-quant-planet-composition.js";
 
-const INTRO_TIMEOUT_MS = 4000;
+const INTRO_TIMEOUT_MS = 4000 - 1;
 const MAX_SCENE_ANGLE = Math.PI * 4;
 const TAU = Math.PI * 2;
 
@@ -90,6 +91,12 @@ export function createQuantPlanetRuntime({
     root.classList.add("planet-runtime-starting");
 
     function applyIntroState(state) {
+        const titleProgress = clampUnit(
+            (state.revealProgress - .2) / .8
+        );
+        const actionProgress = clampUnit(
+            (state.revealProgress - .62) / .38
+        );
         root.dataset.introPhase = state.phase;
         root.style.setProperty(
             "--intro-mark-progress",
@@ -106,6 +113,14 @@ export function createQuantPlanetRuntime({
         root.style.setProperty(
             "--intro-world-scale",
             String(state.worldScale)
+        );
+        root.style.setProperty(
+            "--intro-title-progress",
+            String(titleProgress)
+        );
+        root.style.setProperty(
+            "--intro-action-progress",
+            String(actionProgress)
         );
         loader.style.opacity = String(state.loaderOpacity);
         if (introMark?.style) {

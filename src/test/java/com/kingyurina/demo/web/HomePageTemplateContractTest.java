@@ -97,8 +97,8 @@ class HomePageTemplateContractTest {
 
         assertTrue(css.contains("height: 100dvh"));
         assertTrue(css.contains("overflow: hidden"));
-        assertTrue(css.contains("--planet-diameter: min(82vh, 72vw)"));
-        assertTrue(css.contains("--planet-diameter: min(92vw, 68vh)"));
+        assertTrue(css.contains("--planet-diameter: min(64vh, 68vw)"));
+        assertTrue(css.contains("--planet-diameter: min(68vw, 62vh)"));
         assertTrue(css.contains(".product-title"));
         assertTrue(css.contains("min-height: 44px"));
         assertTrue(css.contains(":focus-visible"));
@@ -197,11 +197,13 @@ class HomePageTemplateContractTest {
         assertTrue(occurrences(
                 cssDeclaration(titleLineRule, "text-shadow"),
                 "var(--planet-ink)") >= 3);
-        assertEquals("1", cssDeclaration(activeTitleRule, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(activeTitleRule, "opacity"));
         assertFalse(titleRule.contains("border-radius"));
         assertFalse(css.contains(".product-orbit__link"));
         assertEquals(
-                "1",
+                "var(--intro-title-progress, 1)",
                 cssDeclaration(
                         cssRule(
                                 css,
@@ -277,7 +279,9 @@ class HomePageTemplateContractTest {
                 .contains("scale("));
 
         String focusedTitle = cssRule(css, ".product-title:focus");
-        assertEquals("1", cssDeclaration(focusedTitle, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(focusedTitle, "opacity"));
         assertEquals("50%", cssDeclaration(focusedTitle, "left"));
 
         String mobileCss = cssAtRuleBlock(
@@ -295,7 +299,9 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "var(--planet-center-y)",
                 cssDeclaration(mobileFocusedTitle, "top"));
-        assertEquals("1", cssDeclaration(mobileFocusedTitle, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(mobileFocusedTitle, "opacity"));
         assertTrue(cssDeclaration(mobileFocusedTitle, "transform")
                 .contains("scale(1)"));
     }
@@ -488,11 +494,15 @@ class HomePageTemplateContractTest {
                 + ".product-title:focus";
         String webglActiveRule = cssRule(css, webglActiveSelector);
         String webglFocusRule = cssRule(css, webglFocusSelector);
-        assertEquals("1", cssDeclaration(webglActiveRule, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(webglActiveRule, "opacity"));
         assertEquals(
                 "visible",
                 cssDeclaration(webglActiveRule, "visibility"));
-        assertEquals("1", cssDeclaration(webglFocusRule, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(webglFocusRule, "opacity"));
         assertEquals(
                 "visible",
                 cssDeclaration(webglFocusRule, "visibility"));
@@ -522,7 +532,7 @@ class HomePageTemplateContractTest {
                         + "margin: 0; overflow: hidden; overscroll-behavior: none; }"));
         String experienceRule = cssRule(css, ".planet-experience");
         assertEquals(
-                "min(82vh, 72vw)",
+                "min(64vh, 68vw)",
                 cssDeclaration(experienceRule, "--planet-diameter"));
         assertEquals(
                 "42%",
@@ -547,10 +557,12 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "calc(50% + var(--planet-radius))",
                 cssDeclaration(nextRule, "left"));
-        assertTrue(Double.parseDouble(
-                cssDeclaration(previousRule, "opacity")) > 0);
-        assertTrue(Double.parseDouble(
-                cssDeclaration(nextRule, "opacity")) > 0);
+        assertEquals(
+                "calc(.36 * var(--intro-title-progress, 1))",
+                cssDeclaration(previousRule, "opacity"));
+        assertEquals(
+                "calc(.36 * var(--intro-title-progress, 1))",
+                cssDeclaration(nextRule, "opacity"));
 
         String hiddenRule = cssRule(
                 css,
@@ -563,7 +575,122 @@ class HomePageTemplateContractTest {
 
         String focusRule = cssRule(css, ".product-title:focus");
         assertEquals("50%", cssDeclaration(focusRule, "left"));
-        assertEquals("1", cssDeclaration(focusRule, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(focusRule, "opacity"));
+    }
+
+    @Test
+    void homepageKeepsReferenceCompositionInFallbacks() throws Exception {
+        Document homepage = parseRenderedHtml(getBody("/").body());
+        Element root = homepage.getDocumentElement();
+        List<Element> titles = elementsWithAttribute(
+                root, "a", "data-product-title-link");
+        assertEquals(6, titles.size());
+        assertEquals(
+                "active",
+                titles.getFirst().getAttribute("data-product-position"));
+        assertEquals(
+                "next",
+                titles.get(1).getAttribute("data-product-position"));
+        assertEquals(
+                "previous",
+                titles.getLast().getAttribute("data-product-position"));
+        assertEquals(
+                "/quant",
+                elementsWithAttribute(root, "a", "data-enter-quant")
+                        .getFirst().getAttribute("href"));
+
+        String template = resource("templates/index.html");
+        String css = resource("static/css/home-quant-planet.css");
+        String experience = cssRule(css, ".planet-experience");
+        String scene = cssRule(css, ".planet-scene");
+        String activeTitle = cssRule(
+                css,
+                ".product-title[data-product-position=\"active\"]");
+        String previousTitle = cssRule(
+                css,
+                ".product-title[data-product-position=\"previous\"]");
+        String nextTitle = cssRule(
+                css,
+                ".product-title[data-product-position=\"next\"]");
+        String action = cssRule(css, ".planet-primary-action");
+        String semanticSummary = cssRule(css, ".home-semantic-summary");
+
+        assertTrue(scene.contains("--intro-world-scale"));
+        assertEquals(
+                "max(var(--intro-split-progress, 1), "
+                        + "var(--intro-title-progress, 1))",
+                cssDeclaration(scene, "opacity"));
+        assertEquals(
+                "var(--intro-title-progress, 1)",
+                cssDeclaration(activeTitle, "opacity"));
+        assertTrue(cssDeclaration(action, "opacity")
+                .contains("--intro-action-progress"));
+        assertTrue(cssDeclaration(action, "transform")
+                .contains("--intro-action-progress"));
+        assertTrue(Double.parseDouble(
+                cssDeclaration(previousTitle, "opacity")
+                        .replaceAll("[^0-9.]", "")) > 0);
+        assertTrue(Double.parseDouble(
+                cssDeclaration(nextTitle, "opacity")
+                        .replaceAll("[^0-9.]", "")) > 0);
+        assertEquals("44px", cssDeclaration(previousTitle, "min-height"));
+        assertEquals("44px", cssDeclaration(nextTitle, "min-height"));
+        assertFalse(cssDeclaration(previousTitle, "transform")
+                .contains("scale("));
+        assertFalse(cssDeclaration(nextTitle, "transform")
+                .contains("scale("));
+        assertEquals("1px", cssDeclaration(semanticSummary, "width"));
+        assertEquals("1px", cssDeclaration(semanticSummary, "height"));
+        assertTrue(cssDeclaration(semanticSummary, "clip-path")
+                .contains("inset(50%)"));
+        assertFalse(template.contains(
+                ".home-semantic-summary { visibility: visible !important; }"));
+
+        assertFalse(experience.contains("linear-gradient"));
+        assertTrue(experience.contains("radial-gradient"));
+        String fieldMarks = cssRule(css, ".planet-experience::before");
+        String fieldSignals = cssRule(css, ".planet-experience::after");
+        assertFalse(fieldMarks.contains("border-top"));
+        assertFalse(fieldMarks.contains("linear-gradient"));
+        assertFalse(fieldSignals.contains("border-top"));
+        assertFalse(fieldSignals.contains("linear-gradient"));
+        assertTrue(css.contains("--intro-title-progress"));
+        assertTrue(css.contains("--intro-action-progress"));
+
+        String portraitCss = cssAtRuleBlock(
+                css,
+                "@media (max-width: 1024px) and (orientation: portrait)");
+        String portraitExperience = cssRule(
+                portraitCss, ".planet-experience");
+        assertEquals(
+                "min(68vw, 62vh)",
+                cssDeclaration(portraitExperience, "--planet-diameter"));
+        assertActionFitsViewport(experience, action, 1440, 900);
+        assertActionFitsViewport(experience, action, 1024, 768);
+        assertActionFitsViewport(portraitExperience, action, 768, 1024);
+        assertActionFitsViewport(portraitExperience, action, 375, 812);
+        assertTrue(resolveCssLength(
+                cssDeclaration(action, "min-height"), 375, 812) >= 44);
+        String mobileCss = cssAtRuleBlock(
+                css, "@media (max-width: 767px)");
+        assertFalse(cssDeclaration(
+                cssRule(
+                        mobileCss,
+                        ".product-title"
+                                + "[data-product-position=\"previous\"]"),
+                "transform").contains("scale("));
+        assertFalse(cssDeclaration(
+                cssRule(
+                        mobileCss,
+                        ".product-title[data-product-position=\"next\"]"),
+                "transform").contains("scale("));
+
+        for (String body : cssRuleBodiesWithSelectorTokens(
+                css, ".planet-webgl-ready", ".product-title")) {
+            assertCssDoesNotHideTitle(body);
+        }
     }
 
     @Test
@@ -600,7 +727,7 @@ class HomePageTemplateContractTest {
         assertTrue(entry.contains("./home-quant-planet-runtime.js"));
         assertTrue(runtime.contains("./home-quant-planet-input.js"));
         assertTrue(orchestration.contains("createIntroState"));
-        assertTrue(orchestration.contains("createNavigationRingState"));
+        assertTrue(orchestration.contains("createProductSelection"));
         assertTrue(orchestration.contains("createOrbitInputController"));
         assertTrue(orchestration.contains("webglcontextlost"));
         assertTrue(orchestration.contains("4000"));
