@@ -135,6 +135,9 @@ function createTimerHarness() {
             });
             return id;
         },
+        pendingCount() {
+            return tasks.size;
+        },
         advance(milliseconds) {
             time += milliseconds;
             [...tasks.entries()]
@@ -392,6 +395,10 @@ test("stages the complete world before the title and lower action", async () => 
     await flushPromises();
     harness.frameQueue.runNext(200);
 
+    assert.equal(harness.root.dataset.introPhase, "boot");
+    harness.frameQueue.runNext(500);
+    assert.equal(harness.root.dataset.introPhase, "mark");
+    harness.frameQueue.runNext(1075);
     assert.equal(harness.root.dataset.introPhase, "split");
     assert.equal(
         harness.root.style.getPropertyValue("--intro-title-progress"),
@@ -402,7 +409,7 @@ test("stages the complete world before the title and lower action", async () => 
         "0"
     );
 
-    harness.frameQueue.runNext(500);
+    harness.frameQueue.runNext(1500);
     const titleProgress = Number(
         harness.root.style.getPropertyValue("--intro-title-progress")
     );
@@ -413,7 +420,7 @@ test("stages the complete world before the title and lower action", async () => 
     assert.ok(titleProgress > 0);
     assert.equal(actionProgress, 0);
 
-    harness.frameQueue.runNext(850);
+    harness.frameQueue.runNext(1875);
     assert.equal(harness.root.dataset.introPhase, "ready");
     assert.equal(
         harness.root.style.getPropertyValue("--intro-world-scale"),
@@ -430,11 +437,12 @@ test("stages the complete world before the title and lower action", async () => 
 });
 
 test("forces the complete composition before the four second deadline", () => {
-    const harness = createRuntimeHarness();
+    const timers = createTimerHarness();
+    const harness = createRuntimeHarness({ inputTimers: timers });
 
-    harness.frameQueue.runNext(3998);
+    timers.advance(3998);
     assert.notEqual(harness.root.dataset.introPhase, "ready");
-    harness.frameQueue.runNext(3999);
+    timers.advance(1);
 
     assert.equal(harness.root.dataset.introPhase, "ready");
     assert.equal(
@@ -449,6 +457,31 @@ test("forces the complete composition before the four second deadline", () => {
         harness.root.style.getPropertyValue("--intro-action-progress"),
         "1"
     );
+    assert.equal(timers.pendingCount(), 0);
+    assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("cleans and restores the independent intro deadline across BFCache", () => {
+    const timers = createTimerHarness();
+    const harness = createRuntimeHarness({ inputTimers: timers });
+    assert.equal(timers.pendingCount(), 1);
+
+    harness.windowTarget.emit("pagehide", { persisted: true });
+    assert.equal(timers.pendingCount(), 0);
+
+    timers.advance(2000);
+    harness.setNow(2000);
+    harness.windowTarget.emit("pageshow", { persisted: true });
+    assert.equal(timers.pendingCount(), 1);
+
+    timers.advance(1998);
+    assert.notEqual(harness.root.dataset.introPhase, "ready");
+    timers.advance(1);
+    assert.equal(harness.root.dataset.introPhase, "ready");
+    assert.equal(timers.pendingCount(), 0);
+
+    harness.runtime.destroy();
+    assert.equal(timers.pendingCount(), 0);
 });
 
 test("dismisses the intro at 4000ms when the scene resolves just before it", async () => {

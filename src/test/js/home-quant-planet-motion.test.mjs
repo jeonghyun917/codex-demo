@@ -47,7 +47,7 @@ test("progresses the intro only after readiness and exits on timeout", () => {
         }
     );
     assert.equal(createIntroState({
-        elapsed: 1700, ready: true, readyElapsed: 850,
+        elapsed: 1900, ready: true, readyElapsed: 1050,
         timedOut: false, reduceMotion: false
     }).phase, "ready");
     assert.equal(createIntroState({
@@ -56,13 +56,52 @@ test("progresses the intro only after readiness and exits on timeout", () => {
     }).interactionReady, true);
 });
 
+test("fast scene readiness cannot skip the mark or overlap split and reveal", () => {
+    const earlyReady = createIntroState({
+        elapsed: 500,
+        ready: true,
+        readyElapsed: 500,
+        timedOut: false,
+        reduceMotion: false
+    });
+    assert.equal(earlyReady.phase, "mark");
+    assert.ok(earlyReady.markProgress > 0 && earlyReady.markProgress < 1);
+    assert.equal(earlyReady.splitProgress, 0);
+    assert.equal(earlyReady.revealProgress, 0);
+
+    const halfwaySplit = createIntroState({
+        elapsed: 1075,
+        ready: true,
+        readyElapsed: 1075,
+        timedOut: false,
+        reduceMotion: false
+    });
+    assert.equal(halfwaySplit.phase, "split");
+    assert.equal(halfwaySplit.markProgress, 1);
+    assert.ok(halfwaySplit.splitProgress > 0);
+    assert.ok(halfwaySplit.splitProgress < 1);
+    assert.equal(halfwaySplit.revealProgress, 0);
+    assert.ok(halfwaySplit.loaderOpacity < 1);
+
+    const reveal = createIntroState({
+        elapsed: 1575,
+        ready: true,
+        readyElapsed: 1575,
+        timedOut: false,
+        reduceMotion: false
+    });
+    assert.equal(reveal.phase, "reveal");
+    assert.equal(reveal.splitProgress, 1);
+    assert.ok(reveal.revealProgress > 0);
+});
+
 test("reduced motion resolves directly to a stable ready composition", () => {
     assert.deepEqual(createIntroState({
         elapsed: 20, ready: true, readyElapsed: 0,
         timedOut: false, reduceMotion: true
     }), {
         phase: "ready", loaderOpacity: 0, markProgress: 1,
-        splitProgress: 0, revealProgress: 1, worldScale: 1,
+        splitProgress: 1, revealProgress: 1, worldScale: 1,
         interactionReady: true
     });
 });

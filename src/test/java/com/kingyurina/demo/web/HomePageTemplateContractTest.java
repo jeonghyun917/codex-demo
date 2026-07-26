@@ -187,7 +187,7 @@ class HomePageTemplateContractTest {
         String activeTitleRule = cssRule(
                 css, ".product-title[data-product-position=\"active\"]");
         assertEquals(
-                "clamp(2.7rem, 7.2vw, 7.6rem)",
+                "var(--planet-title-font-size)",
                 cssDeclaration(titleLineRule, "font-size"));
         assertEquals(
                 "var(--planet-paper)",
@@ -605,6 +605,9 @@ class HomePageTemplateContractTest {
         String css = resource("static/css/home-quant-planet.css");
         String experience = cssRule(css, ".planet-experience");
         String scene = cssRule(css, ".planet-scene");
+        String loader = cssRule(css, ".planet-intro-loader");
+        String loaderBefore = cssRule(css, ".planet-intro-loader::before");
+        String loaderAfter = cssRule(css, ".planet-intro-loader::after");
         String activeTitle = cssRule(
                 css,
                 ".product-title[data-product-position=\"active\"]");
@@ -616,12 +619,23 @@ class HomePageTemplateContractTest {
                 ".product-title[data-product-position=\"next\"]");
         String action = cssRule(css, ".planet-primary-action");
         String semanticSummary = cssRule(css, ".home-semantic-summary");
+        String titleLine = cssRule(
+                css, ".product-title [data-title-line]");
+        String titleLines = cssRule(css, ".product-title__lines");
 
         assertTrue(scene.contains("--intro-world-scale"));
         assertEquals(
                 "max(var(--intro-split-progress, 1), "
                         + "var(--intro-title-progress, 1))",
                 cssDeclaration(scene, "opacity"));
+        assertEquals("transparent", cssDeclaration(loader, "background"));
+        assertTrue(cssDeclaration(loaderBefore, "transform")
+                .contains("--intro-split-progress"));
+        assertTrue(cssDeclaration(loaderAfter, "transform")
+                .contains("--intro-split-progress"));
+        assertTrue(cssDeclaration(
+                cssRule(css, ".planet-intro-loader p"), "transform")
+                .contains("--intro-split-progress"));
         assertEquals(
                 "var(--intro-title-progress, 1)",
                 cssDeclaration(activeTitle, "opacity"));
@@ -671,6 +685,14 @@ class HomePageTemplateContractTest {
         assertActionFitsViewport(experience, action, 1024, 768);
         assertActionFitsViewport(portraitExperience, action, 768, 1024);
         assertActionFitsViewport(portraitExperience, action, 375, 812);
+        assertLongTitleGlyphFit(
+                experience, titleLine, titleLines, 1440, 900);
+        assertLongTitleGlyphFit(
+                experience, titleLine, titleLines, 1024, 768);
+        assertLongTitleGlyphFit(
+                portraitExperience, titleLine, titleLines, 768, 1024);
+        assertLongTitleGlyphFit(
+                portraitExperience, titleLine, titleLines, 375, 812);
         assertTrue(resolveCssLength(
                 cssDeclaration(action, "min-height"), 375, 812) >= 44);
         String mobileCss = cssAtRuleBlock(
@@ -1025,6 +1047,54 @@ class HomePageTemplateContractTest {
                 () -> "Action exceeds viewport: "
                         + (center + radius + gap + actionHeight)
                         + " > " + viewportHeight);
+    }
+
+    private static void assertLongTitleGlyphFit(
+            String experienceRule,
+            String titleLineRule,
+            String titleLinesRule,
+            double viewportWidth,
+            double viewportHeight) {
+        assertEquals(
+                "var(--planet-title-font-size)",
+                cssDeclaration(titleLineRule, "font-size"));
+        double worldDiameter = resolveCssLength(
+                cssDeclaration(experienceRule, "--planet-diameter"),
+                viewportWidth,
+                viewportHeight);
+        double fontSize = resolveCssLength(
+                cssDeclaration(experienceRule, "--planet-title-font-size"),
+                viewportWidth,
+                viewportHeight);
+        double letterSpacing = Double.parseDouble(
+                cssDeclaration(titleLineRule, "letter-spacing")
+                        .replace("em", ""));
+        Matcher scale = Pattern.compile("scaleX\\(([0-9.]+)\\)")
+                .matcher(cssDeclaration(titleLinesRule, "transform"));
+        assertTrue(scale.find());
+        double scaleX = Double.parseDouble(scale.group(1));
+        String longestTitle = "INTELLIGENCE";
+        double conservativeGlyphWidthEm = longestTitle.chars()
+                .mapToDouble(character -> switch (character) {
+                    case 'I' -> .35;
+                    case 'L' -> .62;
+                    case 'E' -> .65;
+                    case 'T' -> .68;
+                    case 'C' -> .72;
+                    case 'N' -> .75;
+                    case 'G' -> .78;
+                    default -> .8;
+                })
+                .sum();
+        double titleWidth = fontSize * (
+                conservativeGlyphWidthEm
+                        + letterSpacing * (longestTitle.length() - 1))
+                * scaleX;
+        double ratio = titleWidth / worldDiameter;
+        assertTrue(
+                ratio >= .45 && ratio <= .62,
+                () -> "Long-title glyph ratio outside range: " + ratio
+                        + " at " + viewportWidth + "x" + viewportHeight);
     }
 
     private static double resolveCssLength(

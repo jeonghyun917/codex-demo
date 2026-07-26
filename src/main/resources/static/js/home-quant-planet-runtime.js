@@ -85,10 +85,43 @@ export function createQuantPlanetRuntime({
     let animationRunning = false;
     const selectionAnimations = new Set();
     let introTimedOut = false;
+    let introDeadlineId = null;
     let runtimeFailed = false;
     let destroyed = false;
 
     root.classList.add("planet-runtime-starting");
+
+    function clearIntroDeadline() {
+        if (introDeadlineId === null) {
+            return;
+        }
+        windowTarget?.clearTimeout?.(introDeadlineId);
+        introDeadlineId = null;
+    }
+
+    function scheduleIntroDeadline() {
+        clearIntroDeadline();
+        if (
+            introTimedOut
+            || destroyed
+            || root.classList.contains("planet-intro-ready")
+            || typeof windowTarget?.setTimeout !== "function"
+        ) {
+            return;
+        }
+        const remaining = Math.max(
+            0,
+            startedAt + INTRO_TIMEOUT_MS - now()
+        );
+        if (remaining <= 0) {
+            dismissIntro();
+            return;
+        }
+        introDeadlineId = windowTarget.setTimeout(() => {
+            introDeadlineId = null;
+            dismissIntro();
+        }, remaining);
+    }
 
     function applyIntroState(state) {
         const titleProgress = clampUnit(
@@ -129,6 +162,7 @@ export function createQuantPlanetRuntime({
     }
 
     function markIntroReady() {
+        clearIntroDeadline();
         root.classList.remove("planet-runtime-starting");
         root.classList.add("planet-intro-ready");
     }
@@ -392,6 +426,7 @@ export function createQuantPlanetRuntime({
         }
         destroyed = true;
         animationRunning = false;
+        clearIntroDeadline();
         inputController?.destroy();
         cancelSelectionAnimations();
         disposeScene();
@@ -402,11 +437,11 @@ export function createQuantPlanetRuntime({
         windowTarget.removeEventListener("resize", handleResize);
         windowTarget.removeEventListener(
             "pagehide",
-            lifecycle.handlePageHide
+            handlePageHide
         );
         windowTarget.removeEventListener(
             "pageshow",
-            lifecycle.handlePageShow
+            handlePageShow
         );
         canvas.removeEventListener(
             "webglcontextlost",
@@ -486,7 +521,7 @@ export function createQuantPlanetRuntime({
         lifecycle.pause();
         windowTarget.removeEventListener(
             "pageshow",
-            lifecycle.handlePageShow
+            handlePageShow
         );
         disposeScene();
         root.classList.remove("planet-webgl-ready");
@@ -508,6 +543,20 @@ export function createQuantPlanetRuntime({
         }
     }
 
+    function handlePageHide(event) {
+        if (event?.persisted) {
+            clearIntroDeadline();
+        }
+        lifecycle.handlePageHide(event);
+    }
+
+    function handlePageShow(event) {
+        lifecycle.handlePageShow(event);
+        if (event?.persisted) {
+            scheduleIntroDeadline();
+        }
+    }
+
     function handleResize() {
         scene?.resize();
         applyCurrentRingState();
@@ -518,9 +567,10 @@ export function createQuantPlanetRuntime({
         handleVisibilityChange
     );
     windowTarget.addEventListener("resize", handleResize, { passive: true });
-    windowTarget.addEventListener("pagehide", lifecycle.handlePageHide);
-    windowTarget.addEventListener("pageshow", lifecycle.handlePageShow);
+    windowTarget.addEventListener("pagehide", handlePageHide);
+    windowTarget.addEventListener("pageshow", handlePageShow);
     canvas.addEventListener("webglcontextlost", handleContextLost);
+    scheduleIntroDeadline();
 
     applyCurrentRingState();
     if (!motionDisabled) {

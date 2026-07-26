@@ -215,6 +215,7 @@ a {
     --planet-diameter: min(64vh, 68vw);
     --planet-radius: min(32vh, 34vw);
     --planet-title-envelope: min(37.12vh, 39.44vw);
+    --planet-title-font-size: min(7.04vh, 7.48vw);
     --planet-action-gap: clamp(.75rem, 1.5vh, 1.25rem);
     position: fixed;
     inset: 0;
@@ -279,8 +280,9 @@ a {
     place-content: center;
     justify-items: center;
     gap: 1.25rem;
-    background:
-        radial-gradient(circle at 50% 50%, var(--planet-haze), var(--planet-sky) 72%);
+    overflow: hidden;
+    isolation: isolate;
+    background: transparent;
     opacity: 1;
     visibility: visible;
     transition:
@@ -288,10 +290,46 @@ a {
         visibility 480ms step-end;
 }
 
+.planet-intro-loader::before,
+.planet-intro-loader::after {
+    position: absolute;
+    z-index: -1;
+    right: 0;
+    left: 0;
+    height: 51%;
+    background:
+        radial-gradient(
+            circle at 50% 50%,
+            var(--planet-haze),
+            var(--planet-sky) 72%
+        );
+    content: "";
+    will-change: transform;
+}
+
+.planet-intro-loader::before {
+    top: 0;
+    transform: translateY(
+        calc(var(--intro-split-progress, 0) * -102%)
+    );
+}
+
+.planet-intro-loader::after {
+    bottom: 0;
+    transform: translateY(
+        calc(var(--intro-split-progress, 0) * 102%)
+    );
+}
+
 .planet-intro-loader p {
+    position: relative;
+    z-index: 1;
     margin: 0;
     font: 500 .66rem/1 var(--planet-font-data);
     letter-spacing: .18em;
+    transform: translateY(
+        calc(var(--intro-split-progress, 0) * -2rem)
+    );
 }
 
 .planet-intro-loader__courier {
@@ -302,6 +340,7 @@ a {
     border-radius: .5rem .5rem .35rem .35rem;
     background: linear-gradient(var(--planet-blue) 0 38%, var(--planet-coral) 38% 100%);
     box-shadow: .22rem .25rem 0 rgba(23, 49, 73, .2);
+    opacity: calc(1 - var(--intro-split-progress, 0));
     animation: courier-ready 900ms ease-in-out infinite alternate;
 }
 
@@ -634,7 +673,7 @@ a {
     display: block;
     width: 100%;
     color: var(--planet-paper);
-    font-size: clamp(2.7rem, 7.2vw, 7.6rem);
+    font-size: var(--planet-title-font-size);
     font-weight: 700;
     letter-spacing: -.075em;
     line-height: .72;
@@ -851,6 +890,7 @@ a {
         --planet-diameter: min(68vw, 62vh);
         --planet-radius: min(34vw, 31vh);
         --planet-title-envelope: min(39.44vw, 35.96vh);
+        --planet-title-font-size: min(7.48vw, 6.82vh);
         --planet-action-gap: clamp(.6rem, 1.3vh, 1rem);
     }
 
@@ -865,6 +905,7 @@ a {
         --planet-diameter: min(68vw, 62vh);
         --planet-radius: min(34vw, 31vh);
         --planet-title-envelope: min(39.44vw, 35.96vh);
+        --planet-title-font-size: min(7.48vw, 6.82vh);
         --planet-action-gap: clamp(.5rem, 1.25vh, .85rem);
     }
 
@@ -937,6 +978,7 @@ a {
         --planet-diameter: min(78vh, 72vw);
         --planet-radius: min(39vh, 36vw);
         --planet-title-envelope: min(45.24vh, 41.76vw);
+        --planet-title-font-size: min(8.58vh, 7.92vw);
         --planet-action-gap: clamp(.5rem, 1vh, .75rem);
     }
 

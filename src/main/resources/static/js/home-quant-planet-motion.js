@@ -113,7 +113,7 @@ export function createIntroState({
     if (timedOut || (reduceMotion && ready)) {
         return {
             phase: "ready", loaderOpacity: 0, markProgress: 1,
-            splitProgress: 0, revealProgress: 1, worldScale: 1,
+            splitProgress: 1, revealProgress: 1, worldScale: 1,
             interactionReady: true
         };
     }
@@ -125,20 +125,30 @@ export function createIntroState({
         };
     }
     const markProgress = clamp((total - 250) / 625, 0, 1);
-    const splitProgress = ready ? smoothStep(sinceReady / 400) : 0;
+    const markReadyElapsed = Math.max(0, total - 875);
+    const gatedReadyElapsed = ready
+        ? Math.min(sinceReady, markReadyElapsed)
+        : 0;
+    const splitProgress = ready
+        ? smoothStep(gatedReadyElapsed / 400)
+        : 0;
     const revealProgress = ready
-        ? smoothStep((sinceReady - 250) / 600) : 0;
-    const interactionReady = ready && revealProgress >= 1;
+        ? smoothStep((gatedReadyElapsed - 400) / 600)
+        : 0;
+    const interactionReady = ready
+        && markProgress >= 1
+        && revealProgress >= 1;
     const phase = interactionReady ? "ready"
-        : ready ? (sinceReady < 250 ? "split" : "reveal")
-            : total < 250 ? "boot" : "mark";
+        : total < 250 ? "boot"
+            : markProgress < 1 || !ready ? "mark"
+                : gatedReadyElapsed < 400 ? "split" : "reveal";
     return {
         phase,
-        loaderOpacity: 1 - revealProgress,
+        loaderOpacity: 1 - splitProgress,
         markProgress,
         splitProgress,
         revealProgress,
-        worldScale: .88 + revealProgress * .12,
+        worldScale: .88 + splitProgress * .12,
         interactionReady
     };
 }
