@@ -9,16 +9,20 @@ import {
     createQuantPlanetScene
 } from "./home-quant-planet-scene.js";
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const LOOPBACK_HOSTS = new Set([
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "[::1]"
+]);
 const root = document.documentElement;
 const experience = document.querySelector("[data-home-experience]");
+const loader = document.querySelector("[data-intro-loader]");
 const sceneElement = document.querySelector("[data-home-scene]");
 const canvas = document.querySelector("[data-home-canvas]");
-const loader = document.querySelector("[data-intro-loader]");
-const introMark = loader?.querySelector("[data-intro-mark]");
-const productLinks = [
-    ...document.querySelectorAll("[data-product-orbit-link]")
-];
+const fallback = document.querySelector("[data-planet-fallback]");
+const title = document.querySelector("[data-reference-title]");
+const action = document.querySelector("[data-enter-quant]");
 const overrides = resolveLocalTestOverrides({
     hostname: window.location.hostname,
     search: window.location.search
@@ -38,28 +42,43 @@ const capabilities = resolveQuantPlanetCapabilities({
 function detectWebglSupport() {
     try {
         const probe = document.createElement("canvas");
-        return Boolean(probe.getContext("webgl2") || probe.getContext("webgl"));
+        return Boolean(
+            probe.getContext("webgl2")
+            || probe.getContext("webgl")
+        );
     } catch {
         return false;
     }
 }
 
+function revealStaticComposition() {
+    root.style.setProperty("--intro-world-progress", "1");
+    root.style.setProperty("--intro-title-progress", "1");
+    root.style.setProperty("--intro-action-progress", "1");
+    root.classList.remove("planet-runtime-starting");
+    root.classList.add("planet-intro-ready", "planet-webgl-failed");
+}
+
 const selectorsAreValid = Boolean(
     experience
+    && loader
     && sceneElement
     && canvas
-    && loader
-    && productLinks.length === 6
+    && fallback
+    && title
+    && action
 );
 
 if (selectorsAreValid) {
     createQuantPlanetRuntime({
         root,
         experience,
-        canvas,
         loader,
-        introMark,
-        productLinks,
+        sceneElement,
+        canvas,
+        fallback,
+        title,
+        action,
         profile: capabilities.profile,
         motionDisabled: capabilities.motionDisabled,
         isLoopback: LOOPBACK_HOSTS.has(window.location.hostname),
@@ -71,9 +90,5 @@ if (selectorsAreValid) {
         windowTarget: window
     });
 } else {
-    root.classList.remove("planet-runtime-starting");
-    root.classList.add("planet-intro-ready", "planet-webgl-failed");
-    if (loader?.style) {
-        loader.style.opacity = "0";
-    }
+    revealStaticComposition();
 }

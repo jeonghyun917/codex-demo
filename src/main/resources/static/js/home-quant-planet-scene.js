@@ -1,22 +1,38 @@
 import {
-    createCourierLoopPose,
-    createOrbitPose,
     shouldRenderFrame
 } from "./home-quant-planet-motion.js";
-import { fitPerspectiveSphere } from "./home-quant-planet-composition.js";
-import { createQuantPlanetWorld } from "./home-quant-planet-world.js";
+import {
+    fitPerspectiveSphere
+} from "./home-quant-planet-composition.js";
+import {
+    createQuantPlanetWorld
+} from "./home-quant-planet-world.js";
 
-const HIGH_LIMITS = Object.freeze({ drawCalls: 75, triangles: 140000 });
-const BALANCED_LIMITS = Object.freeze({ drawCalls: 65, triangles: 90000 });
+const HIGH_LIMITS = Object.freeze({
+    drawCalls: 75,
+    triangles: 140000
+});
+const BALANCED_LIMITS = Object.freeze({
+    drawCalls: 65,
+    triangles: 90000
+});
 const framingMargin = (aspect) => aspect < .75 ? 1 : 1.1;
+
+const EMPTY_POSE = Object.freeze({
+    worldAngle: 0,
+    dragAngle: 0,
+    pointer: Object.freeze({ x: 0, y: 0 }),
+    elapsedMs: 0,
+    reduceMotion: true
+});
 
 function createStaticSceneController() {
     return {
         resize() {},
-        setPointer() {},
-        setDragAngle() {},
         setVisible() {},
-        render() { return false; },
+        render() {
+            return false;
+        },
         getDiagnostics() {
             return {
                 drawCalls: 0,
@@ -29,7 +45,11 @@ function createStaticSceneController() {
     };
 }
 
-export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
+export async function createQuantPlanetScene({
+    canvas,
+    profile,
+    three
+} = {}) {
     if (!canvas || !profile?.webgl || profile.name === "static") {
         return createStaticSceneController();
     }
@@ -41,12 +61,12 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         try {
             world?.dispose();
         } catch {
-            // Preserve the initialization error after attempting every cleanup.
+            // Preserve the initialization failure after all cleanup attempts.
         }
         try {
             renderer?.dispose();
         } catch {
-            // Preserve the initialization error after attempting every cleanup.
+            // Preserve the initialization failure after all cleanup attempts.
         }
     }
 
@@ -61,7 +81,10 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.08;
-        renderer.setPixelRatio(profile.pixelRatio);
+        renderer.setPixelRatio(Math.min(
+            Math.max(Number(profile.pixelRatio) || 1, 1),
+            1.5
+        ));
         renderer.shadowMap.enabled = Boolean(profile.shadows);
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -69,9 +92,13 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         scene.fog = new THREE.Fog(0xd9efe8, 11, 24);
         const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
         world = createQuantPlanetWorld(THREE, { profile });
-        const worldScale = Math.max(.001, Number(profile.planetScale) || 1);
+        const worldScale = Math.max(
+            .001,
+            Number(profile.planetScale) || 1
+        );
         world.group.scale.setScalar(worldScale);
         scene.add(world.group);
+
         const localEnvelope = world.getFramingEnvelope();
         const envelope = {
             center: {
@@ -79,9 +106,7 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
                 y: localEnvelope.center.y * worldScale,
                 z: localEnvelope.center.z * worldScale
             },
-            radius: localEnvelope.radius * worldScale,
-            top: localEnvelope.top * worldScale,
-            bottom: localEnvelope.bottom * worldScale
+            radius: localEnvelope.radius * worldScale
         };
         function refitCamera(aspect) {
             const next = fitPerspectiveSphere({
@@ -100,7 +125,11 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         let framing = refitCamera(1);
         const framingTarget = new THREE.Vector3();
 
-        const hemisphere = new THREE.HemisphereLight(0xfff9ea, 0x71847e, 1.7);
+        const hemisphere = new THREE.HemisphereLight(
+            0xfff9ea,
+            0x71847e,
+            1.7
+        );
         hemisphere.name = "SkyHemisphereFill";
         const key = new THREE.DirectionalLight(0xfff1cc, 3.1);
         key.name = "DaylightKey";
@@ -121,18 +150,12 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         rim.position.set(5, 2, -6);
         scene.add(hemisphere, key, rim);
 
-        let pointer = { x: 0, y: 0 };
-        let dragAngle = 0;
         let visible = true;
         let dirty = true;
         let disposed = false;
-        const limits = profile.name === "high" ? HIGH_LIMITS : BALANCED_LIMITS;
-
-        function markDirty() {
-            if (!disposed) {
-                dirty = true;
-            }
-        }
+        const limits = profile.name === "high"
+            ? HIGH_LIMITS
+            : BALANCED_LIMITS;
 
         function resize() {
             if (disposed) {
@@ -143,67 +166,51 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
             camera.aspect = width / height;
             framing = refitCamera(camera.aspect);
             renderer.setSize(width, height, false);
-            markDirty();
+            dirty = true;
         }
 
         return {
             resize,
-            setDragAngle(value) {
-                const next = Math.max(-Math.PI * 4, Math.min(
-                    Math.PI * 4, Number(value) || 0
-                ));
-                if (next !== dragAngle) {
-                    dragAngle = next;
-                    markDirty();
-                }
-            },
-            setPointer(value) {
-                const next = profile.pointerEnabled
-                    ? value || { x: 0, y: 0 }
-                    : { x: 0, y: 0 };
-                if (next.x !== pointer.x || next.y !== pointer.y) {
-                    pointer = next;
-                    markDirty();
-                }
-            },
             setVisible(value) {
                 const next = Boolean(value);
                 if (next !== visible) {
                     visible = next;
-                    markDirty();
+                    dirty = true;
                 }
             },
-            render(time = 0) {
+            render(pose = EMPTY_POSE) {
                 if (disposed || !shouldRenderFrame({
                     visible,
                     hidden: false,
                     webgl: profile.webgl,
-                    reducedMotion: profile.name === "static",
+                    reducedMotion: pose.reduceMotion,
                     dirty,
-                    profile
+                    profile,
+                    ambient: !pose.reduceMotion
                 })) {
                     return false;
                 }
-                const orbitPose = createOrbitPose({
-                    time, dragAngle, pointer,
-                    reduceMotion: profile.name === "static"
-                });
-                const courierPose = createCourierLoopPose(time, false);
-                world.update({ orbitPose, courierPose, time });
+
+                world.update(pose);
+                const pointer = profile.pointerEnabled && !pose.reduceMotion
+                    ? pose.pointer || EMPTY_POSE.pointer
+                    : EMPTY_POSE.pointer;
+                const cameraYaw = (Number(pointer.x) || 0) * .055;
+                const cameraPitch = -(Number(pointer.y) || 0) * .04;
 
                 framingTarget.set(
                     framing.target.x,
                     framing.target.y,
                     framing.target.z
                 ).applyQuaternion(world.group.quaternion);
-                const cosPitch = Math.cos(orbitPose.cameraPitch);
+                const cosPitch = Math.cos(cameraPitch);
                 camera.position.set(
-                    framingTarget.x + Math.sin(orbitPose.cameraYaw)
-                        * cosPitch * framing.distance,
-                    framingTarget.y + Math.sin(orbitPose.cameraPitch)
-                        * framing.distance,
-                    framingTarget.z + Math.cos(orbitPose.cameraYaw)
-                        * cosPitch * framing.distance
+                    framingTarget.x
+                        + Math.sin(cameraYaw) * cosPitch * framing.distance,
+                    framingTarget.y
+                        + Math.sin(cameraPitch) * framing.distance,
+                    framingTarget.z
+                        + Math.cos(cameraYaw) * cosPitch * framing.distance
                 );
                 camera.lookAt(framingTarget);
                 renderer.render(scene, camera);
