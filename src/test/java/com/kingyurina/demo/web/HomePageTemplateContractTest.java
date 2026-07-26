@@ -594,8 +594,17 @@ class HomePageTemplateContractTest {
         String titleRule = cssRule(
                 noScriptCss,
                 ".product-orbit .product-title[data-product-position]");
+        String focusWithinRule = cssRule(
+                noScriptCss,
+                ".product-orbit:focus-within "
+                        + ".product-title"
+                        + "[data-product-position=\"active\"]"
+                        + ":not(:focus)");
 
         assertEquals("grid", cssDeclaration(orbitRule, "display"));
+        assertEquals(
+                "repeat(3, minmax(44px, 1fr))",
+                cssDeclaration(orbitRule, "grid-template-columns"));
         assertEquals("auto", cssDeclaration(orbitRule, "pointer-events"));
         assertEquals("relative", cssDeclaration(titleRule, "position"));
         assertEquals("auto", cssDeclaration(titleRule, "left"));
@@ -611,16 +620,15 @@ class HomePageTemplateContractTest {
         assertEquals("none", cssDeclaration(titleRule, "transform"));
         assertEquals("auto", cssDeclaration(titleRule, "pointer-events"));
         assertFalse(titleRule.contains("display: none"));
+        assertEquals("1", cssDeclaration(focusWithinRule, "opacity"));
+        assertEquals("none", cssDeclaration(focusWithinRule, "transform"));
+        String desktopNoScriptCss = cssAtRuleBlock(
+                noScriptCss, "@media (min-width: 768px)");
         assertEquals(
-                "1",
+                "repeat(6, minmax(44px, 1fr))",
                 cssDeclaration(
-                        cssRule(
-                                noScriptCss,
-                                ".product-orbit:focus-within "
-                                        + ".product-title"
-                                        + "[data-product-position=\"active\"]"
-                                        + ":not(:focus)"),
-                        "opacity"));
+                        cssRule(desktopNoScriptCss, ".product-orbit"),
+                        "grid-template-columns"));
 
         Document homepage = parseRenderedHtml(getBody("/").body());
         Element root = homepage.getDocumentElement();
