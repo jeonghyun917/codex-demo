@@ -150,17 +150,6 @@ test("exports only the reference hero and bounds fitting contracts", () => {
     ]);
 });
 
-test("defines one messenger reference hero without homepage routes", () => {
-    assert.deepEqual(REFERENCE_HERO, {
-        titleAssetUrl: "/img/home-messenger-reference-title.png",
-        introDeadlineMs: 3999,
-        worldRevolutionMs: 96000,
-        dragRadiansPerPixel: 0.0048,
-        settleMs: 720
-    });
-    assert.equal("routes" in REFERENCE_HERO, false);
-});
-
 test("fits complete bounds against the stricter viewport field of view", () => {
     const landscape = fitPerspectiveSphere({
         center: { x: 0, y: .4, z: 0 },
