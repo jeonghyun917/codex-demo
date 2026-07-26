@@ -161,7 +161,7 @@ a {
 .planet-primary-action {
     position: absolute;
     z-index: calc(var(--layer-content) + 2);
-    top: calc(54% + min(30.42vh, 26.71vw) + clamp(.75rem, 1.5vh, 1.25rem));
+    top: calc(var(--planet-center-y) + var(--planet-radius) + var(--planet-action-gap));
     left: 50%;
     display: inline-flex;
     width: min(11rem, calc(100vw - 2rem));
@@ -205,7 +205,11 @@ a {
 }
 
 .planet-experience {
-    --planet-size: min(82vh, 72vw);
+    --planet-center-y: 42%;
+    --planet-diameter: min(82vh, 72vw);
+    --planet-radius: min(41vh, 36vw);
+    --planet-title-envelope: min(47.56vh, 41.76vw);
+    --planet-action-gap: clamp(.75rem, 1.5vh, 1.25rem);
     position: fixed;
     inset: 0;
     min-height: 100dvh;
@@ -312,10 +316,10 @@ a {
 .planet-scene {
     position: absolute;
     z-index: var(--layer-world);
-    width: var(--planet-size);
-    height: var(--planet-size);
+    width: var(--planet-diameter);
+    height: var(--planet-diameter);
     left: 50%;
-    top: 54%;
+    top: var(--planet-center-y);
     transform: translate(-50%, -50%)
         scale(var(--intro-world-scale, .88));
     filter: drop-shadow(0 2rem 1.5rem var(--planet-shadow));
@@ -570,10 +574,10 @@ a {
 .product-title {
     position: absolute;
     left: 50%;
-    top: 47%;
+    top: var(--planet-center-y);
     z-index: calc(var(--layer-content) + 1);
     display: grid;
-    width: min(53.4vw, 60.84vh, 52rem);
+    width: var(--planet-title-envelope);
     min-width: 44px;
     min-height: 44px;
     align-content: center;
@@ -595,6 +599,8 @@ a {
     display: grid;
     width: 100%;
     justify-items: center;
+    transform: scaleX(.78);
+    transform-origin: center;
 }
 
 .product-title [data-title-line] {
@@ -630,23 +636,23 @@ a {
 
 .product-title[data-product-position="active"] {
     left: 50%;
-    top: 47%;
+    top: var(--planet-center-y);
     z-index: calc(var(--layer-content) + 2);
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
 }
 
 .product-title[data-product-position="previous"] {
-    left: calc(50% - min(26.7vw, 30.42vh));
-    top: 49%;
+    left: calc(50% - var(--planet-radius));
+    top: var(--planet-center-y);
     z-index: var(--layer-content);
     opacity: .36;
     transform: translate(-50%, -50%) scale(.34) rotateY(12deg);
 }
 
 .product-title[data-product-position="next"] {
-    left: calc(50% + min(26.7vw, 30.42vh));
-    top: 49%;
+    left: calc(50% + var(--planet-radius));
+    top: var(--planet-center-y);
     z-index: var(--layer-content);
     opacity: .36;
     transform: translate(-50%, -50%) scale(.34) rotateY(-12deg);
@@ -671,9 +677,9 @@ a {
 
 .product-title:focus {
     left: 50%;
-    top: 47%;
+    top: var(--planet-center-y);
     z-index: calc(var(--layer-content) + 3);
-    width: min(53.4vw, 60.84vh, 52rem);
+    width: var(--planet-title-envelope);
     height: auto;
     min-width: 44px;
     min-height: 44px;
@@ -684,6 +690,11 @@ a {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
     white-space: normal;
+}
+
+.product-orbit:focus-within .product-title[data-product-position="active"]:not(:focus) {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.72);
 }
 
 .product-title:hover .product-title__supporting,
@@ -784,7 +795,13 @@ a {
 }
 
 @media (max-width: 767px) {
-    .planet-experience { --planet-size: min(92vw, 68vh); }
+    .planet-experience {
+        --planet-center-y: 40%;
+        --planet-diameter: min(92vw, 68vh);
+        --planet-radius: min(46vw, 34vh);
+        --planet-title-envelope: min(53.36vw, 39.44vh);
+        --planet-action-gap: clamp(.5rem, 1.25vh, .85rem);
+    }
 
     .home-nav {
         min-height: 4rem;
@@ -800,35 +817,33 @@ a {
     }
 
     .planet-primary-action {
-        top: calc(49% + min(34.51vw, 25.51vh) + .75rem);
+        top: calc(var(--planet-center-y) + var(--planet-radius) + var(--planet-action-gap));
         padding-inline: .7rem;
         font-size: .58rem;
     }
 
-    .planet-scene { top: 49%; }
-
-    .product-title,
-    .product-title:focus {
-        top: 45%;
-        width: min(69.02vw, 51.02vh);
-    }
-
-    .product-title[data-product-position="active"] {
-        top: 45%;
+    .product-title {
+        width: var(--planet-title-envelope);
     }
 
     .product-title[data-product-position="previous"] {
-        left: calc(50% - min(34.51vw, 25.51vh));
-        top: 48%;
+        left: calc(50% - var(--planet-radius));
         opacity: .3;
         transform: translate(-50%, -50%) scale(.3) rotateY(12deg);
     }
 
     .product-title[data-product-position="next"] {
-        left: calc(50% + min(34.51vw, 25.51vh));
-        top: 48%;
+        left: calc(50% + var(--planet-radius));
         opacity: .3;
         transform: translate(-50%, -50%) scale(.3) rotateY(-12deg);
+    }
+
+    .product-title:focus {
+        left: 50%;
+        top: var(--planet-center-y);
+        width: var(--planet-title-envelope);
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
     }
 
     .product-title__supporting {
@@ -869,10 +884,6 @@ a {
 }
 
 @media (max-height: 540px) and (orientation: landscape) {
-    .planet-primary-action {
-        top: calc(51% + min(34.51vw, 25.51vh) + .5rem);
-    }
-
     .home-semantic-summary {
         bottom: 2.5rem;
         width: 19rem;

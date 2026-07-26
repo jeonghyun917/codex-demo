@@ -97,8 +97,8 @@ class HomePageTemplateContractTest {
 
         assertTrue(css.contains("height: 100dvh"));
         assertTrue(css.contains("overflow: hidden"));
-        assertTrue(css.contains("--planet-size: min(82vh, 72vw)"));
-        assertTrue(css.contains("--planet-size: min(92vw, 68vh)"));
+        assertTrue(css.contains("--planet-diameter: min(82vh, 72vw)"));
+        assertTrue(css.contains("--planet-diameter: min(92vw, 68vh)"));
         assertTrue(css.contains(".product-title"));
         assertTrue(css.contains("min-height: 44px"));
         assertTrue(css.contains(":focus-visible"));
@@ -218,6 +218,211 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageFocusKeepsOneForegroundProductTitle() throws Exception {
+        Document homepage = parseRenderedHtml(getBody("/").body());
+        Element root = homepage.getDocumentElement();
+        List<Element> titles = elementsWithAttribute(
+                root, "a", "data-product-title-link");
+
+        assertEquals(
+                List.of(
+                        "active",
+                        "next",
+                        "hidden",
+                        "hidden",
+                        "hidden",
+                        "previous"),
+                titles.stream()
+                        .map(title -> title.getAttribute(
+                                "data-product-position"))
+                        .toList());
+        assertEquals(1, titles.stream()
+                .filter(title -> "active".equals(title.getAttribute(
+                        "data-product-position")))
+                .count());
+        assertEquals(1, titles.stream()
+                .filter(title -> "previous".equals(title.getAttribute(
+                        "data-product-position")))
+                .count());
+        assertEquals(1, titles.stream()
+                .filter(title -> "next".equals(title.getAttribute(
+                        "data-product-position")))
+                .count());
+
+        Element header = (Element) homepage.getElementsByTagName("header").item(0);
+        List<Element> headerLinks = elementsWithAttribute(header, "a", "href");
+        assertEquals(1, headerLinks.size());
+        assertTrue(elementsWithClass(header, "home-brand")
+                .contains(headerLinks.getFirst()));
+        assertFalse("/quant".equals(headerLinks.getFirst().getAttribute("href")));
+        assertEquals(0, elementsWithClass(
+                header, "planet-primary-action").size());
+
+        String css = resource("static/css/home-quant-planet.css");
+        String activeDemotion = cssRule(
+                css,
+                ".product-orbit:focus-within "
+                        + ".product-title[data-product-position=\"active\"]"
+                        + ":not(:focus)");
+        assertEquals("0", cssDeclaration(activeDemotion, "opacity"));
+        assertTrue(cssDeclaration(activeDemotion, "transform")
+                .contains("scale("));
+
+        String focusedTitle = cssRule(css, ".product-title:focus");
+        assertEquals("1", cssDeclaration(focusedTitle, "opacity"));
+        assertEquals("50%", cssDeclaration(focusedTitle, "left"));
+
+        String mobileCss = cssAtRuleBlock(
+                css, "@media (max-width: 767px)");
+        int mobileFocusIndex = mobileCss.indexOf(".product-title:focus");
+        assertTrue(mobileFocusIndex
+                > mobileCss.indexOf(
+                        ".product-title[data-product-position=\"previous\"]"));
+        assertTrue(mobileFocusIndex
+                > mobileCss.indexOf(
+                        ".product-title[data-product-position=\"next\"]"));
+        String mobileFocusedTitle = cssRule(
+                mobileCss, ".product-title:focus");
+        assertEquals("50%", cssDeclaration(mobileFocusedTitle, "left"));
+        assertEquals(
+                "var(--planet-center-y)",
+                cssDeclaration(mobileFocusedTitle, "top"));
+        assertEquals("1", cssDeclaration(mobileFocusedTitle, "opacity"));
+        assertTrue(cssDeclaration(mobileFocusedTitle, "transform")
+                .contains("scale(1)"));
+    }
+
+    @Test
+    void homepageTitleEnvelopeStaysWithinPlanetScale() throws Exception {
+        Document homepage = parseRenderedHtml(getBody("/").body());
+        Element root = homepage.getDocumentElement();
+        Element semanticSummary = elementsWithAttribute(
+                root, "*", "data-home-semantic-summary").getFirst();
+        NodeList pageHeadings = root.getElementsByTagName("h1");
+        assertEquals(1, pageHeadings.getLength());
+        assertTrue(semanticSummary.isSameNode(
+                pageHeadings.item(0).getParentNode()));
+        assertEquals(3, semanticSummary.getElementsByTagName("dt").getLength());
+        assertEquals(3, semanticSummary.getElementsByTagName("dd").getLength());
+        assertEquals(
+                root.getElementsByTagName("dt").getLength(),
+                semanticSummary.getElementsByTagName("dt").getLength());
+        assertEquals(
+                root.getElementsByTagName("dd").getLength(),
+                semanticSummary.getElementsByTagName("dd").getLength());
+
+        String css = resource("static/css/home-quant-planet.css");
+        String desktopExperience = cssRule(css, ".planet-experience");
+        assertMinLengthRatioBetween(
+                cssDeclaration(
+                        desktopExperience, "--planet-title-envelope"),
+                cssDeclaration(desktopExperience, "--planet-diameter"),
+                .45,
+                .62);
+        String sceneRule = cssRule(css, ".planet-scene");
+        assertEquals(
+                "var(--planet-diameter)",
+                cssDeclaration(sceneRule, "width"));
+        assertEquals(
+                "var(--planet-diameter)",
+                cssDeclaration(sceneRule, "height"));
+        assertEquals(
+                "var(--planet-title-envelope)",
+                cssDeclaration(cssRule(css, ".product-title"), "width"));
+
+        String mobileCss = cssAtRuleBlock(
+                css, "@media (max-width: 767px)");
+        String mobileExperience = cssRule(
+                mobileCss, ".planet-experience");
+        assertMinLengthRatioBetween(
+                cssDeclaration(
+                        mobileExperience, "--planet-title-envelope"),
+                cssDeclaration(mobileExperience, "--planet-diameter"),
+                .45,
+                .62);
+        String mobileTitle = cssRule(mobileCss, ".product-title");
+        assertEquals(
+                "var(--planet-title-envelope)",
+                cssDeclaration(mobileTitle, "width"));
+    }
+
+    @Test
+    void homepageActionClearsSharedPlanetBounds() throws IOException {
+        String css = resource("static/css/home-quant-planet.css");
+        String experienceRule = cssRule(css, ".planet-experience");
+        String actionRule = cssRule(css, ".planet-primary-action");
+        String clearance = "calc(var(--planet-center-y) "
+                + "+ var(--planet-radius) + var(--planet-action-gap))";
+
+        assertEquals(clearance, cssDeclaration(actionRule, "top"));
+        List<String> actionPositionRules = cssRuleBodiesForExactSelector(
+                css, ".planet-primary-action").stream()
+                .filter(body -> hasCssDeclaration(body, "top"))
+                .toList();
+        assertTrue(actionPositionRules.size() >= 2);
+        for (String positionRule : actionPositionRules) {
+            assertEquals(clearance, cssDeclaration(positionRule, "top"));
+        }
+        assertEquals(
+                "var(--planet-center-y)",
+                cssDeclaration(cssRule(css, ".planet-scene"), "top"));
+        assertTrue(Double.parseDouble(cssDeclaration(
+                experienceRule, "--planet-center-y")
+                .replace("%", "")) <= 44);
+        assertTrue(cssDeclaration(
+                experienceRule, "--planet-radius").startsWith("min("));
+        assertTrue(cssDeclaration(
+                experienceRule, "--planet-action-gap").startsWith("clamp("));
+        assertMinLengthRatioBetween(
+                cssDeclaration(experienceRule, "--planet-radius"),
+                cssDeclaration(experienceRule, "--planet-diameter"),
+                .499,
+                .501);
+        assertPlanetBottomAtMost(experienceRule, 85);
+
+        String mobileCss = cssAtRuleBlock(
+                css, "@media (max-width: 767px)");
+        String mobileExperience = cssRule(
+                mobileCss, ".planet-experience");
+        assertTrue(Double.parseDouble(cssDeclaration(
+                mobileExperience, "--planet-center-y")
+                .replace("%", "")) <= 44);
+        assertFalse(cssDeclaration(
+                mobileExperience, "--planet-diameter").equals(
+                        cssDeclaration(
+                                experienceRule, "--planet-diameter")));
+        assertMinLengthRatioBetween(
+                cssDeclaration(mobileExperience, "--planet-radius"),
+                cssDeclaration(mobileExperience, "--planet-diameter"),
+                .499,
+                .501);
+        assertPlanetBottomAtMost(mobileExperience, 85);
+        assertEquals(
+                clearance,
+                cssDeclaration(
+                        cssRule(mobileCss, ".planet-primary-action"), "top"));
+
+        for (String body : cssRuleBodiesWithSelectorTokens(
+                css, ".planet-webgl-ready", ".product-title")) {
+            String normalized = body.replaceAll("\\s+", " ");
+            assertFalse(normalized.matches(
+                    "(?s).*\\bdisplay\\s*:\\s*none\\b.*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\bvisibility\\s*:\\s*hidden\\b.*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\bopacity\\s*:\\s*0(?:\\D|$).*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\b(?:clip|clip-path)\\s*:.*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\bleft\\s*:\\s*-.*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\b(?:width|height)\\s*:\\s*1px\\b.*"));
+            assertFalse(normalized.matches(
+                    "(?s).*\\btransform\\s*:.*scale\\(0\\).*"));
+        }
+    }
+
+    @Test
     void homepageFallbackNavigationKeepsDepthTitlesKeyboardReachable()
             throws IOException {
         String template = resource("templates/index.html")
@@ -232,10 +437,18 @@ class HomePageTemplateContractTest {
         assertTrue(normalizedCss.contains(
                 "html, body { width: 100%; height: 100%; height: 100dvh; "
                         + "margin: 0; overflow: hidden; overscroll-behavior: none; }"));
-        assertTrue(normalizedCss.contains(
-                ".planet-experience { --planet-size: min(82vh, 72vw); "
-                        + "position: fixed; inset: 0; min-height: 100dvh; "
-                        + "overflow: hidden; isolation: isolate;"));
+        String experienceRule = cssRule(css, ".planet-experience");
+        assertEquals(
+                "min(82vh, 72vw)",
+                cssDeclaration(experienceRule, "--planet-diameter"));
+        assertEquals(
+                "42%",
+                cssDeclaration(experienceRule, "--planet-center-y"));
+        assertEquals("fixed", cssDeclaration(experienceRule, "position"));
+        assertEquals("0", cssDeclaration(experienceRule, "inset"));
+        assertEquals(
+                "100dvh",
+                cssDeclaration(experienceRule, "min-height"));
         assertTrue(normalizedCss.contains(
                 "@media (prefers-reduced-motion: reduce)"));
 
@@ -245,8 +458,12 @@ class HomePageTemplateContractTest {
         String nextRule = cssRule(
                 css,
                 ".product-title[data-product-position=\"next\"]");
-        assertTrue(cssDeclaration(previousRule, "left").contains("min("));
-        assertTrue(cssDeclaration(nextRule, "left").contains("min("));
+        assertEquals(
+                "calc(50% - var(--planet-radius))",
+                cssDeclaration(previousRule, "left"));
+        assertEquals(
+                "calc(50% + var(--planet-radius))",
+                cssDeclaration(nextRule, "left"));
         assertTrue(Double.parseDouble(
                 cssDeclaration(previousRule, "opacity")) > 0);
         assertTrue(Double.parseDouble(
@@ -491,6 +708,117 @@ class HomePageTemplateContractTest {
                 .matcher(rule);
         assertTrue(matcher.find(), () -> "Missing CSS property: " + property);
         return matcher.group(1).strip().replaceAll("\\s+", " ");
+    }
+
+    private static String cssAtRuleBlock(String css, String atRule) {
+        int atRuleStart = css.indexOf(atRule);
+        assertTrue(atRuleStart >= 0, () -> "Missing CSS at-rule: " + atRule);
+        int blockStart = css.indexOf('{', atRuleStart);
+        assertTrue(blockStart >= 0, () -> "Missing CSS block: " + atRule);
+        int depth = 0;
+        for (int index = blockStart; index < css.length(); index++) {
+            char character = css.charAt(index);
+            if (character == '{') {
+                depth++;
+            } else if (character == '}') {
+                depth--;
+                if (depth == 0) {
+                    return css.substring(blockStart + 1, index);
+                }
+            }
+        }
+        throw new AssertionError("Unclosed CSS at-rule: " + atRule);
+    }
+
+    private static void assertMinLengthRatioBetween(
+            String numerator,
+            String denominator,
+            double minimum,
+            double maximum) {
+        Pattern minLengths = Pattern.compile(
+                "min\\(\\s*([0-9.]+)(v[hw])\\s*,\\s*"
+                        + "([0-9.]+)(v[hw])\\s*\\)");
+        Matcher numeratorMatcher = minLengths.matcher(numerator);
+        Matcher denominatorMatcher = minLengths.matcher(denominator);
+        assertTrue(numeratorMatcher.matches(), () -> "Not a min length: "
+                + numerator);
+        assertTrue(denominatorMatcher.matches(), () -> "Not a min length: "
+                + denominator);
+        for (int component = 0; component < 2; component++) {
+            int valueGroup = 1 + component * 2;
+            int unitGroup = valueGroup + 1;
+            assertEquals(
+                    denominatorMatcher.group(unitGroup),
+                    numeratorMatcher.group(unitGroup));
+            double ratio = Double.parseDouble(
+                    numeratorMatcher.group(valueGroup))
+                    / Double.parseDouble(
+                            denominatorMatcher.group(valueGroup));
+            assertTrue(
+                    ratio >= minimum && ratio <= maximum,
+                    () -> "Length ratio outside range: " + ratio);
+        }
+    }
+
+    private static void assertPlanetBottomAtMost(
+            String experienceRule,
+            double maximumViewportPercent) {
+        double center = Double.parseDouble(cssDeclaration(
+                experienceRule, "--planet-center-y").replace("%", ""));
+        Matcher verticalRadius = Pattern.compile(
+                "([0-9.]+)vh")
+                .matcher(cssDeclaration(
+                        experienceRule, "--planet-radius"));
+        assertTrue(verticalRadius.find());
+        double radius = Double.parseDouble(verticalRadius.group(1));
+        assertTrue(center + radius <= maximumViewportPercent);
+    }
+
+    private static List<String> cssRuleBodiesWithSelectorTokens(
+            String css,
+            String... tokens) {
+        List<String> bodies = new ArrayList<>();
+        Matcher matcher = Pattern.compile(
+                "(?s)([^{}]+)\\{([^{}]*)}")
+                .matcher(css);
+        while (matcher.find()) {
+            String selector = matcher.group(1);
+            boolean includesAllTokens = true;
+            for (String token : tokens) {
+                includesAllTokens &= selector.contains(token);
+            }
+            if (includesAllTokens) {
+                bodies.add(matcher.group(2));
+            }
+        }
+        return bodies;
+    }
+
+    private static List<String> cssRuleBodiesForExactSelector(
+            String css,
+            String expectedSelector) {
+        List<String> bodies = new ArrayList<>();
+        Matcher matcher = Pattern.compile(
+                "(?s)([^{}]+)\\{([^{}]*)}")
+                .matcher(css);
+        while (matcher.find()) {
+            String[] selectors = matcher.group(1).split(",");
+            for (String selector : selectors) {
+                if (expectedSelector.equals(selector.strip())) {
+                    bodies.add(matcher.group(2));
+                    break;
+                }
+            }
+        }
+        return bodies;
+    }
+
+    private static boolean hasCssDeclaration(String rule, String property) {
+        return Pattern.compile(
+                "(?s)(?:^|;)\\s*" + Pattern.quote(property)
+                        + "\\s*:")
+                .matcher(rule)
+                .find();
     }
 
     private HttpResponse<Void> get(String path) throws IOException, InterruptedException {
