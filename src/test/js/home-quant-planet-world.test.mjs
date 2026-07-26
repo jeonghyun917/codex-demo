@@ -49,8 +49,63 @@ function collectMeshPoints(root) {
     return points;
 }
 
-function projectedOccupancy(root) {
-    const points = collectMeshPoints(root);
+function collectRenderedCenters(root) {
+    const points = [];
+    const instanceMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    const center = new THREE.Vector3();
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+        if (!object.isMesh || object.visible === false) {
+            return;
+        }
+        object.geometry.computeBoundingBox();
+        object.geometry.boundingBox.getCenter(center);
+        if (object.isInstancedMesh) {
+            for (let index = 0; index < object.count; index += 1) {
+                object.getMatrixAt(index, instanceMatrix);
+                worldMatrix.multiplyMatrices(
+                    object.matrixWorld,
+                    instanceMatrix
+                );
+                points.push(center.clone().applyMatrix4(worldMatrix));
+            }
+            return;
+        }
+        points.push(center.clone().applyMatrix4(object.matrixWorld));
+    });
+    return points;
+}
+
+function authoredLandmarkOccupancy(root) {
+    root.updateMatrixWorld(true);
+    const landmarkCenters = [];
+    const representatives = [];
+    const anchorPosition = new THREE.Vector3();
+    root.traverse((object) => {
+        if (!object.userData?.landmarkAnchor) {
+            return;
+        }
+        const centers = collectRenderedCenters(object);
+        landmarkCenters.push(...centers);
+        object.getWorldPosition(anchorPosition);
+        const closest = centers.toSorted(
+            (left, right) => left.distanceToSquared(anchorPosition)
+                - right.distanceToSquared(anchorPosition)
+        )[0];
+        if (closest) {
+            representatives.push(closest);
+        }
+    });
+    if (landmarkCenters.length === 0) {
+        return {
+            landmarkCount: 0,
+            widthToHeight: 0,
+            occupiedQuadrants: 0,
+            occupiedAzimuthSectors: 0
+        };
+    }
+    const points = landmarkCenters;
     const bounds = new THREE.Box3().setFromPoints(points);
     const center = bounds.getCenter(new THREE.Vector3());
     const width = bounds.max.x - bounds.min.x;
@@ -66,8 +121,13 @@ function projectedOccupancy(root) {
         }`);
     });
     return {
+        landmarkCount: representatives.length,
         widthToHeight: width / height,
-        occupiedQuadrants: quadrants.size
+        occupiedQuadrants: quadrants.size,
+        occupiedAzimuthSectors: new Set(representatives.map((point) => {
+            const angle = Math.atan2(point.z, point.x);
+            return (Math.round(angle / (Math.PI * 2) * 8) + 8) % 8;
+        })).size
     };
 }
 
@@ -87,20 +147,47 @@ test("builds every authored reference silhouette group", (t) => {
     }
 });
 
-test("populates every azimuth sector with authored landmarks", (t) => {
+test("each authored district owns rendered landmark geometry", (t) => {
     const world = createWorld(t);
-    const bins = new Set();
+    const districts = [];
     world.group.traverse((object) => {
         if (!object.userData?.landmarkAnchor) {
             return;
         }
-        const angle = Math.atan2(object.position.z, object.position.x);
-        bins.add(Math.floor(
-            (angle + Math.PI) / (Math.PI * 2) * 8
-        ) % 8);
+        districts.push(object);
     });
 
-    assert.deepEqual([...bins].sort(), [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.equal(districts.length, 8);
+    districts.forEach((district) => {
+        assert.ok(
+            collectRenderedCenters(district).length > 0,
+            `${district.name} must own rendered landmark geometry`
+        );
+    });
+});
+
+test("each village cluster contains its own instanced buildings", (t) => {
+    const world = createWorld(t);
+    [
+        "ReferenceMountainVillage",
+        "ReferenceForestHamlet",
+        "ReferenceBacksideVillage",
+        "ReferenceWaterVillage"
+    ].forEach((name) => {
+        const village = world.group.getObjectByName(name);
+        assert.ok(village, `Missing ${name}`);
+        const meshes = [];
+        village.traverse((object) => {
+            if (object.isMesh) {
+                meshes.push(object);
+            }
+        });
+        assert.ok(meshes.length > 0, `${name} must contain rendered geometry`);
+        assert.ok(
+            meshes.every((mesh) => mesh.isInstancedMesh && mesh.count >= 3),
+            `${name} must instance its authored buildings`
+        );
+    });
 });
 
 test("uses only the world angle for deterministic primary yaw", (t) => {
@@ -153,7 +240,7 @@ test("planet yaw is unaffected by pointer-shaped extra input", (t) => {
     assert.deepEqual(world.group.quaternion.toArray(), first.toArray());
 });
 
-test("keeps a rounded occupied silhouette at eight yaw samples", (t) => {
+test("keeps rendered landmark content occupied through eight yaw samples", (t) => {
     const world = createWorld(t);
     for (let index = 0; index < 8; index += 1) {
         world.update({
@@ -161,7 +248,9 @@ test("keeps a rounded occupied silhouette at eight yaw samples", (t) => {
             elapsedMs: index * 1000,
             reduceMotion: false
         });
-        const coverage = projectedOccupancy(world.group);
+        const coverage = authoredLandmarkOccupancy(world.group);
+        assert.equal(coverage.landmarkCount, 8);
+        assert.equal(coverage.occupiedAzimuthSectors, 8);
         assert.ok(coverage.widthToHeight >= .72);
         assert.ok(coverage.widthToHeight <= 1.28);
         assert.ok(coverage.occupiedQuadrants >= 4);

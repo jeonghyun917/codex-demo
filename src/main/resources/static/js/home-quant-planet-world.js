@@ -151,6 +151,7 @@ function pointOnPlanet(THREE, radius, yawDegrees, latitude) {
 function buildDistrictAnchors(THREE) {
     const group = new THREE.Group();
     group.name = "ReferenceWorldDistricts";
+    const byId = new Map();
     WORLD_DISTRICTS.forEach((districtConfig) => {
         const district = new THREE.Group();
         district.name = `ReferenceDistrict-${districtConfig.id}`;
@@ -164,8 +165,9 @@ function buildDistrictAnchors(THREE) {
         district.userData.landmarkType = districtConfig.type;
         district.userData.districtId = districtConfig.id;
         group.add(district);
+        byId.set(districtConfig.id, district);
     });
-    return group;
+    return { group, byId };
 }
 
 function addCable(THREE, parent, resources, material, points, name) {
@@ -721,8 +723,7 @@ function buildUtilityCluster(THREE, resources, palette) {
 }
 
 function buildVillageClusters(THREE, resources, palette) {
-    const group = new THREE.Group();
-    group.name = "ReferenceVillageClusters";
+    const clusters = new Map();
     const clusterNames = new Map([
         ["mountain-village", "ReferenceMountainVillage"],
         ["forest-hamlet", "ReferenceForestHamlet"],
@@ -733,53 +734,71 @@ function buildVillageClusters(THREE, resources, palette) {
         const cluster = new THREE.Group();
         cluster.name = name;
         cluster.userData.villageCluster = clusterId;
-        group.add(cluster);
-    });
-
-    const bodies = new THREE.InstancedMesh(
-        resources.geometry.box,
-        palette.architecture,
-        VILLAGE_PLACEMENTS.length
-    );
-    bodies.name = "ReferenceVillageHouses";
-    const roofs = new THREE.InstancedMesh(
-        resources.geometry.cone,
-        palette.coralShade,
-        VILLAGE_PLACEMENTS.length
-    );
-    roofs.name = "ReferenceVillageRoofs";
-    const matrix = new THREE.Matrix4();
-    VILLAGE_PLACEMENTS.forEach((placement, index) => {
-        orientSurfaceInstance(
-            THREE,
-            matrix,
-            placement.position,
-            placement.scale,
-            placement.rotation
+        const placements = VILLAGE_PLACEMENTS.filter(
+            (placement) => placement.clusterId === clusterId
         );
-        bodies.setMatrixAt(index, matrix);
-
-        const normal = new THREE.Vector3(...placement.position).normalize();
-        const roofPosition = new THREE.Vector3(...placement.position)
-            .addScaledVector(normal, placement.scale[1] * .78)
-            .toArray();
-        orientSurfaceInstance(
-            THREE,
-            matrix,
-            roofPosition,
-            [
-                placement.scale[0] * 1.16,
-                placement.scale[1] * .56,
-                placement.scale[2] * 1.16
-            ],
-            placement.rotation
+        const buildings = new THREE.InstancedMesh(
+            resources.geometry.box,
+            palette.village,
+            placements.length * 3
         );
-        roofs.setMatrixAt(index, matrix);
+        buildings.name = `${name}Buildings`;
+        const matrix = new THREE.Matrix4();
+        const architectureColor = new THREE.Color(COLORS.architecture);
+        const roofColor = new THREE.Color(COLORS.coralShade);
+        placements.forEach((placement, placementIndex) => {
+            const instanceIndex = placementIndex * 3;
+            orientSurfaceInstance(
+                THREE,
+                matrix,
+                placement.position,
+                placement.scale,
+                placement.rotation
+            );
+            buildings.setMatrixAt(instanceIndex, matrix);
+            buildings.setColorAt(instanceIndex, architectureColor);
+
+            const normal = new THREE.Vector3(...placement.position).normalize();
+            const tangent = new THREE.Vector3(
+                -normal.z,
+                0,
+                normal.x
+            ).normalize();
+            for (const side of [-1, 1]) {
+                const roofPosition = new THREE.Vector3(...placement.position)
+                    .addScaledVector(normal, placement.scale[1] * .72)
+                    .addScaledVector(
+                        tangent,
+                        side * placement.scale[0] * .28
+                    )
+                    .toArray();
+                orientSurfaceInstance(
+                    THREE,
+                    matrix,
+                    roofPosition,
+                    [
+                        placement.scale[0] * .7,
+                        placement.scale[1] * .13,
+                        placement.scale[2] * 1.18
+                    ],
+                    [
+                        placement.rotation[0],
+                        placement.rotation[1],
+                        placement.rotation[2] + side * .42
+                    ]
+                );
+                buildings.setMatrixAt(instanceIndex + (side === -1 ? 1 : 2), matrix);
+                buildings.setColorAt(
+                    instanceIndex + (side === -1 ? 1 : 2),
+                    roofColor
+                );
+            }
+        });
+        markInstancesDirty(buildings);
+        cluster.add(buildings);
+        clusters.set(clusterId, cluster);
     });
-    markInstancesDirty(bodies);
-    markInstancesDirty(roofs);
-    group.add(bodies, roofs);
-    return group;
+    return clusters;
 }
 
 function buildLowerCanopy(THREE, resources, palette, count) {
@@ -1008,6 +1027,14 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             architecture: ownMaterial(
                 createToonMaterial(THREE, COLORS.architecture, gradientMap)
             ),
+            village: ownMaterial(
+                createToonMaterial(
+                    THREE,
+                    COLORS.architecture,
+                    gradientMap,
+                    { vertexColors: true }
+                )
+            ),
             paper: ownMaterial(
                 createToonMaterial(THREE, COLORS.paper, gradientMap)
             ),
@@ -1071,11 +1098,28 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             temple,
             industrial,
             utility.group,
-            villages,
+            ...villages.values(),
             canopy,
             debris,
-            districts
+            districts.group
         );
+        content.updateMatrixWorld(true);
+        districts.byId.get("summit-shrine").attach(temple);
+        districts.byId.get("mountain-village").attach(
+            villages.get("mountain-village")
+        );
+        districts.byId.get("utility-ridge").attach(utility.group);
+        districts.byId.get("forest-hamlet").attach(
+            villages.get("forest-hamlet")
+        );
+        districts.byId.get("root-gardens").attach(canopy);
+        districts.byId.get("backside-houses").attach(
+            villages.get("backside-houses")
+        );
+        districts.byId.get("industrial-yard").attach(industrial);
+        const waterDistrict = districts.byId.get("water-works");
+        waterDistrict.attach(waterBand.group);
+        waterDistrict.attach(villages.get("water-works"));
         planet.add(content);
 
         const framingBox = new THREE.Box3();
