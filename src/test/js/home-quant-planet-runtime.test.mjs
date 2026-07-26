@@ -267,10 +267,12 @@ function createMotionHarness() {
 function createRuntimeHarness({
     profile = HIGH_PROFILE,
     motionDisabled = profile.name === "static",
+    rootClasses = [],
     timers = createTimerHarness(),
     motion = createMotionHarness()
 } = {}) {
     const root = createEventTarget();
+    root.classList.add(...rootClasses);
     const experience = createEventTarget();
     const loader = createEventTarget();
     const sceneElement = createEventTarget();
@@ -378,6 +380,10 @@ test("creates one scene and leaves the runtime as the only RAF owner", async () 
     const harness = createRuntimeHarness();
     assert.equal(harness.sceneConstructionCalls(), 1);
     assert.equal(harness.frameQueue.frames.size, 1);
+    assert.equal(
+        harness.root.classList.contains("planet-webgl-ready"),
+        false
+    );
 
     const scene = createScene();
     harness.sceneDeferred.resolve(scene);
@@ -385,9 +391,36 @@ test("creates one scene and leaves the runtime as the only RAF owner", async () 
 
     assert.equal(harness.sceneConstructionCalls(), 1);
     assert.equal(harness.frameQueue.frames.size, 1);
+    assert.equal(
+        harness.root.classList.contains("planet-webgl-ready"),
+        true
+    );
+    assert.equal(
+        harness.root.classList.contains("planet-webgl-failed"),
+        false
+    );
     harness.frameQueue.runNext(16);
     assert.equal(scene.poses.length, 1);
     assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("clears stale WebGL ownership until the replacement scene is ready", async () => {
+    const harness = createRuntimeHarness({
+        rootClasses: ["planet-webgl-ready"]
+    });
+
+    assert.equal(
+        harness.root.classList.contains("planet-webgl-ready"),
+        false
+    );
+
+    harness.sceneDeferred.resolve(createScene());
+    await flushPromises();
+
+    assert.equal(
+        harness.root.classList.contains("planet-webgl-ready"),
+        true
+    );
 });
 
 test("reveals loader then world then title then action then ready", async () => {
@@ -642,6 +675,14 @@ test("maps missing Motion, reduced motion, and static query to static mode", () 
             harness.root.classList.contains("planet-reduced-motion"),
             true
         );
+        assert.equal(
+            harness.root.classList.contains("planet-webgl-ready"),
+            false
+        );
+        assert.equal(
+            harness.root.classList.contains("planet-webgl-failed"),
+            true
+        );
         assert.equal(harness.sceneConstructionCalls(), 0);
         assert.equal(harness.input.createCalls, 0);
         assert.equal(harness.frameQueue.frames.size, 0);
@@ -668,6 +709,7 @@ test("shows the complete fallback when WebGL construction fails", async () => {
 
     assertCompleteFallback(harness);
     assert.equal(harness.root.classList.contains("planet-webgl-failed"), true);
+    assert.equal(harness.root.classList.contains("planet-webgl-ready"), false);
     assert.equal(harness.frameQueue.frames.size, 0);
     assert.equal(harness.input.destroyCalls, 1);
 });
@@ -688,6 +730,7 @@ test("shows the complete fallback and retires WebGL on context loss", async () =
     assert.equal(prevented, true);
     assertCompleteFallback(harness);
     assert.equal(harness.root.classList.contains("planet-webgl-failed"), true);
+    assert.equal(harness.root.classList.contains("planet-webgl-ready"), false);
     assert.equal(scene.disposeCalls, 1);
     assert.equal(harness.input.destroyCalls, 1);
     assert.equal(harness.frameQueue.frames.size, 0);
@@ -757,6 +800,7 @@ test("disposes a scene that resolves after runtime destruction exactly once", as
 
 test("bootstrap fallback writes progress at the experience cascade boundary", async () => {
     const root = createEventTarget();
+    root.classList.add("planet-webgl-ready");
     const experience = createEventTarget();
     const elements = new Map([
         ["[data-home-experience]", experience],
@@ -830,4 +874,5 @@ test("bootstrap fallback writes progress at the experience cascade boundary", as
     assert.deepEqual(root.style.entries(), []);
     assert.equal(root.classList.contains("planet-intro-ready"), true);
     assert.equal(root.classList.contains("planet-webgl-failed"), true);
+    assert.equal(root.classList.contains("planet-webgl-ready"), false);
 });

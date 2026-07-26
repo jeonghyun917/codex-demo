@@ -86,6 +86,13 @@ class HomePageTemplateContractTest {
                 "image/svg+xml",
                 fallback.headers().firstValue("Content-Type").orElse(""));
         assertTrue(fallback.body().length > 0);
+        for (String asset : List.of(
+                "/js/home-quant-planet-glyph-contours.js",
+                "/js/home-quant-planet-glyphs.js")) {
+            HttpResponse<byte[]> served = getBytes(asset);
+            assertEquals(200, served.statusCode());
+            assertTrue(served.body().length > 0);
+        }
         assertEquals(403, get("/admin").statusCode());
 
         assertTrue(resource("static/vendor/motion/LICENSE.md")
@@ -114,6 +121,9 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "/img/home-messenger-reference-title.png",
                 titles.getFirst().getAttribute("src"));
+        assertTrue(List.of(
+                titles.getFirst().getAttribute("class").split("\\s+"))
+                .contains("reference-title--fallback"));
         assertTrue(titles.getFirst().hasAttribute("alt"));
         assertEquals("", titles.getFirst().getAttribute("alt"));
 
@@ -301,7 +311,15 @@ class HomePageTemplateContractTest {
                 "fallback-industrial-machinery",
                 "fallback-utility-antenna",
                 "fallback-lower-canopy",
-                "fallback-exterior-debris")) {
+                "fallback-exterior-debris",
+                "fallback-summit-shrine",
+                "fallback-mountain-village",
+                "fallback-industrial-yard",
+                "fallback-utility-ridge",
+                "fallback-water-works",
+                "fallback-backside-houses",
+                "fallback-forest-belt",
+                "fallback-floating-debris")) {
             assertNotNull(
                     elementWithId(svg, landmark),
                     () -> "Missing fallback landmark: " + landmark);
@@ -430,7 +448,8 @@ class HomePageTemplateContractTest {
         assertTrue(runtime.contains("createHeroPose"));
         assertTrue(runtime.contains("createHeroInputController"));
         assertTrue(runtime.contains("REFERENCE_HERO"));
-        assertTrue(scene.contains("world.update(pose)"));
+        assertTrue(scene.contains("world.update({"));
+        assertTrue(scene.contains("glyphs.update({"));
         assertTrue(scene.contains("fitPerspectiveSphere"));
         assertTrue(scene.contains("Math.min"));
         assertTrue(scene.contains("1.5"));

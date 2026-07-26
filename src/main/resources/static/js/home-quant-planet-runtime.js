@@ -83,6 +83,10 @@ export function createQuantPlanetRuntime({
     let sceneReady = false;
     let worldAngle = 0;
 
+    root.classList.remove(
+        "planet-webgl-ready",
+        "planet-webgl-failed"
+    );
     root.classList.add("planet-runtime-starting");
     if (staticMode) {
         root.classList.add("planet-static-mode");

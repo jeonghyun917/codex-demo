@@ -32,6 +32,40 @@
         </g>
     </g>
 
+    <g id="fallback-floating-debris"
+       fill="#d65f47"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <path d="M54 394l25-16 23 13-2 29-26 12-22-17z"/>
+        <path d="M706 402l22-17 25 11 3 28-23 17-27-12z"/>
+        <path d="M296 82l17-19 24 8 5 25-20 17-24-9z"/>
+        <path d="M484 710l20-12 19 15-7 24-24 1z"/>
+        <g fill="#e7b54f" stroke-width="4">
+            <circle cx="76" cy="405" r="7"/>
+            <circle cx="731" cy="412" r="7"/>
+            <circle cx="319" cy="88" r="6"/>
+            <circle cx="504" cy="719" r="6"/>
+        </g>
+    </g>
+
+    <g id="fallback-backside-houses"
+       fill="#253238"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <path d="M134 350l37-32 38 31v59h-75z"/>
+        <path d="M578 346l35-31 39 33v58h-74z"/>
+        <path d="M239 184l28-25 31 26v47h-59z"/>
+        <path d="M507 187l28-25 30 25v48h-58z"/>
+        <g fill="#e7b54f" stroke="none">
+            <path d="M154 359h13v18h-13zM178 359h13v18h-13z"/>
+            <path d="M596 356h13v18h-13zM621 356h13v18h-13z"/>
+            <path d="M255 190h11v15h-11zM275 190h11v15h-11z"/>
+            <path d="M521 192h11v15h-11zM541 192h11v15h-11z"/>
+        </g>
+    </g>
+
     <g id="fallback-planet-core" filter="url(#fallback-soft-shadow)">
         <path d="M151 382C146 274 225 170 337 139C449 108 584 154 642 255C700 356 671 493 598 585C525 677 391 713 275 668C159 623 91 503 151 382Z"
               fill="#a8bf78" stroke="#253238" stroke-width="15" stroke-linejoin="round"/>
@@ -60,6 +94,25 @@
         </g>
     </g>
 
+    <g id="fallback-water-works"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M242 392v83h47v-83z" fill="#f2e5c7"/>
+        <path d="M232 393h67l-8-20h-51z" fill="#d65f47"/>
+        <path d="M493 377v85h49v-85z" fill="#f2e5c7"/>
+        <path d="M483 379h69l-9-21h-51z" fill="#d65f47"/>
+        <path d="M289 434h52c21 0 20 30 42 30h110"
+              fill="none"
+              stroke="#fff6df"
+              stroke-width="13"
+              stroke-linecap="round"/>
+        <g fill="#338f91">
+            <circle cx="265" cy="434" r="15"/>
+            <circle cx="518" cy="420" r="15"/>
+        </g>
+    </g>
+
     <g id="fallback-temple" stroke="#253238" stroke-linejoin="round">
         <path d="M282 243l43-119 47 108 48-137 52 137 38-92 40 120z"
               fill="#f2e5c7" stroke-width="9"/>
@@ -74,6 +127,42 @@
         <path d="M305 225l95-35 97 35-16 28-81-19-80 19z" fill="#d65f47" stroke-width="8"/>
         <path d="M400 190v-38" fill="none" stroke="#e7b54f" stroke-width="10" stroke-linecap="round"/>
         <path d="M400 126l15 26-15 16-15-16z" fill="#e7b54f" stroke-width="7"/>
+    </g>
+
+    <g id="fallback-summit-shrine"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M351 172h98l-14 22h-70z" fill="#d65f47"/>
+        <path d="M368 192h64v42h-64z" fill="#fff6df"/>
+        <path d="M357 192l43-28 43 28z" fill="#a94737"/>
+        <path d="M385 205h30v29h-30z" fill="#253238"/>
+        <path d="M400 164v-35" fill="none" stroke="#e7b54f" stroke-linecap="round"/>
+        <circle cx="400" cy="120" r="10" fill="#e7b54f"/>
+    </g>
+
+    <g id="fallback-mountain-village"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <g fill="#f2e5c7">
+            <path d="M225 270h53v52h-53z"/>
+            <path d="M252 233h57v56h-57z"/>
+            <path d="M489 238h58v57h-58z"/>
+            <path d="M524 278h55v53h-55z"/>
+        </g>
+        <g fill="#d65f47">
+            <path d="M216 272l35-31 36 31z"/>
+            <path d="M243 235l38-32 38 32z"/>
+            <path d="M480 240l38-33 39 33z"/>
+            <path d="M515 280l36-31 37 31z"/>
+        </g>
+        <g fill="#338f91" stroke-width="4">
+            <path d="M239 286h12v15h-12zM259 286h12v15h-12z"/>
+            <path d="M268 248h12v16h-12zM289 248h12v16h-12z"/>
+            <path d="M499 253h12v16h-12zM522 253h12v16h-12z"/>
+            <path d="M536 294h12v15h-12zM557 294h12v15h-12z"/>
+        </g>
     </g>
 
     <g id="fallback-industrial-machinery" stroke="#253238" stroke-linejoin="round">
@@ -95,6 +184,21 @@
         </g>
     </g>
 
+    <g id="fallback-industrial-yard"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M154 488h149v58H154z" fill="#7c8580"/>
+        <path d="M178 451h38v95h-38zM246 436h35v110h-35z" fill="#a94737"/>
+        <path d="M167 475h126" fill="none" stroke="#fff6df"/>
+        <g fill="#e7b54f">
+            <circle cx="190" cy="524" r="16"/>
+            <circle cx="267" cy="524" r="16"/>
+        </g>
+        <path d="M198 449v-46h70l26 29" fill="none" stroke-linecap="round"/>
+        <path d="M290 427l21 5-13 19z" fill="#d65f47"/>
+    </g>
+
     <g id="fallback-utility-antenna" stroke="#253238" stroke-linejoin="round">
         <path d="M565 390h91v103h-91z" fill="#f2e5c7" stroke-width="9"/>
         <path d="M552 392l58-48 59 48z" fill="#a94737" stroke-width="9"/>
@@ -108,6 +212,29 @@
               fill="#fff6df" stroke-width="8"/>
         <path d="M617 249c54 28 76 65 84 103M617 249c-32 31-42 74-32 112"
               fill="none" stroke-width="6"/>
+    </g>
+
+    <g id="fallback-utility-ridge"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M520 504l39-48 44 46 47-35 45 53"
+              fill="none"
+              stroke="#7c8580"
+              stroke-width="20"
+              stroke-linecap="round"/>
+        <path d="M560 433v116M624 421v128M677 438v101"
+              fill="none"
+              stroke-linecap="round"/>
+        <path d="M540 456h40M604 447h40M657 462h40"
+              fill="none"
+              stroke="#fff6df"
+              stroke-linecap="round"/>
+        <g fill="#e7b54f">
+            <circle cx="560" cy="433" r="9"/>
+            <circle cx="624" cy="421" r="9"/>
+            <circle cx="677" cy="438" r="9"/>
+        </g>
     </g>
 
     <g id="fallback-lower-canopy" stroke="#253238" stroke-linejoin="round">
@@ -133,5 +260,31 @@
             <circle cx="398" cy="565" r="16"/>
             <circle cx="533" cy="588" r="14"/>
         </g>
+    </g>
+
+    <g id="fallback-forest-belt"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <g fill="#205f43">
+            <path d="M180 610l25-58 25 58z"/>
+            <path d="M236 636l27-66 28 66z"/>
+            <path d="M300 626l28-72 30 72z"/>
+            <path d="M371 647l30-76 31 76z"/>
+            <path d="M449 628l28-73 30 73z"/>
+            <path d="M518 638l27-67 28 67z"/>
+            <path d="M579 612l24-59 26 59z"/>
+        </g>
+        <g fill="#39805b">
+            <circle cx="216" cy="623" r="22"/>
+            <circle cx="335" cy="641" r="23"/>
+            <circle cx="469" cy="642" r="24"/>
+            <circle cx="574" cy="625" r="22"/>
+        </g>
+        <path d="M186 655c105 34 315 35 433-2"
+              fill="none"
+              stroke="#a8bf78"
+              stroke-width="15"
+              stroke-linecap="round"/>
     </g>
 </svg>

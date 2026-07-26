@@ -55,7 +55,10 @@ function revealStaticComposition() {
     experience.style.setProperty("--intro-world-progress", "1");
     experience.style.setProperty("--intro-title-progress", "1");
     experience.style.setProperty("--intro-action-progress", "1");
-    root.classList.remove("planet-runtime-starting");
+    root.classList.remove(
+        "planet-runtime-starting",
+        "planet-webgl-ready"
+    );
     root.classList.add("planet-intro-ready", "planet-webgl-failed");
 }
 
