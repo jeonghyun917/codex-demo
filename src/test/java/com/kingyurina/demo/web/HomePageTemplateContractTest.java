@@ -582,6 +582,68 @@ class HomePageTemplateContractTest {
     }
 
     @Test
+    void homepageNoScriptExposesAllQuantRoutesAsPointerTargets()
+            throws Exception {
+        String template = resource("templates/index.html");
+        Matcher noScriptMatcher = Pattern.compile(
+                "(?s)<noscript>\\s*<style>(.*?)</style>\\s*</noscript>")
+                .matcher(template);
+        assertTrue(noScriptMatcher.find());
+        String noScriptCss = noScriptMatcher.group(1);
+        String orbitRule = cssRule(noScriptCss, ".product-orbit");
+        String titleRule = cssRule(
+                noScriptCss,
+                ".product-orbit .product-title[data-product-position]");
+
+        assertEquals("grid", cssDeclaration(orbitRule, "display"));
+        assertEquals("auto", cssDeclaration(orbitRule, "pointer-events"));
+        assertEquals("relative", cssDeclaration(titleRule, "position"));
+        assertEquals("auto", cssDeclaration(titleRule, "left"));
+        assertEquals("auto", cssDeclaration(titleRule, "top"));
+        assertEquals("auto", cssDeclaration(titleRule, "width"));
+        assertEquals("44px", cssDeclaration(titleRule, "min-width"));
+        assertEquals("44px", cssDeclaration(titleRule, "min-height"));
+        assertEquals("visible", cssDeclaration(titleRule, "overflow"));
+        assertEquals("auto", cssDeclaration(titleRule, "clip"));
+        assertEquals("none", cssDeclaration(titleRule, "clip-path"));
+        assertEquals("1", cssDeclaration(titleRule, "opacity"));
+        assertEquals("visible", cssDeclaration(titleRule, "visibility"));
+        assertEquals("none", cssDeclaration(titleRule, "transform"));
+        assertEquals("auto", cssDeclaration(titleRule, "pointer-events"));
+        assertFalse(titleRule.contains("display: none"));
+        assertEquals(
+                "1",
+                cssDeclaration(
+                        cssRule(
+                                noScriptCss,
+                                ".product-orbit:focus-within "
+                                        + ".product-title"
+                                        + "[data-product-position=\"active\"]"
+                                        + ":not(:focus)"),
+                        "opacity"));
+
+        Document homepage = parseRenderedHtml(getBody("/").body());
+        Element root = homepage.getDocumentElement();
+        List<Element> titles = elementsWithAttribute(
+                root, "a", "data-product-title-link");
+        assertEquals(6, titles.size());
+        assertEquals(
+                List.of(
+                        "/quant",
+                        "/stocks",
+                        "/stocks/heatmap?index=SP500",
+                        "/etfs",
+                        "/atelier",
+                        "/signals/backtest"),
+                titles.stream()
+                        .map(title -> title.getAttribute("href"))
+                        .toList());
+        assertEquals(
+                1,
+                elementsWithAttribute(root, "a", "data-enter-quant").size());
+    }
+
+    @Test
     void homepageKeepsReferenceCompositionInFallbacks() throws Exception {
         Document homepage = parseRenderedHtml(getBody("/").body());
         Element root = homepage.getDocumentElement();

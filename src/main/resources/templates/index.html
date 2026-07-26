@@ -132,6 +132,67 @@
 <noscript>
     <style>
         .planet-intro-loader { display: none !important; }
+        .product-orbit {
+            position: fixed;
+            z-index: 31;
+            inset: auto clamp(.75rem, 3vw, 3rem)
+                clamp(3.75rem, 7vh, 5.5rem);
+            display: grid;
+            grid-template-columns: repeat(3, minmax(44px, 1fr));
+            gap: .5rem;
+            pointer-events: auto;
+        }
+        .product-orbit .product-title[data-product-position] {
+            position: relative;
+            z-index: auto;
+            left: auto;
+            top: auto;
+            display: grid;
+            width: auto;
+            height: auto;
+            min-width: 44px;
+            min-height: 44px;
+            padding: .55rem .45rem;
+            margin: 0;
+            align-content: center;
+            overflow: visible;
+            clip: auto;
+            clip-path: none;
+            border: 2px solid var(--planet-ink);
+            background: rgba(255, 249, 234, .92);
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: none;
+            white-space: normal;
+        }
+        .product-orbit
+        .product-title[data-product-position]
+        .product-title__lines {
+            transform: none;
+        }
+        .product-orbit
+        .product-title[data-product-position]
+        [data-title-line] {
+            font-size: .68rem;
+            letter-spacing: -.02em;
+            line-height: .9;
+            text-shadow: 0 .08em 0 var(--planet-ink);
+            -webkit-text-stroke-width: 1px;
+        }
+        .product-orbit
+        .product-title[data-product-position]
+        .product-title__supporting {
+            display: none;
+        }
+        .product-orbit:focus-within .product-title[data-product-position="active"]:not(:focus) {
+            opacity: 1;
+        }
+        @media (min-width: 768px) {
+            .product-orbit {
+                grid-template-columns: repeat(6, minmax(44px, 1fr));
+            }
+        }
     </style>
 </noscript>
 <script th:src="@{/vendor/motion/motion.js(v='12.29.2')}"
