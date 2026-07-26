@@ -182,6 +182,10 @@ test("defines the six original Quant product scenes and exact routes", () => {
         "/atelier",
         "/signals/backtest"
     ]);
+    assert.equal(
+        resolveSelectedProduct(0).supporting,
+        "Observe · Resolve · Act"
+    );
     assert.deepEqual(resolveSelectedProduct(2).lines, ["MARKET", "HEATMAP"]);
     assert.equal(resolveSelectedProduct(5).supporting, "Backtest field");
 });
