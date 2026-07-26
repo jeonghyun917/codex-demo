@@ -52,9 +52,9 @@ function detectWebglSupport() {
 }
 
 function revealStaticComposition() {
-    root.style.setProperty("--intro-world-progress", "1");
-    root.style.setProperty("--intro-title-progress", "1");
-    root.style.setProperty("--intro-action-progress", "1");
+    experience.style.setProperty("--intro-world-progress", "1");
+    experience.style.setProperty("--intro-title-progress", "1");
+    experience.style.setProperty("--intro-action-progress", "1");
     root.classList.remove("planet-runtime-starting");
     root.classList.add("planet-intro-ready", "planet-webgl-failed");
 }

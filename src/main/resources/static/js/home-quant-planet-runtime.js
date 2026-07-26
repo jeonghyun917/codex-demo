@@ -85,15 +85,15 @@ export function createQuantPlanetRuntime({
 
     function applyIntroState(state) {
         root.dataset.introPhase = state.phase;
-        root.style.setProperty(
+        experience.style.setProperty(
             "--intro-world-progress",
             String(state.world)
         );
-        root.style.setProperty(
+        experience.style.setProperty(
             "--intro-title-progress",
             String(state.title)
         );
-        root.style.setProperty(
+        experience.style.setProperty(
             "--intro-action-progress",
             String(state.action)
         );

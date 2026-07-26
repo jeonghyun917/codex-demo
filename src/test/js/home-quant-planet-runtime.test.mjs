@@ -334,17 +334,18 @@ const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 function assertCompleteFallback(harness) {
     assert.equal(harness.root.dataset.introPhase, "ready");
     assert.equal(
-        harness.root.style.getPropertyValue("--intro-world-progress"),
+        harness.experience.style.getPropertyValue("--intro-world-progress"),
         "1"
     );
     assert.equal(
-        harness.root.style.getPropertyValue("--intro-title-progress"),
+        harness.experience.style.getPropertyValue("--intro-title-progress"),
         "1"
     );
     assert.equal(
-        harness.root.style.getPropertyValue("--intro-action-progress"),
+        harness.experience.style.getPropertyValue("--intro-action-progress"),
         "1"
     );
+    assert.deepEqual(harness.root.style.entries(), []);
     assert.equal(harness.root.classList.contains("planet-intro-ready"), true);
     assert.equal(
         harness.title.src,
@@ -378,25 +379,25 @@ test("reveals loader then world then title then action then ready", async () => 
     assert.equal(harness.root.dataset.introPhase, "loader");
     harness.frameQueue.runNext(650);
     assert.equal(harness.root.dataset.introPhase, "world");
-    assert.ok(Number(harness.root.style.getPropertyValue(
+    assert.ok(Number(harness.experience.style.getPropertyValue(
         "--intro-world-progress"
     )) > 0);
-    assert.equal(harness.root.style.getPropertyValue(
+    assert.equal(harness.experience.style.getPropertyValue(
         "--intro-title-progress"
     ), "0");
 
     harness.frameQueue.runNext(1200);
     assert.equal(harness.root.dataset.introPhase, "title");
-    assert.ok(Number(harness.root.style.getPropertyValue(
+    assert.ok(Number(harness.experience.style.getPropertyValue(
         "--intro-title-progress"
     )) > 0);
-    assert.equal(harness.root.style.getPropertyValue(
+    assert.equal(harness.experience.style.getPropertyValue(
         "--intro-action-progress"
     ), "0");
 
     harness.frameQueue.runNext(1700);
     assert.equal(harness.root.dataset.introPhase, "action");
-    assert.ok(Number(harness.root.style.getPropertyValue(
+    assert.ok(Number(harness.experience.style.getPropertyValue(
         "--intro-action-progress"
     )) > 0);
 
@@ -463,13 +464,14 @@ test("never mutates reference title state during input or frames", async () => {
     assert.deepEqual(harness.title.style.entries(), before.style);
     assert.equal("selectedProduct" in harness.experience.dataset, false);
     assert.deepEqual(
-        harness.root.style.entries().map(([name]) => name).sort(),
+        harness.experience.style.entries().map(([name]) => name).sort(),
         [
             "--intro-action-progress",
             "--intro-title-progress",
             "--intro-world-progress"
         ]
     );
+    assert.deepEqual(harness.root.style.entries(), []);
 });
 
 test("pauses and resumes BFCache state without replaying the intro", async () => {
@@ -620,4 +622,81 @@ test("disposes a scene that resolves after runtime destruction exactly once", as
 
     assert.equal(lateScene.disposeCalls, 1);
     assert.equal(harness.frameQueue.frames.size, 0);
+});
+
+test("bootstrap fallback writes progress at the experience cascade boundary", async () => {
+    const root = createEventTarget();
+    const experience = createEventTarget();
+    const elements = new Map([
+        ["[data-home-experience]", experience],
+        ["[data-intro-loader]", createEventTarget()],
+        ["[data-home-scene]", createEventTarget()],
+        ["[data-home-canvas]", createEventTarget()],
+        ["[data-planet-fallback]", createEventTarget()],
+        ["[data-reference-title]", createEventTarget()],
+        ["[data-enter-quant]", null]
+    ]);
+    const documentTarget = {
+        documentElement: root,
+        querySelector(selector) {
+            return elements.get(selector);
+        },
+        createElement() {
+            return {
+                getContext() {
+                    return null;
+                }
+            };
+        }
+    };
+    const windowTarget = {
+        location: { hostname: "example.com", search: "" },
+        matchMedia() {
+            return { matches: false };
+        },
+        devicePixelRatio: 1
+    };
+    const descriptors = new Map(
+        ["document", "window", "navigator"].map((name) => [
+            name,
+            Object.getOwnPropertyDescriptor(globalThis, name)
+        ])
+    );
+
+    Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: documentTarget
+    });
+    Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: windowTarget
+    });
+    Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: { hardwareConcurrency: 8 }
+    });
+
+    try {
+        await import(
+            "../../main/resources/static/js/home-quant-planet.js"
+            + `?cascade=${Date.now()}`
+        );
+    } finally {
+        descriptors.forEach((descriptor, name) => {
+            if (descriptor) {
+                Object.defineProperty(globalThis, name, descriptor);
+            } else {
+                Reflect.deleteProperty(globalThis, name);
+            }
+        });
+    }
+
+    assert.deepEqual(experience.style.entries().sort(), [
+        ["--intro-action-progress", "1"],
+        ["--intro-title-progress", "1"],
+        ["--intro-world-progress", "1"]
+    ]);
+    assert.deepEqual(root.style.entries(), []);
+    assert.equal(root.classList.contains("planet-intro-ready"), true);
+    assert.equal(root.classList.contains("planet-webgl-failed"), true);
 });
