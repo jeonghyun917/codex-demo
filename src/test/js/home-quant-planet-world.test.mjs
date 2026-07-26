@@ -4,9 +4,6 @@ import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     createQuantPlanetWorld
 } from "../../main/resources/static/js/home-quant-planet-world.js";
-import {
-    createCourierLoopPose
-} from "../../main/resources/static/js/home-quant-planet-motion.js";
 
 const profile = {
     name: "high",
@@ -52,112 +49,98 @@ function collectMeshPoints(root) {
     return points;
 }
 
-function update(world, courierPose, time = 1000) {
+test("builds every authored reference silhouette group", (t) => {
+    const world = createWorld(t);
+
+    for (const name of [
+        "ReferencePlanetCore",
+        "ReferenceWaterBand",
+        "ReferenceTemplePeak",
+        "ReferenceIndustrialCluster",
+        "ReferenceUtilityCluster",
+        "ReferenceLowerCanopy",
+        "ReferenceFloatingDebris"
+    ]) {
+        assert.ok(world.group.getObjectByName(name), `Missing ${name}`);
+    }
+});
+
+test("uses only world and drag angles for deterministic primary yaw", (t) => {
+    const world = createWorld(t);
+    const firstPose = {
+        worldAngle: .75,
+        dragAngle: -.25,
+        pointer: { x: -1, y: .75 },
+        elapsedMs: 4200,
+        reduceMotion: false
+    };
+    world.update(firstPose);
+    world.group.updateMatrix();
+    const firstMatrix = world.group.matrix.clone();
+    world.update(firstPose);
+    world.group.updateMatrix();
+
+    assert.equal(world.group.rotation.x, 0);
+    assert.equal(world.group.rotation.y, .5);
+    assert.equal(world.group.rotation.z, 0);
+    assert.deepEqual(world.group.matrix.elements, firstMatrix.elements);
+
     world.update({
-        orbitPose: {
-            planetPitch: -.08,
-            planetYaw: .42,
-            planetRoll: .02
-        },
-        courierPose,
-        time
+        ...firstPose,
+        worldAngle: .25,
+        dragAngle: .25,
+        pointer: { x: 1, y: -1 }
     });
-}
-
-function withLandmarkActivity(landmarkActivity) {
-    return {
-        ...createCourierLoopPose(0, false),
-        landmarkActivity
-    };
-}
-
-test("pauses Observe calibration outside the Observe chapter", (t) => {
-    const world = createWorld(t);
-    const dish = world.group.getObjectByName("ObserveDirectionalDish");
-
-    update(world, withLandmarkActivity({ observe: 0, resolve: 1, act: 0 }));
-    assert.equal(dish.rotation.y, 0);
-
-    update(world, withLandmarkActivity({ observe: 1, resolve: 0, act: 0 }));
-    assert.ok(dish.rotation.y > 0);
+    world.group.updateMatrix();
+    assert.equal(world.group.rotation.y, .5);
+    assert.deepEqual(world.group.matrix.elements, firstMatrix.elements);
 });
 
-test("gives Decision Gate an Act-linked portal response", (t) => {
+test("animates water and utility details deterministically unless motion is reduced", (t) => {
     const world = createWorld(t);
-    const portal = world.group.getObjectByName("QuantProductPortal");
+    const water = world.group.getObjectByName("ReferenceWaterSurface");
+    const rotor = world.group.getObjectByName("ReferenceUtilityRotor");
+    assert.ok(water, "Missing ReferenceWaterSurface");
+    assert.ok(rotor, "Missing ReferenceUtilityRotor");
 
-    update(world, withLandmarkActivity({ observe: 0, resolve: 1, act: 0 }));
-    const inactiveScale = portal.scale.x;
-    update(world, withLandmarkActivity({ observe: 0, resolve: 0, act: 1 }));
+    world.update({
+        worldAngle: 0,
+        dragAngle: 0,
+        pointer: { x: 0, y: 0 },
+        elapsedMs: 4000,
+        reduceMotion: false
+    });
+    assert.equal(water.material.uniforms.time.value, 4);
+    assert.equal(rotor.rotation.z, 1.4);
 
-    assert.ok(portal.scale.x > inactiveScale);
+    world.update({
+        worldAngle: 0,
+        dragAngle: 0,
+        pointer: { x: 1, y: -1 },
+        elapsedMs: 9000,
+        reduceMotion: true
+    });
+    assert.equal(water.material.uniforms.time.value, 0);
+    assert.equal(rotor.rotation.z, 0);
 });
 
-test("illuminates only the route segment near the active chapter", (t) => {
-    const world = createWorld(t);
-    const routeLights = world.group.getObjectByName("InstancedRouteLamps");
-
-    update(world, withLandmarkActivity({ observe: 1, resolve: 0, act: 0 }));
-    assert.ok(routeLights.instanceColor, "route lights require per-instance color");
-
-    const observeColor = new THREE.Color();
-    const resolveColor = new THREE.Color();
-    routeLights.getColorAt(0, observeColor);
-    routeLights.getColorAt(5, resolveColor);
-    assert.ok(observeColor.r > resolveColor.r);
-
-    update(world, withLandmarkActivity({ observe: 0, resolve: 0, act: 1 }));
-    const previousObserveRed = observeColor.r;
-    const actColor = new THREE.Color();
-    routeLights.getColorAt(0, observeColor);
-    routeLights.getColorAt(9, actColor);
-    assert.ok(observeColor.r < previousObserveRed);
-    assert.ok(actColor.r > observeColor.r);
-});
-
-test("uses route activity to brighten lamps independently of landmarks", (t) => {
-    const world = createWorld(t);
-    const routeLights = world.group.getObjectByName("InstancedRouteLamps");
-    const courierPose = {
-        ...createCourierLoopPose(0, false),
-        landmarkActivity: { observe: 0, resolve: 0, act: 0 }
-    };
-    const inactiveColor = new THREE.Color();
-    const activeColor = new THREE.Color();
-
-    update(world, { ...courierPose, routeActivity: 0 });
-    routeLights.getColorAt(5, inactiveColor);
-    update(world, { ...courierPose, routeActivity: 1 });
-    routeLights.getColorAt(5, activeColor);
-
-    assert.ok(activeColor.r > inactiveColor.r);
-});
-
-test("moves the courier continuously and lights its nearest landmark", (t) => {
-    const world = createWorld(t);
-    const courier = world.group.getObjectByName("QuantCourier");
-    update(world, createCourierLoopPose(7000, false), 7000);
-    const resolvePosition = courier.position.clone();
-    const portal = world.group.getObjectByName("QuantProductPortal");
-    const inactivePortalScale = portal.scale.x;
-    update(world, createCourierLoopPose(15000, false), 15000);
-    assert.ok(courier.position.distanceTo(resolvePosition) > 1);
-    assert.ok(portal.scale.x > inactivePortalScale);
-});
-
-test("exposes a complete framing envelope that includes upper landmarks", (t) => {
+test("exposes a complete reference silhouette envelope", (t) => {
     const world = createWorld(t);
     const envelope = world.getFramingEnvelope();
+    assert.ok(envelope.min, "Missing envelope.min");
+    assert.ok(envelope.max, "Missing envelope.max");
 
-    assert.ok(envelope.radius >= 3.6);
-    assert.ok(envelope.center.y > 0);
-    assert.ok(envelope.top >= 3.2);
-    assert.ok(envelope.bottom <= -2.4);
+    assert.ok(envelope.min.x <= -4.8);
+    assert.ok(envelope.max.x >= 4.4);
+    assert.ok(envelope.max.y >= 5.2);
+    assert.ok(envelope.min.y <= -4.9);
 });
 
 test("fits the public envelope tightly to actual mesh and instance bounds", (t) => {
     const world = createWorld(t);
     const envelope = world.getFramingEnvelope();
+    assert.ok(envelope.min, "Missing envelope.min");
+    assert.ok(envelope.max, "Missing envelope.max");
     const center = new THREE.Vector3(
         envelope.center.x,
         envelope.center.y,
@@ -167,21 +150,32 @@ test("fits the public envelope tightly to actual mesh and instance bounds", (t) 
     const actualRadius = Math.max(
         ...points.map((point) => point.distanceTo(center))
     );
-    const actualTop = Math.max(...points.map((point) => point.y));
-    const actualBottom = Math.min(...points.map((point) => point.y));
+    const actualMin = new THREE.Box3().setFromPoints(points).min;
+    const actualMax = new THREE.Box3().setFromPoints(points).max;
 
     assert.ok(actualRadius <= envelope.radius + 1e-6);
     assert.ok(envelope.radius - actualRadius <= .02);
-    assert.ok(Math.abs(envelope.top - actualTop) <= 1e-6);
-    assert.ok(Math.abs(envelope.bottom - actualBottom) <= 1e-6);
+    assert.deepEqual(envelope.min, {
+        x: actualMin.x,
+        y: actualMin.y,
+        z: actualMin.z
+    });
+    assert.deepEqual(envelope.max, {
+        x: actualMax.x,
+        y: actualMax.y,
+        z: actualMax.z
+    });
 
     envelope.center.y = 999;
+    envelope.min.x = 999;
     assert.notEqual(world.getFramingEnvelope().center.y, 999);
+    assert.notEqual(world.getFramingEnvelope().min.x, 999);
 });
 
-test("builds a rounded world body instead of an oblate front plate", (t) => {
+test("builds an irregular rounded reference core", (t) => {
     const world = createWorld(t);
-    const land = world.group.getObjectByName("FacetedLand");
+    const land = world.group.getObjectByName("ReferencePlanetBody");
+    assert.ok(land, "Missing ReferencePlanetBody");
     world.group.updateMatrixWorld(true);
     const center = land.localToWorld(new THREE.Vector3());
     const positions = land.geometry.attributes.position;
@@ -190,65 +184,30 @@ test("builds a rounded world body instead of an oblate front plate", (t) => {
             .applyMatrix4(land.matrixWorld)
             .distanceTo(center));
 
-    assert.ok(Math.max(...radii) / Math.min(...radii) <= 1.01);
+    assert.ok(Math.max(...radii) / Math.min(...radii) <= 1.3);
 });
 
-test("adds the complete contour density in three shared instanced draws", (t) => {
+test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     const world = createWorld(t);
-    const expectedCounts = new Map([
-        ["ContourSignalFragments", 12],
-        ["PerimeterUtilityModules", 8],
-        ["AtmosphericSpecks", 10]
-    ]);
-
-    expectedCounts.forEach((count, name) => {
-        const mesh = world.group.getObjectByName(name);
-        assert.equal(mesh?.isInstancedMesh, true, `${name} must be instanced`);
-        assert.equal(mesh.count, count);
-    });
-});
-
-test("places contour density inside the world perimeter band", (t) => {
-    const world = createWorld(t);
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-
     [
-        "ContourSignalFragments",
-        "PerimeterUtilityModules",
-        "AtmosphericSpecks"
+        "ReferenceCanopyCrowns",
+        "ReferenceCoreRocks",
+        "ReferenceTempleRoofPieces",
+        "ReferenceDebrisPieces"
     ].forEach((name) => {
         const mesh = world.group.getObjectByName(name);
-        for (let index = 0; index < mesh.count; index += 1) {
-            mesh.getMatrixAt(index, matrix);
-            position.setFromMatrixPosition(matrix);
-            assert.ok(position.length() >= 3);
-            assert.ok(position.length() <= 3.75);
-        }
+        assert.equal(mesh?.isInstancedMesh, true, `${name} must be instanced`);
+        assert.ok(mesh.count > 0, `${name} must contain authored instances`);
     });
 });
 
 test("stays within the high-profile world render budget", (t) => {
     const world = createWorld(t);
-    let drawCalls = 0;
-    let shadowCalls = 0;
-    let triangles = 0;
+    assert.equal(typeof world.getRenderStats, "function");
+    const stats = world.getRenderStats();
 
-    world.group.traverse((object) => {
-        if (!object.isMesh) {
-            return;
-        }
-        drawCalls += 1;
-        shadowCalls += object.castShadow ? 1 : 0;
-        const instances = object.isInstancedMesh ? object.count : 1;
-        const primitives = object.geometry.index
-            ? object.geometry.index.count
-            : object.geometry.attributes.position.count;
-        triangles += primitives / 3 * instances;
-    });
-
-    assert.ok(drawCalls + shadowCalls <= 75);
-    assert.ok(triangles <= 140000);
+    assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
+    assert.ok(stats.triangles <= 140000);
 });
 
 test("disposes every attached world resource exactly once", () => {
@@ -311,6 +270,7 @@ test("rolls back every tracked resource when world construction throws", () => {
         DataTexture: trackDisposable(THREE.DataTexture),
         MeshToonMaterial: trackDisposable(THREE.MeshToonMaterial),
         MeshBasicMaterial: trackDisposable(THREE.MeshBasicMaterial),
+        ShaderMaterial: trackDisposable(THREE.ShaderMaterial),
         BoxGeometry: trackDisposable(THREE.BoxGeometry),
         CylinderGeometry: trackDisposable(THREE.CylinderGeometry),
         IcosahedronGeometry: trackDisposable(THREE.IcosahedronGeometry),

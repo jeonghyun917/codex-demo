@@ -77,12 +77,6 @@ function createSceneHarness() {
             camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
             const planet = scene.getObjectByName("QuantPlanet");
             const worldPoints = collectMeshPoints(planet);
-            const primaryPoints = collectMeshPoints(
-                planet,
-                (object) => object.name === "FacetedLand"
-                    || object.name === "FacetedLandOutline"
-                    || object.name === "ShallowWaterShell"
-            );
             frames.push({
                 aspect: camera.aspect,
                 near: camera.near,
@@ -92,7 +86,7 @@ function createSceneHarness() {
                 worldScale: planet.scale.x,
                 worldQuaternion: planet.quaternion.clone(),
                 worldPoints,
-                primaryProjected: primaryPoints.map((point) =>
+                primaryProjected: worldPoints.map((point) =>
                     point.clone().project(camera)),
                 projected: worldPoints.map((point) =>
                     point.clone().project(camera)),
@@ -387,7 +381,7 @@ test("applies pointer parallax only when the capability profile enables it", asy
     assert.ok(disabledLeft.target.distanceTo(disabledRight.target) < 1e-9);
 });
 
-test("composes the primary silhouette at desktop and mobile occupancy", async (t) => {
+test("composes the complete reference silhouette at desktop and mobile occupancy", async (t) => {
     const profile = sceneProfile({
         name: "balanced",
         outlineLevel: 1,
