@@ -7,6 +7,9 @@ import {
 import {
     REFERENCE_TIMING
 } from "../../main/resources/static/js/home-quant-planet-composition.js";
+import {
+    createOrbitPose
+} from "../../main/resources/static/js/home-quant-planet-motion.js";
 
 const HIGH_PROFILE = {
     name: "high",
@@ -116,6 +119,36 @@ function createDeferred() {
     return { promise, reject, resolve };
 }
 
+function createTimerHarness() {
+    const tasks = new Map();
+    let nextId = 0;
+    let time = 0;
+    return {
+        clearTimeout(id) {
+            tasks.delete(id);
+        },
+        setTimeout(callback, delay) {
+            const id = ++nextId;
+            tasks.set(id, {
+                callback,
+                dueAt: time + Math.max(0, Number(delay) || 0)
+            });
+            return id;
+        },
+        advance(milliseconds) {
+            time += milliseconds;
+            [...tasks.entries()]
+                .filter(([, task]) => task.dueAt <= time)
+                .sort((left, right) => left[1].dueAt - right[1].dueAt)
+                .forEach(([id, task]) => {
+                    if (tasks.delete(id)) {
+                        task.callback();
+                    }
+                });
+        }
+    };
+}
+
 function createFrameQueue() {
     const frames = new Map();
     let nextId = 0;
@@ -171,16 +204,40 @@ function createScene() {
     };
 }
 
+function createOrbitIntegratedScene() {
+    const scene = createScene();
+    scene.dragAngle = 0;
+    scene.planetYaws = [];
+    scene.setDragAngle = function setDragAngle(value) {
+        this.dragAngle = value;
+        this.dragAngles.push(value);
+    };
+    scene.render = function render(time) {
+        this.renderCalls.push(time);
+        this.planetYaws.push(createOrbitPose({
+            time,
+            dragAngle: this.dragAngle,
+            pointer: { x: 0, y: 0 },
+            reduceMotion: false
+        }).planetYaw);
+        return true;
+    };
+    return scene;
+}
+
 function createInputHarness() {
+    let getBaseAngle = null;
     let onChange = null;
     let onCommit = null;
     return {
         connectCalls: 0,
         destroyCalls: 0,
         createInput({
+            getBaseAngle: baseAngleCallback,
             onChange: changeCallback,
             onCommit: commitCallback
         }) {
+            getBaseAngle = baseAngleCallback;
             onChange = changeCallback;
             onCommit = commitCallback;
             return {
@@ -196,6 +253,9 @@ function createInputHarness() {
         commit(selection) {
             assert.equal(typeof onCommit, "function");
             onCommit(selection);
+        },
+        readBaseAngle() {
+            return getBaseAngle?.();
         },
         emit(state) {
             onChange({
@@ -214,7 +274,8 @@ function createRuntimeHarness({
     profile = HIGH_PROFILE,
     motionDisabled = profile.name === "static",
     useRealInput = false,
-    MotionAPI
+    MotionAPI,
+    inputTimers
 } = {}) {
     const root = {
         classList: createClassList(),
@@ -239,9 +300,11 @@ function createRuntimeHarness({
     const canvas = createEventTarget({ dataset: {} });
     const documentTarget = createEventTarget({ hidden: false });
     const windowTarget = createEventTarget({
+        clearTimeout: inputTimers?.clearTimeout,
         innerHeight: 900,
         innerWidth: 1440,
-        Motion: MotionAPI
+        Motion: MotionAPI,
+        setTimeout: inputTimers?.setTimeout
     });
     const frameQueue = createFrameQueue();
     const input = createInputHarness();
@@ -293,6 +356,20 @@ function createRuntimeHarness({
 }
 
 const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
+
+function runFrames(harness, startTime, count, step = 100) {
+    let time = startTime;
+    for (let index = 0; index < count; index += 1) {
+        time += step;
+        harness.frameQueue.runNext(time);
+    }
+    return time;
+}
+
+const circularDistance = (left, right) => Math.abs(Math.atan2(
+    Math.sin(left - right),
+    Math.cos(left - right)
+));
 
 test("dismisses the intro at 4000ms when the scene resolves just before it", async () => {
     const harness = createRuntimeHarness();
@@ -449,6 +526,92 @@ test("uses one committed angle for title selection and world rotation", async ()
     assert.equal(harness.frameQueue.frames.size, 1);
 });
 
+test("snaps ambient ring plus a small drag to the displayed nearest sector", async () => {
+    const timers = createTimerHarness();
+    const harness = createRuntimeHarness({
+        inputTimers: timers,
+        useRealInput: true
+    });
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(0);
+    runFrames(harness, 0, 36);
+    assert.equal(harness.root.dataset.productFront, "5");
+
+    harness.experience.emit("pointerdown", {
+        pointerId: 41,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: harness.experience,
+        preventDefault() {}
+    });
+    harness.experience.emit("pointermove", {
+        pointerId: 41,
+        isPrimary: true,
+        clientX: 110,
+        clientY: 150,
+        preventDefault() {}
+    });
+    const worldBeforeRelease = scene.dragAngles.at(-1);
+    harness.experience.emit("pointerup", {
+        pointerId: 41,
+        isPrimary: true
+    });
+
+    assert.equal(harness.experience.dataset.selectedProduct, "5");
+    assert.equal(harness.root.dataset.productFront, "5");
+    assert.ok(
+        circularDistance(scene.dragAngles.at(-1), worldBeforeRelease)
+            < Math.PI / 3
+    );
+    harness.runtime.destroy();
+});
+
+test("holds hovered and focused selection through idle delay without phase jumps", async () => {
+    for (const mode of ["hover", "focus"]) {
+        const timers = createTimerHarness();
+        const harness = createRuntimeHarness({
+            inputTimers: timers,
+            useRealInput: true
+        });
+        const scene = createScene();
+        harness.sceneDeferred.resolve(scene);
+        await flushPromises();
+        harness.frameQueue.runNext(0);
+        let frameTime = runFrames(harness, 0, 36);
+        const link = harness.productLinks[2];
+
+        link.emit(mode === "hover" ? "pointerenter" : "focus");
+        frameTime = runFrames(harness, frameTime, 1);
+        const heldWorldAngle = scene.dragAngles.at(-1);
+        const heldOrbitX = link.style.getPropertyValue("--orbit-x");
+        assert.equal(harness.experience.dataset.selectedProduct, "2");
+
+        link.emit(mode === "hover" ? "pointerleave" : "blur", {
+            relatedTarget: null
+        });
+        frameTime = runFrames(harness, frameTime, 8);
+        assert.equal(harness.experience.dataset.selectedProduct, "2");
+        assert.equal(link.style.getPropertyValue("--orbit-x"), heldOrbitX);
+        assert.equal(scene.dragAngles.at(-1), heldWorldAngle);
+
+        timers.advance(REFERENCE_TIMING.idleResumeMs - 1);
+        frameTime = runFrames(harness, frameTime, 1);
+        assert.equal(scene.dragAngles.at(-1), heldWorldAngle);
+        timers.advance(1);
+        assert.equal(scene.dragAngles.at(-1), heldWorldAngle);
+
+        frameTime = runFrames(harness, frameTime, 1);
+        assert.ok(
+            circularDistance(scene.dragAngles.at(-1), heldWorldAngle) < .02
+        );
+        assert.equal(harness.frameQueue.frames.size, 1);
+        harness.runtime.destroy();
+    }
+});
+
 test("advances ambient world rotation on the named reference revolution", async () => {
     const harness = createRuntimeHarness();
     const scene = createScene();
@@ -462,6 +625,25 @@ test("advances ambient world rotation on the named reference revolution", async 
         scene.dragAngles.at(-1)
         - Math.PI * 2 * 100 / REFERENCE_TIMING.worldRevolutionMs
     ) < 1e-9);
+    assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("completes one real orbit-pose revolution in exactly 96 seconds", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createOrbitIntegratedScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    harness.frameQueue.runNext(0);
+    const initialYaw = scene.planetYaws.at(-1);
+    let frameTime = runFrames(harness, 0, 480);
+    const halfwayYaw = scene.planetYaws.at(-1);
+    runFrames(harness, frameTime, 480);
+    const fullYaw = scene.planetYaws.at(-1);
+
+    assert.ok(Math.abs(
+        circularDistance(halfwayYaw, initialYaw) - Math.PI
+    ) < 1e-9);
+    assert.ok(circularDistance(fullYaw, initialYaw) < 1e-9);
     assert.equal(harness.frameQueue.frames.size, 1);
 });
 

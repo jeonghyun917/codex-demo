@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     PRODUCT_SCENES,
+    REFERENCE_TIMING,
     createProductSelection,
     fitPerspectiveSphere,
     resolveAdjacentProduct,
@@ -315,6 +316,24 @@ test("keeps actual transformed bounds visible at extreme orbit poses", async (t)
             assert.ok(Math.abs(point.z) <= 1 + 1e-6);
         });
     });
+});
+
+test("real scene adds no render-time yaw beyond the runtime world angle", async (t) => {
+    const scene = await createTestScene(t, {
+        width: 1440,
+        height: 900
+    });
+    scene.controller.setDragAngle(.7);
+    assert.equal(scene.controller.render(0), true);
+    const initialRotation = scene.frames.at(-1).worldQuaternion;
+
+    assert.equal(
+        scene.controller.render(REFERENCE_TIMING.worldRevolutionMs / 2),
+        true
+    );
+    const laterRotation = scene.frames.at(-1).worldQuaternion;
+
+    assert.ok(initialRotation.angleTo(laterRotation) < 1e-7);
 });
 
 test("composes the primary silhouette at desktop and mobile occupancy", async (t) => {

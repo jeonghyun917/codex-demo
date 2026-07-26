@@ -5,15 +5,35 @@ import {
 } from "../../main/resources/static/js/home-quant-planet-input.js";
 import {
     createProductSelection,
-    REFERENCE_TIMING
+    REFERENCE_TIMING,
+    resolveSelectedProduct
 } from "../../main/resources/static/js/home-quant-planet-composition.js";
 
 function createFakeTarget() {
     const listeners = new Map();
     return {
+        children: [],
         listeners,
+        nodeType: 1,
+        parentNode: null,
         captureCalls: [],
         releaseCalls: [],
+        appendChild(child) {
+            child.parentNode = this;
+            this.children.push(child);
+            return child;
+        },
+        contains(target) {
+            if (!target?.nodeType) {
+                throw new TypeError("contains expects a Node");
+            }
+            for (let node = target; node; node = node.parentNode) {
+                if (node === this) {
+                    return true;
+                }
+            }
+            return false;
+        },
         addEventListener(type, listener) {
             const group = listeners.get(type) || new Set();
             group.add(listener);
@@ -42,14 +62,52 @@ function createFakeTarget() {
     };
 }
 
-function createFocusableTarget() {
+function createFocusableTarget(href) {
     const target = createFakeTarget();
+    target.href = href;
     target.focusCalls = 0;
     target.focus = () => {
         target.focusCalls += 1;
         target.emit("focus");
     };
     return target;
+}
+
+function dispatchBubbling(target, type, event = {}) {
+    const path = [];
+    for (let node = target; node; node = node.parentNode) {
+        path.push(node);
+    }
+    let defaultPrevented = false;
+    let propagationStopped = false;
+    const dispatched = {
+        ...event,
+        target,
+        composedPath: () => [...path, { kind: "window" }],
+        preventDefault() {
+            defaultPrevented = true;
+            event.preventDefault?.();
+        },
+        stopPropagation() {
+            propagationStopped = true;
+            event.stopPropagation?.();
+        }
+    };
+    for (const currentTarget of path) {
+        dispatched.currentTarget = currentTarget;
+        currentTarget.emit(type, dispatched);
+        if (propagationStopped) {
+            break;
+        }
+    }
+    return {
+        get defaultPrevented() {
+            return defaultPrevented;
+        },
+        get propagationStopped() {
+            return propagationStopped;
+        }
+    };
 }
 
 function createTimerHarness() {
@@ -88,7 +146,10 @@ function createTimerHarness() {
 
 function createController(options = {}) {
     const surface = createFakeTarget();
-    const links = Array.from({ length: 6 }, createFocusableTarget);
+    const links = Array.from({ length: 6 }, (_, index) =>
+        surface.appendChild(createFocusableTarget(
+            resolveSelectedProduct(index).route
+        )));
     const commits = [];
     const states = [];
     const timers = options.timers || createTimerHarness();
@@ -121,6 +182,7 @@ test("captures primary-pointer drag without registering wheel behavior", () => {
         target: surface,
         preventDefault() {}
     });
+    assert.deepEqual(surface.captureCalls, []);
     surface.emit("pointermove", {
         pointerId: 4,
         clientX: 3000,
@@ -153,34 +215,34 @@ test("updates bounded pointer parallax without changing the orbit outside a drag
     assert.deepEqual(controller.getState().pointer, { x: 0, y: 0 });
 });
 
-test("preserves a native product-link click when no drag occurs", () => {
+test("preserves native anchor and nested-title clicks without pointer capture", () => {
     const { controller, links, surface } = createController();
     controller.connect();
-    let pointerPrevented = false;
-    let clickPrevented = false;
+    const nestedLine = links[2].appendChild(createFakeTarget());
+    const clickTargets = [links[2], nestedLine];
 
-    const pointerEvent = {
-        pointerId: 8,
-        isPrimary: true,
-        clientX: 120,
-        button: 0,
-        target: links[2],
-        preventDefault() {
-            pointerPrevented = true;
-        }
-    };
-    links[2].emit("pointerdown", pointerEvent);
-    surface.emit("pointerdown", pointerEvent);
-    surface.emit("pointerup", { pointerId: 8, isPrimary: true });
-    links[2].emit("click", {
-        preventDefault() {
-            clickPrevented = true;
-        }
+    clickTargets.forEach((target, index) => {
+        const pointerId = 8 + index;
+        const down = dispatchBubbling(target, "pointerdown", {
+            pointerId,
+            isPrimary: true,
+            clientX: 120,
+            button: 0
+        });
+        assert.equal(down.defaultPrevented, false);
+        assert.deepEqual(surface.captureCalls, []);
+
+        dispatchBubbling(target, "pointerup", {
+            pointerId,
+            isPrimary: true
+        });
+        const click = dispatchBubbling(target, "click", { detail: 1 });
+        assert.equal(click.defaultPrevented, false);
+        assert.equal(links[2].href, "/stocks/heatmap?index=SP500");
     });
 
     assert.equal(controller.getState().dragging, false);
-    assert.equal(pointerPrevented, false);
-    assert.equal(clickPrevented, false);
+    assert.deepEqual(surface.releaseCalls, []);
 });
 
 test("arrow keys wrap, promote, and focus the adjacent product title", () => {
@@ -233,6 +295,36 @@ test("commits a horizontal primary drag to the nearest wrapped sector", () => {
     assert.equal(controller.getState().dragAngle, commits[0].dragAngle);
 });
 
+test("snaps against the displayed base ring phase instead of local drag alone", () => {
+    const baseAngle = .8;
+    const { commits, controller, surface } = createController({
+        getBaseAngle: () => baseAngle
+    });
+    controller.connect();
+
+    surface.emit("pointerdown", {
+        pointerId: 36,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    surface.emit("pointermove", {
+        pointerId: 36,
+        isPrimary: true,
+        clientX: 110,
+        clientY: 150,
+        preventDefault() {}
+    });
+    surface.emit("pointerup", { pointerId: 36, isPrimary: true });
+
+    assert.equal(commits.at(-1).selectedIndex, 5);
+    assert.ok(Math.abs(
+        baseAngle + commits.at(-1).dragAngle - Math.PI / 3
+    ) < 1e-9);
+});
+
 test("keeps keyboard promotion sector-aligned at bounded drag extremes", () => {
     const { commits, controller, links, surface } = createController();
     controller.connect();
@@ -269,47 +361,45 @@ test("keeps keyboard promotion sector-aligned at bounded drag extremes", () => {
     assert.equal(snapped.selectedIndex, commit.selectedIndex);
 });
 
-test("suppresses the click synthesized after dragging a product title", () => {
+test("captures only after title drag threshold and suppresses its retargeted click", () => {
     const { commits, controller, links, surface } = createController();
     controller.connect();
-    let pointerPrevented = false;
-    let clickPrevented = false;
-    let propagationStopped = false;
-    const pointerDown = {
+    const nestedLine = links[2].appendChild(createFakeTarget());
+
+    const down = dispatchBubbling(nestedLine, "pointerdown", {
         pointerId: 32,
         isPrimary: true,
         clientX: 100,
-        button: 0,
-        target: links[2],
-        preventDefault() {
-            pointerPrevented = true;
-        }
-    };
+        button: 0
+    });
+    assert.equal(down.defaultPrevented, false);
+    assert.deepEqual(surface.captureCalls, []);
 
-    links[2].emit("pointerdown", pointerDown);
-    surface.emit("pointerdown", pointerDown);
-    surface.emit("pointermove", {
+    const belowThreshold = dispatchBubbling(nestedLine, "pointermove", {
+        pointerId: 32,
+        isPrimary: true,
+        clientX: 104,
+        clientY: 150,
+    });
+    assert.equal(belowThreshold.defaultPrevented, false);
+    assert.deepEqual(surface.captureCalls, []);
+
+    const drag = dispatchBubbling(nestedLine, "pointermove", {
         pointerId: 32,
         isPrimary: true,
         clientX: 300,
-        clientY: 150,
-        preventDefault() {
-            pointerPrevented = true;
-        }
+        clientY: 150
     });
-    surface.emit("pointerup", { pointerId: 32, isPrimary: true });
-    links[2].emit("click", {
-        preventDefault() {
-            clickPrevented = true;
-        },
-        stopPropagation() {
-            propagationStopped = true;
-        }
-    });
+    assert.equal(drag.defaultPrevented, true);
+    assert.deepEqual(surface.captureCalls, [32]);
 
-    assert.equal(pointerPrevented, true);
-    assert.equal(clickPrevented, true);
-    assert.equal(propagationStopped, true);
+    surface.emit("pointerup", { pointerId: 32, isPrimary: true });
+    const retargetedClick = dispatchBubbling(surface, "click", { detail: 1 });
+    const nextClick = dispatchBubbling(links[3], "click", { detail: 1 });
+
+    assert.equal(retargetedClick.defaultPrevented, true);
+    assert.equal(retargetedClick.propagationStopped, true);
+    assert.equal(nextClick.defaultPrevented, false);
     assert.equal(commits.length, 1);
 });
 
@@ -322,12 +412,14 @@ test("delays idle auto-rotation until the reference resume interval", () => {
     assert.equal(controller.getState().paused, true);
     links[1].emit("pointerleave", { relatedTarget: null });
     assert.equal(controller.getState().paused, true);
+    assert.equal(controller.getState().snapToSelected, true);
     assert.equal(timers.pendingCount(), 1);
 
     timers.advance(REFERENCE_TIMING.idleResumeMs - 1);
     assert.equal(controller.getState().paused, true);
     timers.advance(1);
     assert.equal(controller.getState().paused, false);
+    assert.equal(controller.getState().snapToSelected, false);
 
     surface.emit("pointerdown", {
         pointerId: 33,
@@ -383,6 +475,13 @@ test("destroy removes every listener and releases an active pointer", () => {
         target: surface,
         preventDefault() {}
     });
+    surface.emit("pointermove", {
+        pointerId: 9,
+        isPrimary: true,
+        clientX: 200,
+        clientY: 150,
+        preventDefault() {}
+    });
 
     controller.destroy();
 
@@ -408,6 +507,13 @@ test("capture API failures cannot strand drag state or listeners", () => {
         clientX: 100,
         button: 0,
         target: surface,
+        preventDefault() {}
+    }));
+    assert.doesNotThrow(() => surface.emit("pointermove", {
+        pointerId: 10,
+        isPrimary: true,
+        clientX: 200,
+        clientY: 150,
         preventDefault() {}
     }));
     assert.equal(controller.getState().dragging, true);
@@ -483,7 +589,7 @@ test("keeps the active primary drag when a non-primary pointer joins", () => {
     });
     assert.equal(controller.getState().dragAngle, 0);
     assert.equal(controller.getState().dragging, true);
-    assert.deepEqual(surface.captureCalls, [11]);
+    assert.deepEqual(surface.captureCalls, []);
 
     surface.emit("pointermove", {
         pointerId: 11,
@@ -491,6 +597,7 @@ test("keeps the active primary drag when a non-primary pointer joins", () => {
         clientY: 150,
         preventDefault() {}
     });
+    assert.deepEqual(surface.captureCalls, [11]);
     surface.emit("pointerup", { pointerId: 12, isPrimary: false });
     assert.equal(controller.getState().dragging, true);
     assert.equal(controller.getState().dragAngle, .6);

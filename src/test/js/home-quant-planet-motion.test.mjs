@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+    REFERENCE_TIMING
+} from "../../main/resources/static/js/home-quant-planet-composition.js";
+import {
     advanceRingAngle,
     clampUnit,
     createCourierLoopPose,
@@ -86,6 +89,31 @@ test("removes orbit pointer parallax in reduced motion", () => {
         pointer: { x: 1, y: 1 }, reduceMotion: true
     });
     assert.deepEqual(pointerLeft, pointerRight);
+});
+
+test("leaves all time-based planet yaw to the runtime world-angle owner", () => {
+    const initial = createOrbitPose({
+        time: 0,
+        dragAngle: .6,
+        pointer: { x: 0, y: 0 },
+        reduceMotion: false
+    });
+    const later = createOrbitPose({
+        time: REFERENCE_TIMING.worldRevolutionMs / 2,
+        dragAngle: .6,
+        pointer: { x: 0, y: 0 },
+        reduceMotion: false
+    });
+    const reducedLater = createOrbitPose({
+        time: REFERENCE_TIMING.worldRevolutionMs / 2,
+        dragAngle: .6,
+        pointer: { x: 0, y: 0 },
+        reduceMotion: true
+    });
+
+    assert.equal(initial.planetYaw, .6);
+    assert.equal(later.planetYaw, initial.planetYaw);
+    assert.equal(reducedLater.planetYaw, initial.planetYaw);
 });
 
 test("wraps six product links and brings the selected item forward", () => {

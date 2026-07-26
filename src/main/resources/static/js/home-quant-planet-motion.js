@@ -150,14 +150,11 @@ export function createOrbitPose({
     const pointerX = reduceMotion ? 0 : clamp(pointer?.x, -1, 1);
     const pointerY = reduceMotion ? 0 : clamp(pointer?.y, -1, 1);
     const drag = clamp(dragAngle, -TAU * 2, TAU * 2);
-    const ambient = reduceMotion ? 0
-        : (Math.max(0, Number(time) || 0) % REFERENCE_TIMING.productRevolutionMs)
-            / REFERENCE_TIMING.productRevolutionMs * TAU;
     return {
         cameraDistance: 8.9,
         cameraYaw: clamp(drag * .18 + pointerX * .0698, -TAU, TAU),
         cameraPitch: clamp(.12 + pointerY * .052, -.34, .34),
-        planetYaw: drag + ambient * .08,
+        planetYaw: drag,
         planetPitch: clamp(-.08 + pointerY * .02, -.18, .18),
         planetRoll: pointerX * .018
     };

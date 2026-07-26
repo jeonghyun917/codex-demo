@@ -20,6 +20,7 @@ export function createOrbitInputController({
     links = [],
     onChange,
     onCommit,
+    getBaseAngle = () => 0,
     setTimeoutFn = globalThis.setTimeout?.bind(globalThis),
     clearTimeoutFn = globalThis.clearTimeout?.bind(globalThis)
 } = {}) {
@@ -27,6 +28,7 @@ export function createOrbitInputController({
     const listeners = [];
     let connected = false;
     let activePointerId = null;
+    let captureAttempted = false;
     let clickResetTimer = null;
     let dragAngle = 0;
     let dragDistance = 0;
@@ -39,7 +41,9 @@ export function createOrbitInputController({
     let hovered = false;
     let pressed = false;
     let pointer = { x: 0, y: 0 };
+    let pointerCaptured = false;
     let pressedPointerId = null;
+    let startBaseAngle = 0;
     let startX = 0;
     let startAngle = 0;
     let suppressedClickTarget = null;
@@ -58,7 +62,8 @@ export function createOrbitInputController({
             pressed,
             pointer: { ...pointer },
             paused: isInteracting() || idleResumePending,
-            snapToSelected: focused || hovered || pressed
+            snapToSelected:
+                focused || hovered || pressed || idleResumePending
         };
     }
 
@@ -71,8 +76,32 @@ export function createOrbitInputController({
         listeners.push(() => target?.removeEventListener?.(type, listener));
     }
 
+    function productLinkForTarget(target) {
+        return productLinks.find((link) => {
+            if (link === target) {
+                return true;
+            }
+            try {
+                return Boolean(link?.contains?.(target));
+            } catch {
+                return false;
+            }
+        }) || null;
+    }
+
+    function productLinkForEvent(event) {
+        const path = event?.composedPath?.() || [];
+        for (const target of path) {
+            const link = productLinkForTarget(target);
+            if (link) {
+                return link;
+            }
+        }
+        return productLinkForTarget(event?.target);
+    }
+
     function isProductLink(target) {
-        return productLinks.includes(target);
+        return Boolean(productLinkForTarget(target));
     }
 
     function clearTimer(timerId) {
@@ -109,24 +138,37 @@ export function createOrbitInputController({
         }
     }
 
-    function nearestAngleForIndex(index) {
+    function currentBaseAngle() {
+        const angle = Number(getBaseAngle?.());
+        return Number.isFinite(angle) ? angle : 0;
+    }
+
+    function nearestTotalAngleForIndex(index, aroundAngle) {
         const count = Math.max(1, productLinks.length);
         const step = TAU / count;
         const target = -wrapIndex(index, count) * step;
-        let nearest = target
-            + Math.round((dragAngle - target) / TAU) * TAU;
-        while (nearest > MAX_DRAG_ANGLE) {
-            nearest -= TAU;
+        return target
+            + Math.round((aroundAngle - target) / TAU) * TAU;
+    }
+
+    function boundedEquivalentDragAngle(value) {
+        let angle = Number(value) || 0;
+        while (angle > MAX_DRAG_ANGLE) {
+            angle -= TAU;
         }
-        while (nearest < -MAX_DRAG_ANGLE) {
-            nearest += TAU;
+        while (angle < -MAX_DRAG_ANGLE) {
+            angle += TAU;
         }
-        return nearest;
+        return angle;
     }
 
     function promoteSelection(index) {
+        const baseAngle = currentBaseAngle();
+        const totalAngle = baseAngle + dragAngle;
         selectedIndex = wrapIndex(index, productLinks.length);
-        dragAngle = nearestAngleForIndex(selectedIndex);
+        dragAngle = boundedEquivalentDragAngle(
+            nearestTotalAngleForIndex(selectedIndex, totalAngle) - baseAngle
+        );
     }
 
     function emitCommit() {
@@ -140,8 +182,10 @@ export function createOrbitInputController({
     function capturePointer(pointerId) {
         try {
             surface?.setPointerCapture?.(pointerId);
+            return true;
         } catch {
             // Pointer capture can disappear during browser gesture cancellation.
+            return false;
         }
     }
 
@@ -163,12 +207,14 @@ export function createOrbitInputController({
         }
         const wasInteracting = isInteracting();
         activePointerId = event.pointerId;
+        captureAttempted = false;
         startX = Number(event.clientX) || 0;
         startAngle = dragAngle;
+        startBaseAngle = currentBaseAngle();
         dragDistance = 0;
-        gestureTarget = isProductLink(event.target) ? event.target : null;
+        gestureTarget = productLinkForEvent(event);
         dragging = true;
-        capturePointer(activePointerId);
+        pointerCaptured = false;
         if (!gestureTarget) {
             event.preventDefault?.();
         }
@@ -188,6 +234,13 @@ export function createOrbitInputController({
             dragAngle = clampDragAngle(
                 startAngle + distance * DRAG_RADIANS_PER_PIXEL
             );
+            if (
+                dragDistance >= CLICK_SUPPRESSION_DISTANCE
+                && !captureAttempted
+            ) {
+                captureAttempted = true;
+                pointerCaptured = capturePointer(activePointerId);
+            }
             if (!gestureTarget || dragDistance >= CLICK_SUPPRESSION_DISTANCE) {
                 event.preventDefault?.();
             }
@@ -203,15 +256,19 @@ export function createOrbitInputController({
         const wasInteracting = isInteracting();
         const pointerId = activePointerId;
         const suppressClick = dragDistance >= CLICK_SUPPRESSION_DISTANCE;
+        const totalAngle = startBaseAngle + dragAngle;
         const selection = createProductSelection({
+            rotationAngle: startBaseAngle,
             dragAngle,
             selectedIndex: 0,
             snap: true,
             count: productLinks.length
         });
-        const step = TAU / Math.max(1, productLinks.length);
         selectedIndex = selection.selectedIndex;
-        dragAngle = clampDragAngle(Math.round(dragAngle / step) * step);
+        dragAngle = boundedEquivalentDragAngle(
+            nearestTotalAngleForIndex(selectedIndex, totalAngle)
+                - startBaseAngle
+        );
         if (suppressClick && gestureTarget) {
             suppressedClickTarget = gestureTarget;
             clearTimer(clickResetTimer);
@@ -223,11 +280,15 @@ export function createOrbitInputController({
         try {
             emitCommit();
         } finally {
-            releasePointer(pointerId);
+            if (pointerCaptured) {
+                releasePointer(pointerId);
+            }
             activePointerId = null;
+            captureAttempted = false;
             dragging = false;
             dragDistance = 0;
             gestureTarget = null;
+            pointerCaptured = false;
             updateIdleResume(wasInteracting);
             notify();
         }
@@ -263,6 +324,21 @@ export function createOrbitInputController({
 
     function handleClick(link, event) {
         if (suppressedClickTarget !== link || event?.detail === 0) {
+            return;
+        }
+        suppressedClickTarget = null;
+        clearTimer(clickResetTimer);
+        clickResetTimer = null;
+        event.preventDefault?.();
+        event.stopPropagation?.();
+    }
+
+    function handleSurfaceClick(event) {
+        if (
+            !suppressedClickTarget
+            || event?.detail === 0
+            || productLinkForEvent(event)
+        ) {
             return;
         }
         suppressedClickTarget = null;
@@ -338,6 +414,7 @@ export function createOrbitInputController({
         listen(surface, "pointerup", finishPointer);
         listen(surface, "pointercancel", finishPointer);
         listen(surface, "pointerleave", handleSurfaceLeave);
+        listen(surface, "click", handleSurfaceClick);
         productLinks.forEach((link, index) => {
             listen(link, "focus", () => handleFocus(index));
             listen(link, "blur", handleBlur);
@@ -353,12 +430,13 @@ export function createOrbitInputController({
     }
 
     function destroy() {
-        if (activePointerId !== null) {
+        if (activePointerId !== null && pointerCaptured) {
             releasePointer(activePointerId);
         }
         clearTimer(clickResetTimer);
         clearTimer(idleResumeTimer);
         activePointerId = null;
+        captureAttempted = false;
         clickResetTimer = null;
         dragDistance = 0;
         dragging = false;
@@ -366,6 +444,7 @@ export function createOrbitInputController({
         idleResumePending = false;
         idleResumeTimer = null;
         pressed = false;
+        pointerCaptured = false;
         pressedPointerId = null;
         suppressedClickTarget = null;
         connected = false;

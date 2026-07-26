@@ -289,11 +289,13 @@ export function createQuantPlanetRuntime({
     inputController = createInput({
         surface: experience,
         links: productLinks,
+        getBaseAngle: () => ringAngle,
+        setTimeoutFn: windowTarget?.setTimeout?.bind?.(windowTarget),
+        clearTimeoutFn: windowTarget?.clearTimeout?.bind?.(windowTarget),
         onCommit(selection) {
             const previousPositions = productLinks.map(
                 (link) => link.dataset.productPosition
             );
-            ringAngle = 0;
             inputState = {
                 ...inputState,
                 dragAngle: selection.dragAngle,
@@ -428,7 +430,7 @@ export function createQuantPlanetRuntime({
             inputState.paused,
             motionDisabled
         );
-        if (!motionDisabled) {
+        if (!motionDisabled && !inputState.paused) {
             const worldDelta = Math.min(
                 Math.max(Number(deltaTime) || 0, 0),
                 100
