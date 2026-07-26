@@ -18,7 +18,6 @@ const GLYPH_RESPONSE = Object.freeze([
 
 const COLUMN_SPACING = 1.12;
 const ROW_SPACING = 1.02;
-const LOCAL_LAYOUT_WIDTH = COLUMN_SPACING * 2 + 1;
 const TITLE_DIAMETER_RATIO = .62;
 const ZERO_POINTER = Object.freeze({ x: 0, y: 0 });
 
@@ -194,6 +193,11 @@ export async function createQuantGlyphRig(THREE, {
             group.add(pivot);
             pivots.push(pivot);
         });
+        const layoutBounds = new THREE.Box3().setFromObject(group);
+        const localLayoutWidth = Math.max(
+            .001,
+            layoutBounds.max.x - layoutBounds.min.x
+        );
 
         function setLayout({
             center = { x: 0, y: 0, z: 0 },
@@ -213,7 +217,7 @@ export async function createQuantGlyphRig(THREE, {
             finalZ = finiteOr(Number(center?.z), 0) + safeRadius * 1.05;
             revealDistance = safeRadius * .18;
             layoutScale = safeRadius * 2 * TITLE_DIAMETER_RATIO
-                / LOCAL_LAYOUT_WIDTH * portraitFactor;
+                / localLayoutWidth * portraitFactor;
             applyReveal();
         }
 
@@ -250,12 +254,16 @@ export async function createQuantGlyphRig(THREE, {
                 const restYaw = response[2];
                 const responseGain = response[3];
                 const depthOffset = response[4];
-                const alpha = reduceMotion
-                    ? 1
-                    : 1 - Math.exp(
-                        -REFERENCE_HERO.glyphResponsePerSecond
-                            * responseGain * deltaSeconds
-                    );
+                if (reduceMotion) {
+                    pivot.rotation.y = restYaw;
+                    pivot.rotation.x = pivot.userData.restPitch;
+                    pivot.position.z = depthOffset;
+                    continue;
+                }
+                const alpha = 1 - Math.exp(
+                    -REFERENCE_HERO.glyphResponsePerSecond
+                        * responseGain * deltaSeconds
+                );
                 pivot.rotation.y += (
                     restYaw + targetYaw * yawGain - pivot.rotation.y
                 ) * alpha;
@@ -277,10 +285,18 @@ export async function createQuantGlyphRig(THREE, {
         function getRenderStats() {
             let drawCalls = 0;
             let triangles = 0;
-            group.traverse((object) => {
-                if (object.visible === false) {
-                    return;
+            let ancestor = group;
+            while (ancestor) {
+                if (ancestor.visible === false) {
+                    return {
+                        drawCalls: 0,
+                        shadowCalls: 0,
+                        triangles: 0
+                    };
                 }
+                ancestor = ancestor.parent;
+            }
+            group.traverseVisible((object) => {
                 if (object.isMesh) {
                     drawCalls += Array.isArray(object.material)
                         ? Math.max(1, object.geometry.groups.length)
