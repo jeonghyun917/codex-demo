@@ -423,6 +423,68 @@ test("clears stale WebGL ownership until the replacement scene is ready", async 
     );
 });
 
+test("replaces stale static mode with capable WebGL ownership", async () => {
+    const harness = createRuntimeHarness({
+        rootClasses: [
+            "planet-static-mode",
+            "planet-webgl-ready",
+            "planet-webgl-failed"
+        ]
+    });
+
+    for (const className of [
+        "planet-static-mode",
+        "planet-reduced-motion",
+        "planet-webgl-ready",
+        "planet-webgl-failed"
+    ]) {
+        assert.equal(harness.root.classList.contains(className), false);
+    }
+
+    harness.sceneDeferred.resolve(createScene());
+    await flushPromises();
+
+    assert.equal(harness.root.classList.contains("planet-webgl-ready"), true);
+    for (const className of [
+        "planet-static-mode",
+        "planet-reduced-motion",
+        "planet-webgl-failed"
+    ]) {
+        assert.equal(harness.root.classList.contains(className), false);
+    }
+});
+
+test("replaces stale reduced motion with capable WebGL ownership", async () => {
+    const harness = createRuntimeHarness({
+        rootClasses: [
+            "planet-reduced-motion",
+            "planet-webgl-ready",
+            "planet-webgl-failed"
+        ]
+    });
+
+    for (const className of [
+        "planet-static-mode",
+        "planet-reduced-motion",
+        "planet-webgl-ready",
+        "planet-webgl-failed"
+    ]) {
+        assert.equal(harness.root.classList.contains(className), false);
+    }
+
+    harness.sceneDeferred.resolve(createScene());
+    await flushPromises();
+
+    assert.equal(harness.root.classList.contains("planet-webgl-ready"), true);
+    for (const className of [
+        "planet-static-mode",
+        "planet-reduced-motion",
+        "planet-webgl-failed"
+    ]) {
+        assert.equal(harness.root.classList.contains(className), false);
+    }
+});
+
 test("reveals loader then world then title then action then ready", async () => {
     const harness = createRuntimeHarness();
     harness.sceneDeferred.resolve(createScene());

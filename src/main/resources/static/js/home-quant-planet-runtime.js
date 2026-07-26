@@ -84,6 +84,8 @@ export function createQuantPlanetRuntime({
     let worldAngle = 0;
 
     root.classList.remove(
+        "planet-static-mode",
+        "planet-reduced-motion",
         "planet-webgl-ready",
         "planet-webgl-failed"
     );
