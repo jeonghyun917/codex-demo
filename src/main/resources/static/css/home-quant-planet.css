@@ -868,22 +868,22 @@ a {
     .product-orbit {
         position: absolute;
         z-index: calc(var(--layer-content) + 1);
-        inset: 5rem 0 auto;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(5rem, 7rem));
-        align-content: start;
-        justify-content: space-between;
-        gap: .5rem;
-        padding: .5rem 1rem;
+        inset: 0;
+        display: block;
+        padding: 0;
         perspective: none;
     }
 
     .product-orbit__link {
-        position: relative;
-        inset: auto;
-        transform: none;
-        opacity: 1;
-        z-index: auto;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform:
+            translate(-50%, -50%)
+            translate3d(var(--orbit-x), var(--orbit-y), var(--orbit-z))
+            scale(var(--orbit-scale));
+        opacity: var(--orbit-opacity);
+        z-index: var(--orbit-z-index);
         will-change: auto;
     }
 

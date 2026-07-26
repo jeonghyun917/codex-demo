@@ -68,6 +68,7 @@ test("captures primary-pointer drag without registering wheel behavior", () => {
     assert.equal(surface.listeners.has("wheel"), false);
     surface.emit("pointerdown", {
         pointerId: 4,
+        isPrimary: true,
         clientX: 100,
         button: 0,
         target: surface,
@@ -111,6 +112,7 @@ test("leaves native product-link clicks out of drag capture", () => {
 
     surface.emit("pointerdown", {
         pointerId: 8,
+        isPrimary: true,
         clientX: 120,
         button: 0,
         target: links[2],
@@ -169,6 +171,7 @@ test("destroy removes every listener and releases an active pointer", () => {
     controller.connect();
     surface.emit("pointerdown", {
         pointerId: 9,
+        isPrimary: true,
         clientX: 100,
         button: 0,
         target: surface,
@@ -195,6 +198,7 @@ test("capture API failures cannot strand drag state or listeners", () => {
 
     assert.doesNotThrow(() => surface.emit("pointerdown", {
         pointerId: 10,
+        isPrimary: true,
         clientX: 100,
         button: 0,
         target: surface,
@@ -205,4 +209,90 @@ test("capture API failures cannot strand drag state or listeners", () => {
     assert.equal(controller.getState().dragging, false);
     assert.equal(surface.listenerCount(), 0);
     assert.ok(links.every((link) => link.listenerCount() === 0));
+});
+
+test("keeps the active primary drag when a non-primary pointer joins", () => {
+    const { controller, surface } = createController();
+    controller.connect();
+
+    surface.emit("pointerdown", {
+        pointerId: 11,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    surface.emit("pointerdown", {
+        pointerId: 12,
+        isPrimary: false,
+        clientX: 350,
+        button: 0,
+        target: surface,
+        preventDefault() {
+            assert.fail("a non-primary pointer must be ignored");
+        }
+    });
+    surface.emit("pointermove", {
+        pointerId: 12,
+        clientX: 400,
+        clientY: 150,
+        preventDefault() {
+            assert.fail("a non-primary pointer must not drag");
+        }
+    });
+    assert.equal(controller.getState().dragAngle, 0);
+    assert.equal(controller.getState().dragging, true);
+    assert.deepEqual(surface.captureCalls, [11]);
+
+    surface.emit("pointermove", {
+        pointerId: 11,
+        clientX: 200,
+        clientY: 150,
+        preventDefault() {}
+    });
+    surface.emit("pointerup", { pointerId: 12, isPrimary: false });
+    assert.equal(controller.getState().dragging, true);
+    assert.equal(controller.getState().dragAngle, .6);
+    surface.emit("pointerup", { pointerId: 11, isPrimary: true });
+    assert.equal(controller.getState().dragging, false);
+});
+
+test("pauses for a native-link press without preventing activation", () => {
+    const { controller, links, surface } = createController();
+    controller.connect();
+    let prevented = false;
+
+    links[2].emit("pointerdown", {
+        pointerId: 13,
+        isPrimary: true,
+        button: 0,
+        target: links[2],
+        preventDefault() {
+            prevented = true;
+        }
+    });
+
+    assert.equal(controller.getState().pressed, true);
+    assert.equal(controller.getState().selectedIndex, 2);
+    assert.equal(controller.getState().paused, true);
+    assert.equal(prevented, false);
+    assert.deepEqual(surface.captureCalls, []);
+
+    links[2].emit("pointerup", { pointerId: 13, isPrimary: true });
+    assert.equal(controller.getState().pressed, false);
+    assert.equal(controller.getState().paused, false);
+
+    links[4].emit("pointerdown", {
+        pointerId: 14,
+        isPrimary: true,
+        button: 0,
+        target: links[4]
+    });
+    links[4].emit("pointercancel", {
+        pointerId: 14,
+        isPrimary: true
+    });
+    assert.equal(controller.getState().pressed, false);
+    assert.equal(controller.getState().paused, false);
 });

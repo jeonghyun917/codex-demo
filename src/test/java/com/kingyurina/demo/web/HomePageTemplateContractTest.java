@@ -130,12 +130,15 @@ class HomePageTemplateContractTest {
         assertTrue(css.contains(
                 ".product-orbit { position: absolute; "
                         + "z-index: calc(var(--layer-content) + 1); "
-                        + "inset: 5rem 0 auto; display: grid; "
-                        + "grid-template-columns: repeat(3, minmax(5rem, 7rem)); "
-                        + "align-content: start;"));
+                        + "inset: 0; display: block; padding: 0; "
+                        + "perspective: none;"));
         assertTrue(css.contains(
-                ".product-orbit__link { position: relative; inset: auto; "
-                        + "transform: none; opacity: 1; z-index: auto;"));
+                ".product-orbit__link { position: absolute; left: 50%; "
+                        + "top: 50%; transform: translate(-50%, -50%) "
+                        + "translate3d(var(--orbit-x), var(--orbit-y), "
+                        + "var(--orbit-z)) scale(var(--orbit-scale)); "
+                        + "opacity: var(--orbit-opacity); "
+                        + "z-index: var(--orbit-z-index); will-change: auto;"));
     }
 
     @Test
@@ -143,17 +146,19 @@ class HomePageTemplateContractTest {
             throws IOException {
         String template = resource("templates/index.html");
         String entry = resource("static/js/home-quant-planet.js");
+        String runtime = resource("static/js/home-quant-planet-runtime.js");
+        String orchestration = entry + "\n" + runtime;
 
         assertTrue(template.contains("/js/home-quant-planet.js"));
         assertTrue(entry.contains("./home-quant-planet-motion.js"));
         assertTrue(entry.contains("./home-quant-planet-scene.js"));
-        assertTrue(entry.contains("createPageLifecycle"));
-        assertTrue(entry.contains("visibilitychange"));
-        assertTrue(entry.contains("pageshow"));
+        assertTrue(orchestration.contains("createPageLifecycle"));
+        assertTrue(orchestration.contains("visibilitychange"));
+        assertTrue(orchestration.contains("pageshow"));
         assertTrue(entry.contains("prefers-reduced-motion: reduce"));
         assertTrue(entry.contains("\"[::1]\""));
-        assertFalse(entry.contains("setInterval"));
-        assertFalse(entry.contains("fetch("));
+        assertFalse(orchestration.contains("setInterval"));
+        assertFalse(orchestration.contains("fetch("));
         assertFalse(new ClassPathResource("static/css/home-observatory.css").exists());
         assertFalse(new ClassPathResource("static/js/home-observatory.js").exists());
         assertFalse(new ClassPathResource("static/js/home-observatory-motion.js").exists());
@@ -164,21 +169,24 @@ class HomePageTemplateContractTest {
     @Test
     void homepageCoordinatesFullscreenOrbitRuntime() throws IOException {
         String entry = resource("static/js/home-quant-planet.js");
+        String runtime = resource("static/js/home-quant-planet-runtime.js");
+        String orchestration = entry + "\n" + runtime;
 
-        assertTrue(entry.contains("./home-quant-planet-input.js"));
-        assertTrue(entry.contains("createIntroState"));
-        assertTrue(entry.contains("createNavigationRingState"));
-        assertTrue(entry.contains("createOrbitInputController"));
-        assertTrue(entry.contains("webglcontextlost"));
-        assertTrue(entry.contains("4000"));
-        assertTrue(entry.contains("visibilitychange"));
-        assertTrue(entry.contains("pagehide"));
-        assertTrue(entry.contains("pageshow"));
-        assertFalse(entry.contains("createScrollController"));
-        assertFalse(entry.contains("normalizeScrollProgress"));
-        assertFalse(entry.contains("IntersectionObserver"));
-        assertFalse(entry.contains("setInterval"));
-        assertFalse(entry.contains("fetch("));
+        assertTrue(entry.contains("./home-quant-planet-runtime.js"));
+        assertTrue(runtime.contains("./home-quant-planet-input.js"));
+        assertTrue(orchestration.contains("createIntroState"));
+        assertTrue(orchestration.contains("createNavigationRingState"));
+        assertTrue(orchestration.contains("createOrbitInputController"));
+        assertTrue(orchestration.contains("webglcontextlost"));
+        assertTrue(orchestration.contains("4000"));
+        assertTrue(orchestration.contains("visibilitychange"));
+        assertTrue(orchestration.contains("pagehide"));
+        assertTrue(orchestration.contains("pageshow"));
+        assertFalse(orchestration.contains("createScrollController"));
+        assertFalse(orchestration.contains("normalizeScrollProgress"));
+        assertFalse(orchestration.contains("IntersectionObserver"));
+        assertFalse(orchestration.contains("setInterval"));
+        assertFalse(orchestration.contains("fetch("));
         assertFalse(new ClassPathResource(
                 "static/js/home-quant-planet-scroll.js").exists());
     }

@@ -21,7 +21,9 @@ export function createOrbitInputController({
     let dragging = false;
     let focused = false;
     let hovered = false;
+    let pressed = false;
     let pointer = { x: 0, y: 0 };
+    let pressedPointerId = null;
     let startX = 0;
     let startAngle = 0;
 
@@ -32,9 +34,10 @@ export function createOrbitInputController({
             dragging,
             focused,
             hovered,
+            pressed,
             pointer: { ...pointer },
-            paused: dragging || focused || hovered,
-            snapToSelected: focused || hovered
+            paused: dragging || focused || hovered || pressed,
+            snapToSelected: focused || hovered || pressed
         };
     }
 
@@ -68,7 +71,12 @@ export function createOrbitInputController({
     }
 
     function handlePointerDown(event) {
-        if (event?.button !== 0 || isProductLink(event.target)) {
+        if (
+            event?.isPrimary !== true
+            || event.button !== 0
+            || activePointerId !== null
+            || isProductLink(event.target)
+        ) {
             return;
         }
         activePointerId = event.pointerId;
@@ -96,12 +104,37 @@ export function createOrbitInputController({
     }
 
     function finishPointer(event) {
+        finishPress(event);
         if (!dragging || event?.pointerId !== activePointerId) {
             return;
         }
         releasePointer(activePointerId);
         activePointerId = null;
         dragging = false;
+        notify();
+    }
+
+    function handlePress(index, event) {
+        if (
+            event?.isPrimary !== true
+            || event.button !== 0
+            || pressedPointerId !== null
+            || activePointerId !== null
+        ) {
+            return;
+        }
+        selectedIndex = index;
+        pressed = true;
+        pressedPointerId = event.pointerId;
+        notify();
+    }
+
+    function finishPress(event) {
+        if (!pressed || event?.pointerId !== pressedPointerId) {
+            return;
+        }
+        pressed = false;
+        pressedPointerId = null;
         notify();
     }
 
@@ -159,6 +192,9 @@ export function createOrbitInputController({
             listen(link, "blur", handleBlur);
             listen(link, "pointerenter", () => handlePointerEnter(index));
             listen(link, "pointerleave", handlePointerLeave);
+            listen(link, "pointerdown", (event) => handlePress(index, event));
+            listen(link, "pointerup", finishPress);
+            listen(link, "pointercancel", finishPress);
             listen(link, "keydown", (event) => handleKeyDown(index, event));
         });
         notify();
@@ -170,6 +206,8 @@ export function createOrbitInputController({
         }
         activePointerId = null;
         dragging = false;
+        pressed = false;
+        pressedPointerId = null;
         connected = false;
         listeners.splice(0).forEach((remove) => remove());
     }
