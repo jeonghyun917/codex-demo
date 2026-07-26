@@ -150,6 +150,15 @@ const FACE_COLOR = 0xf2efe4;
 const SIDE_COLOR = 0x778279;
 const ALPHA_THRESHOLD = 32;
 const ZERO_POINTER = Object.freeze({ x: 0, y: 0 });
+const SWEEP_IMPULSE_PER_POINTER_UNIT = 44;
+const SWEEP_IMPULSE_PITCH_RATIO = .22;
+const SWEEP_IMPULSE_ROLL_RATIO = .18;
+const SWEEP_FALLOFF = 4;
+const REST_SPRING_PER_SECOND = 8;
+const MAX_POINTER_VELOCITY = 50;
+const MAX_TRANSLATION_X = .18;
+const MAX_TRANSLATION_Y = .18;
+const MAX_TRANSLATION_Z = .12;
 
 function createShape(THREE, record) {
     const shape = new THREE.Shape();
@@ -179,6 +188,42 @@ function clamp(value, minimum, maximum) {
 function damp(current, target, responseSpeed, deltaSeconds) {
     const alpha = 1 - Math.exp(-responseSpeed * deltaSeconds);
     return current + (target - current) * alpha;
+}
+
+function integrateRestSpring(state, offsetKey, velocityKey, deltaSeconds) {
+    if (deltaSeconds === 0) {
+        return;
+    }
+    const offset = state[offsetKey];
+    const velocity = state[velocityKey];
+    const springTerm = velocity + REST_SPRING_PER_SECOND * offset;
+    const decay = Math.exp(-REST_SPRING_PER_SECOND * deltaSeconds);
+    state[offsetKey] = (
+        offset + springTerm * deltaSeconds
+    ) * decay;
+    state[velocityKey] = (
+        velocity - REST_SPRING_PER_SECOND * springTerm * deltaSeconds
+    ) * decay;
+}
+
+function distanceToPointerSegmentSquared(anchorX, anchorY,
+        startX, startY, endX, endY) {
+    const segmentX = endX - startX;
+    const segmentY = endY - startY;
+    const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+    const projection = lengthSquared === 0
+        ? 0
+        : clamp(
+            ((anchorX - startX) * segmentX
+                + (anchorY - startY) * segmentY) / lengthSquared,
+            0,
+            1
+        );
+    const nearestX = startX + segmentX * projection;
+    const nearestY = startY + segmentY * projection;
+    const distanceX = anchorX - nearestX;
+    const distanceY = anchorY - nearestY;
+    return distanceX * distanceX + distanceY * distanceY;
 }
 
 function dampSineWave(current, target, amplitude, phaseSpeed,
@@ -334,9 +379,13 @@ export async function createQuantGlyphRig(THREE, {
     const materials = new Set();
     const textures = new Set();
     const pivots = [];
+    const motionStates = [];
     let disposed = false;
     let previousElapsedMs = 0;
     let phaseElapsedSeconds = 0;
+    let previousPointerX = 0;
+    let previousPointerY = 0;
+    let hasPreviousPointer = false;
     let titleProgress = 1;
     let layoutScale = 1;
     let centerX = 0;
@@ -516,6 +565,17 @@ export async function createQuantGlyphRig(THREE, {
             pivot.add(mesh, outline, overlay);
             group.add(pivot);
             pivots.push(pivot);
+            motionStates.push({
+                basePitch: profile.restPitch,
+                baseYaw: profile.restYaw,
+                baseRoll: profile.restRoll,
+                pitchOffset: 0,
+                yawOffset: 0,
+                rollOffset: 0,
+                pitchVelocity: 0,
+                yawVelocity: 0,
+                rollVelocity: 0
+            });
         });
         const layoutBounds = new THREE.Box3().setFromObject(group);
         const localLayoutWidth = Math.max(
@@ -561,9 +621,13 @@ export async function createQuantGlyphRig(THREE, {
                 return;
             }
             const elapsed = Math.max(0, finiteOr(Number(elapsedMs), 0));
+            const rawDeltaSeconds = Math.max(
+                0,
+                elapsed - previousElapsedMs
+            ) / 1000;
             const deltaSeconds = Math.min(
                 .05,
-                Math.max(0, elapsed - previousElapsedMs) / 1000
+                rawDeltaSeconds
             );
             previousElapsedMs = elapsed;
             const previousPhaseSeconds = phaseElapsedSeconds;
@@ -578,12 +642,39 @@ export async function createQuantGlyphRig(THREE, {
                 Math.abs(pointerX),
                 Math.abs(pointerY)
             );
+            const hasPointerVelocity = hasPreviousPointer
+                && rawDeltaSeconds > 0
+                && pointerMagnitude > 0;
+            const pointerVelocityX = hasPointerVelocity
+                ? clamp(
+                    (pointerX - previousPointerX) / rawDeltaSeconds,
+                    -MAX_POINTER_VELOCITY,
+                    MAX_POINTER_VELOCITY
+                )
+                : 0;
+            const pointerVelocityY = hasPointerVelocity
+                ? clamp(
+                    (pointerY - previousPointerY) / rawDeltaSeconds,
+                    -MAX_POINTER_VELOCITY,
+                    MAX_POINTER_VELOCITY
+                )
+                : 0;
 
             for (let index = 0; index < pivots.length; index += 1) {
                 const pivot = pivots[index];
                 const profile = pivot.userData.profile;
                 const anchor = pivot.userData.layoutAnchor;
+                const motion = motionStates[index];
                 if (reduceMotion) {
+                    motion.basePitch = profile.restPitch;
+                    motion.baseYaw = profile.restYaw;
+                    motion.baseRoll = profile.restRoll;
+                    motion.pitchOffset = 0;
+                    motion.yawOffset = 0;
+                    motion.rollOffset = 0;
+                    motion.pitchVelocity = 0;
+                    motion.yawVelocity = 0;
+                    motion.rollVelocity = 0;
                     pivot.rotation.x = profile.restPitch;
                     pivot.rotation.y = profile.restYaw;
                     pivot.rotation.z = profile.restRoll;
@@ -632,17 +723,26 @@ export async function createQuantGlyphRig(THREE, {
                     -profile.rotationLimitRoll,
                     profile.rotationLimitRoll
                 );
-                const positionXTarget = anchor.x + localX
-                    * profile.translateXFromX + localY
-                    * profile.translateXFromY;
-                const positionYTarget = anchor.y + localX
-                    * profile.translateYFromX + localY
-                    * profile.translateYFromY;
-                const positionZTarget = anchor.z + localX
-                    * profile.translateZFromX + localY
-                    * profile.translateZFromY;
-                pivot.rotation.y = clamp(dampSineWave(
-                    pivot.rotation.y,
+                const positionXTarget = anchor.x + clamp(
+                    localX * profile.translateXFromX
+                        + localY * profile.translateXFromY,
+                    -MAX_TRANSLATION_X,
+                    MAX_TRANSLATION_X
+                );
+                const positionYTarget = anchor.y + clamp(
+                    localX * profile.translateYFromX
+                        + localY * profile.translateYFromY,
+                    -MAX_TRANSLATION_Y,
+                    MAX_TRANSLATION_Y
+                );
+                const positionZTarget = anchor.z + clamp(
+                    localX * profile.translateZFromX
+                        + localY * profile.translateZFromY,
+                    -MAX_TRANSLATION_Z,
+                    MAX_TRANSLATION_Z
+                );
+                motion.baseYaw = clamp(dampSineWave(
+                    motion.baseYaw,
                     yawTarget,
                     yawAmplitude,
                     profile.phaseSpeed,
@@ -651,17 +751,80 @@ export async function createQuantGlyphRig(THREE, {
                     phaseElapsedSeconds,
                     responseSpeed
                 ), -profile.rotationLimitYaw, profile.rotationLimitYaw);
-                pivot.rotation.x = damp(
-                    pivot.rotation.x,
+                motion.basePitch = damp(
+                    motion.basePitch,
                     pitchTarget,
                     responseSpeed,
                     deltaSeconds
                 );
-                pivot.rotation.z = damp(
-                    pivot.rotation.z,
+                motion.baseRoll = damp(
+                    motion.baseRoll,
                     rollTarget,
                     responseSpeed,
                     deltaSeconds
+                );
+                if (hasPointerVelocity) {
+                    const distanceSquared = distanceToPointerSegmentSquared(
+                        anchor.normalizedX,
+                        anchor.normalizedY,
+                        previousPointerX,
+                        -previousPointerY,
+                        pointerX,
+                        -pointerY
+                    );
+                    const sweepInfluence = Math.exp(
+                        -distanceSquared * SWEEP_FALLOFF
+                    );
+                    const velocityX = pointerVelocityX;
+                    const velocityY = -pointerVelocityY;
+                    const impulseSeconds = deltaSeconds
+                        * SWEEP_IMPULSE_PER_POINTER_UNIT
+                        * sweepInfluence;
+                    motion.yawVelocity += (
+                        velocityX * profile.yawFromX
+                        + velocityY * profile.yawFromY
+                    ) * impulseSeconds;
+                    motion.pitchVelocity += (
+                        velocityX * profile.pitchFromX
+                        + velocityY * profile.pitchFromY
+                    ) * impulseSeconds * SWEEP_IMPULSE_PITCH_RATIO;
+                    motion.rollVelocity += (
+                        velocityX * profile.rollFromX
+                        + velocityY * profile.rollFromY
+                    ) * impulseSeconds * SWEEP_IMPULSE_ROLL_RATIO;
+                }
+                integrateRestSpring(
+                    motion,
+                    "pitchOffset",
+                    "pitchVelocity",
+                    deltaSeconds
+                );
+                integrateRestSpring(
+                    motion,
+                    "yawOffset",
+                    "yawVelocity",
+                    deltaSeconds
+                );
+                integrateRestSpring(
+                    motion,
+                    "rollOffset",
+                    "rollVelocity",
+                    deltaSeconds
+                );
+                pivot.rotation.x = clamp(
+                    motion.basePitch + motion.pitchOffset,
+                    -profile.rotationLimitPitch,
+                    profile.rotationLimitPitch
+                );
+                pivot.rotation.y = clamp(
+                    motion.baseYaw + motion.yawOffset,
+                    -profile.rotationLimitYaw,
+                    profile.rotationLimitYaw
+                );
+                pivot.rotation.z = clamp(
+                    motion.baseRoll + motion.rollOffset,
+                    -profile.rotationLimitRoll,
+                    profile.rotationLimitRoll
                 );
                 pivot.position.x = damp(
                     pivot.position.x,
@@ -682,6 +845,9 @@ export async function createQuantGlyphRig(THREE, {
                     deltaSeconds
                 );
             }
+            previousPointerX = pointerX;
+            previousPointerY = pointerY;
+            hasPreviousPointer = true;
 
             titleProgress = reduceMotion
                 ? 1

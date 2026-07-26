@@ -77,6 +77,29 @@ function assertNear(actual, expected, tolerance = 1e-12) {
     );
 }
 
+function restQuaternion(pivot) {
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        pivot.userData.restPitch,
+        pivot.userData.restYaw,
+        pivot.userData.restRoll,
+        pivot.rotation.order
+    ));
+}
+
+function restAngle(pivot) {
+    return pivot.quaternion.angleTo(restQuaternion(pivot));
+}
+
+function assertRestPose(pivot, tolerance = 1e-12) {
+    const anchor = pivot.userData.layoutAnchor;
+    assertNear(pivot.rotation.x, pivot.userData.restPitch, tolerance);
+    assertNear(pivot.rotation.y, pivot.userData.restYaw, tolerance);
+    assertNear(pivot.rotation.z, pivot.userData.restRoll, tolerance);
+    assertNear(pivot.position.x, anchor.x, tolerance);
+    assertNear(pivot.position.y, anchor.y, tolerance);
+    assertNear(pivot.position.z, anchor.z, tolerance);
+}
+
 function renderedWidth(group) {
     group.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(group);
@@ -319,20 +342,32 @@ test("articulates nine distinct glyph poses across direct and cross axes",
         Math.abs(pivot.position.x - anchors[index].x) > .01));
     assert.ok(pivots.some((pivot, index) =>
         Math.abs(pivot.position.y - anchors[index].y) > .01));
+    assert.ok(pivots.some((pivot) =>
+        Math.abs(
+            pivot.position.z - pivot.userData.layoutAnchor.z
+        ) > .01));
 
-    const crossAxisRig = await createRig(t);
-    advanceRig(crossAxisRig, { x: 0, y: pointer.y });
-    const crossAxisPivots = glyphPivots(crossAxisRig.group);
-    assert.ok(crossAxisPivots.filter((pivot) =>
-        Math.abs(pivot.rotation.y - pivot.userData.restYaw) > .05
-    ).length >= 3);
+    const crossUpRig = await createRig(t);
+    const crossDownRig = await createRig(t);
+    advanceRig(crossUpRig, { x: 0, y: -.7 });
+    advanceRig(crossDownRig, { x: 0, y: .7 });
+    const crossUpCenter = glyphPivots(crossUpRig.group)[4];
+    const crossDownCenter = glyphPivots(crossDownRig.group)[4];
+    assert.ok(
+        Math.abs(crossUpCenter.rotation.y - crossDownCenter.rotation.y) > .05
+    );
 
-    const directAxisRig = await createRig(t);
-    advanceRig(directAxisRig, { x: pointer.x, y: 0 });
-    const directAxisPivots = glyphPivots(directAxisRig.group);
-    assert.ok(directAxisPivots.filter((pivot) =>
-        Math.abs(pivot.rotation.x - pivot.userData.restPitch) > .05
-    ).length >= 3);
+    const directLeftRig = await createRig(t);
+    const directRightRig = await createRig(t);
+    advanceRig(directLeftRig, { x: -.9, y: 0 });
+    advanceRig(directRightRig, { x: .9, y: 0 });
+    const directLeftCenter = glyphPivots(directLeftRig.group)[4];
+    const directRightCenter = glyphPivots(directRightRig.group)[4];
+    assert.ok(
+        Math.abs(
+            directLeftCenter.rotation.x - directRightCenter.rotation.x
+        ) > .05
+    );
 });
 
 test("weights glyph articulation by each anchor's local pointer distance",
@@ -423,15 +458,88 @@ test("reduced motion restores all glyphs to authored rest poses", async (t) => {
         titleProgress: .2,
         reduceMotion: true
     });
-    glyphPivots(rig.group).forEach((pivot) => {
-        assert.equal(pivot.rotation.x, pivot.userData.restPitch);
-        assert.equal(pivot.rotation.y, pivot.userData.restYaw);
-        assert.equal(pivot.rotation.z, pivot.userData.restRoll);
-        assert.equal(pivot.position.x, pivot.userData.layoutAnchor.x);
-        assert.equal(pivot.position.y, pivot.userData.layoutAnchor.y);
-        assert.equal(pivot.position.z, pivot.userData.layoutAnchor.z);
+    glyphPivots(rig.group).forEach((pivot) => assertRestPose(pivot));
+    rig.update({
+        pointer: { x: 0, y: 0 },
+        elapsedMs: 150,
+        titleProgress: 1,
+        reduceMotion: false
     });
+    glyphPivots(rig.group).forEach((pivot) => assertRestPose(pivot));
     assert.equal(rig.group.visible, true);
+});
+
+test("center return settles all six pose components to authored rest",
+        async (t) => {
+    const rig = await createRig(t);
+    advanceRig(rig, { x: .9, y: -.7 }, 500);
+    for (let elapsedMs = 550; elapsedMs <= 2500; elapsedMs += 50) {
+        rig.update({
+            pointer: { x: 0, y: 0 },
+            elapsedMs,
+            titleProgress: 1,
+            reduceMotion: false
+        });
+    }
+
+    glyphPivots(rig.group).forEach((pivot) =>
+        assertRestPose(pivot, 5e-5));
+});
+
+test("fast top-row sweep flips one nearby glyph without flipping the grid",
+        async (t) => {
+    const rig = await createRig(t);
+    const sweep = [
+        { elapsedMs: 0, pointer: { x: -1, y: -1 } },
+        { elapsedMs: 20, pointer: { x: 0, y: -1 } },
+        { elapsedMs: 40, pointer: { x: 1, y: -1 } },
+        { elapsedMs: 80, pointer: { x: 0, y: 0 } }
+    ];
+    const pivots = glyphPivots(rig.group);
+    const peakAngles = Array(9).fill(0);
+    const recordAngles = () => pivots.forEach((pivot, index) => {
+        peakAngles[index] = Math.max(peakAngles[index], restAngle(pivot));
+    });
+
+    sweep.forEach((sample) => {
+        rig.update({
+            ...sample,
+            titleProgress: 1,
+            reduceMotion: false
+        });
+        recordAngles();
+    });
+    for (let elapsedMs = 120; elapsedMs <= 480; elapsedMs += 40) {
+        rig.update({
+            pointer: { x: 0, y: 0 },
+            elapsedMs,
+            titleProgress: 1,
+            reduceMotion: false
+        });
+        recordAngles();
+    }
+
+    const ninetyDegrees = 90 * Math.PI / 180;
+    const twentyFiveDegrees = 25 * Math.PI / 180;
+    assert.ok(
+        peakAngles.slice(0, 3).some((angle) => angle >= ninetyDegrees),
+        `Expected top-row peak >= 90°, got ${peakAngles.map((angle) =>
+            (angle * 180 / Math.PI).toFixed(1)).join(", ")}`
+    );
+    assert.ok(
+        peakAngles.filter((angle) => angle <= twentyFiveDegrees).length >= 6
+    );
+
+    for (let elapsedMs = 520; elapsedMs <= 1480; elapsedMs += 40) {
+        rig.update({
+            pointer: { x: 0, y: 0 },
+            elapsedMs,
+            titleProgress: 1,
+            reduceMotion: false
+        });
+    }
+    const twelveDegrees = 12 * Math.PI / 180;
+    pivots.forEach((pivot) => assert.ok(restAngle(pivot) <= twelveDegrees));
 });
 
 test("lays out and reveals the title in front of the world", async (t) => {

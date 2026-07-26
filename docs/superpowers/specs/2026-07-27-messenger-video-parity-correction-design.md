@@ -38,8 +38,12 @@ immutable response profile containing:
 
 Each glyph computes its own target pose directly from the normalized pointer.
 There is no shared target rotation and no pointer rotation on the parent group.
-The response remains frame-rate independent. Reduced motion restores all nine
-authored rest poses immediately.
+The response remains frame-rate independent. Pointer velocity adds a
+proximity-weighted angular impulse to independent per-glyph velocity state so a
+fast pass can flip one nearby glyph without flipping the complete grid.
+Independent damping and a front-facing rest spring return the objects after the
+pointer slows or leaves. Reduced motion restores all nine authored rest poses
+immediately.
 
 The movement may expose a narrow side or near-edge-on face, as the video does,
 but the grid anchors stay fixed enough that the 3-by-3 wording remains
@@ -73,6 +77,10 @@ a large undressed core face.
   from their neighbors at a diagonal pointer sample.
 - At least three glyphs expose a strong side angle at the video-calibrated
   pointer extremes.
+- A fast row sweep can push at least one nearby glyph beyond 90 degrees while
+  at least six glyphs remain within 25 degrees.
+- After pointer release, all nine glyphs return within 12 degrees of rest in
+  1.2 to 1.8 seconds.
 - Pointer return to center settles each glyph to its own rest pose.
 - Eight yaw samples at 45-degree intervals each expose dense detail from at
   least three visual categories on the front hemisphere.

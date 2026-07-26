@@ -86,29 +86,36 @@ Commit message: `feat: articulate nine independent title glyphs`.
 
 **Interfaces:**
 - Consumes: the per-glyph profiles from Task 1.
-- Produces: deterministic rest restoration with an unchanged layout parent and
-  unchanged planet pose.
+- Produces: proximity-weighted glyph velocity impulses, deterministic rest
+  restoration, an unchanged layout parent, and an unchanged planet pose.
 
 - [ ] **Step 1: Write failing invariant tests**
 
 Assert center-return settles all six pose components to each authored rest
 value, reduced motion restores the same values immediately, and two renders
 with identical `worldAngle` but opposite pointers produce an identical planet
-matrix while producing different glyph child matrices.
+matrix while producing different glyph child matrices. Add a timestamped fast
+row sweep fixture whose literal expectations require at least one nearby glyph
+to exceed 90 degrees while at least six remain within 25 degrees, followed by
+pointer release that returns all nine within 12 degrees of rest between 1.2 and
+1.8 seconds.
 
 - [ ] **Step 2: Verify RED**
 
 Run:
 `node --test src/test/js/home-quant-planet-glyphs.test.mjs src/test/js/home-quant-planet-composition.test.mjs`
 
-Expected: at least the new rest-pose assertions fail until the complete
-six-component rest model is implemented.
+Expected: the velocity sweep assertion fails because Task 1 has independent
+targets and phase damping but no pointer-velocity impulse state.
 
 - [ ] **Step 3: Complete the minimal rest and clamping behavior**
 
-Clamp every pointer input and per-axis target, use frame-rate-independent
-damping for all six pose components, and set the complete rest pose directly
-under reduced motion.
+Clamp every pointer input and per-axis target. Track normalized pointer velocity
+from timestamped updates, apply a glyph-anchor-distance falloff to angular
+impulses, integrate independent per-glyph angular velocity with frame-rate
+independent damping and a rest spring, and set the complete rest pose and
+velocity state directly under reduced motion. Pointer release must not affect
+planet yaw, camera, or the glyph parent transform.
 
 - [ ] **Step 4: Verify GREEN**
 

@@ -220,15 +220,20 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                     : null,
                 position: camera.position.clone(),
                 cameraPosition: camera.position.clone(),
+                cameraMatrix: camera.matrixWorld.elements.slice(),
                 target: camera.lookAtTarget.clone(),
                 worldScale: planet.scale.x,
                 worldQuaternion: planet.quaternion.clone(),
+                worldMatrix: planet.matrixWorld.elements.slice(),
                 glyphPosition: glyphs.position.clone(),
                 glyphScale: glyphs.scale.clone(),
+                glyphMatrix: glyphs.matrixWorld.elements.slice(),
                 glyphLayoutRadius: glyphs.userData.layoutRadius,
                 glyphDepthRadius: glyphs.userData.depthRadius,
                 glyphQuaternions: glyphs.children.map((pivot) =>
                     pivot.quaternion.toArray()),
+                glyphMatrices: glyphs.children.map((pivot) =>
+                    pivot.matrixWorld.elements.slice()),
                 siblingRigs: planet.parent === glyphs.parent
                     && planet.parent === scene,
                 projected: worldPoints.map((point) =>
@@ -439,16 +444,20 @@ test("pointer changes glyphs without changing planet or camera", async (t) => {
             frame.worldQuaternion.toArray(),
             frames[0].worldQuaternion.toArray()
         );
+        assert.deepEqual(frame.worldMatrix, frames[0].worldMatrix);
         assert.deepEqual(
             frame.cameraPosition.toArray(),
             frames[0].cameraPosition.toArray()
         );
+        assert.deepEqual(frame.cameraMatrix, frames[0].cameraMatrix);
+        assert.deepEqual(frame.glyphMatrix, frames[0].glyphMatrix);
         assert.equal(frame.glyphQuaternions.length, 9);
         assert.equal(frame.siblingRigs, true);
     });
     assert.ok(frames.slice(1).every((frame) =>
         JSON.stringify(frame.glyphQuaternions)
             !== JSON.stringify(frames[0].glyphQuaternions)));
+    assert.notDeepEqual(frames[1].glyphMatrices, frames[2].glyphMatrices);
 
     const disabled = await createTestScene(t, {
         width: 1440,
@@ -467,7 +476,7 @@ test("pointer changes glyphs without changing planet or camera", async (t) => {
     );
 });
 
-test("balanced mobile touch moves all glyphs and release returns them toward rest",
+test("balanced mobile touch settles all glyphs 1.45s after release",
         async (t) => {
     const width = 390;
     const height = 844;
@@ -540,25 +549,35 @@ test("balanced mobile touch moves all glyphs and release returns them toward res
         touching: false
     });
     renderTouchState(100);
+    for (let elapsedMs = 150; elapsedMs <= 1500; elapsedMs += 50) {
+        renderTouchState(elapsedMs);
+    }
 
-    const [rest, moved, released] = scene.frames.slice(-3);
+    const rest = scene.frames[0];
+    const moved = scene.frames[1];
+    const settled = scene.frames.at(-1);
     const rotations = (frame) => frame.glyphQuaternions.map(
         (values) => new THREE.Quaternion(...values)
     );
     const restRotations = rotations(rest);
     const movedRotations = rotations(moved);
-    const releasedRotations = rotations(released);
+    const settledRotations = rotations(settled);
+    const twelveDegrees = 12 * Math.PI / 180;
 
     assert.equal(profile.name, "balanced");
     assert.equal(restRotations.length, 9);
     movedRotations.forEach((rotation, index) => {
         const movedFromRest = rotation.angleTo(restRotations[index]);
-        const releasedFromRest = releasedRotations[index]
+        const settledFromRest = settledRotations[index]
             .angleTo(restRotations[index]);
         assert.ok(movedFromRest > 1e-6);
-        assert.ok(releasedFromRest < movedFromRest);
+        assert.ok(
+            settledFromRest <= twelveDegrees,
+            `Glyph ${index + 1} moved ${movedFromRest}, `
+                + `settled ${settledFromRest}`
+        );
     });
-    [moved, released].forEach((frame) => {
+    [moved, settled].forEach((frame) => {
         assert.deepEqual(
             frame.worldQuaternion.toArray(),
             rest.worldQuaternion.toArray()
@@ -567,6 +586,7 @@ test("balanced mobile touch moves all glyphs and release returns them toward res
             frame.cameraPosition.toArray(),
             rest.cameraPosition.toArray()
         );
+        assert.deepEqual(frame.glyphMatrix, rest.glyphMatrix);
     });
 });
 
