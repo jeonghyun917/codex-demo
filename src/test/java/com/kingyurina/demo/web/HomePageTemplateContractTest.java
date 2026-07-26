@@ -47,6 +47,30 @@ class HomePageTemplateContractTest {
         assertTrue(image.getWidth() >= 900);
         assertTrue(image.getHeight() >= 700);
         assertTrue(image.getColorModel().hasAlpha());
+        assertEquals(0, image.getRGB(0, 0) >>> 24);
+        assertEquals(0, image.getRGB(image.getWidth() - 1, 0) >>> 24);
+        assertEquals(0, image.getRGB(0, image.getHeight() - 1) >>> 24);
+        assertEquals(
+                0,
+                image.getRGB(
+                        image.getWidth() - 1,
+                        image.getHeight() - 1) >>> 24);
+
+        long transparentPixels = 0;
+        long visiblePixels = 0;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int alpha = image.getRGB(x, y) >>> 24;
+                if (alpha == 0) {
+                    transparentPixels++;
+                } else {
+                    visiblePixels++;
+                }
+            }
+        }
+        long totalPixels = (long) image.getWidth() * image.getHeight();
+        assertTrue(transparentPixels > totalPixels / 10);
+        assertTrue(visiblePixels > totalPixels / 10);
     }
 
     @Test
