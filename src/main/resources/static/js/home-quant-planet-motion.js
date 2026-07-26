@@ -1,4 +1,9 @@
-import { REFERENCE_TIMING } from "./home-quant-planet-composition.js";
+import {
+    REFERENCE_TIMING,
+    wrapIndex
+} from "./home-quant-planet-composition.js";
+
+export { wrapIndex };
 
 export function clampUnit(value) {
     return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
@@ -62,11 +67,6 @@ export function selectPlanetQualityProfile(environment = {}) {
         pointerEnabled: true, shadows: true, outlineLevel: 2,
         foliageCount: 34, cloudCount: 8, planetScale: 1
     };
-}
-
-export function wrapIndex(index, count = 6) {
-    const length = Math.max(1, Math.trunc(Number(count)) || 1);
-    return ((Math.trunc(Number(index)) || 0) % length + length) % length;
 }
 
 export function advanceRingAngle(

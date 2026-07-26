@@ -1,9 +1,12 @@
-import { wrapIndex } from "./home-quant-planet-motion.js";
-
 const TAU = Math.PI * 2;
 const radians = (degrees) => degrees * Math.PI / 180;
 const clamp = (value, minimum, maximum) =>
     Math.min(Math.max(Number(value) || 0, minimum), maximum);
+
+export function wrapIndex(index, count = 6) {
+    const length = Math.max(1, Math.trunc(Number(count)) || 1);
+    return ((Math.trunc(Number(index)) || 0) % length + length) % length;
+}
 
 export const PRODUCT_SCENES = Object.freeze([
     Object.freeze({
