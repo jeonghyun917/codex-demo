@@ -173,3 +173,70 @@ each axis at 75% of the corresponding authored foliage placement scale.
 
 The root reviewer must make the final live browser visual and canvas-diagnostic
 decision against the supplied video.
+
+## Fix round 4: Macro-detail panorama replacement
+
+### RED
+
+The browser review found that the v1 panorama's micro-detail and hatching
+collapsed into muddy brown noise on the live 400–600px sphere. The existing
+browser-capable loader contract was changed first to require the exact local
+`/images/quant-planet-panorama-v2.png` URL.
+
+```text
+node --test src/test/js/home-quant-planet-world.test.mjs
+```
+
+RED result: 20 passing, 1 failing. The sole failure reported the production
+loader's actual v1 URL against the required v2 URL.
+
+### GREEN
+
+- Switched the one production panorama constant to the v2 local URL.
+- Removed the superseded v1 bitmap and retained no v1 runtime or test-source
+  references.
+- Added the 1,774×887, 24-bit RGB v2 PNG (2:1 equirectangular ratio;
+  2,551,357 bytes).
+- No glyph motion, world topology, material, instance, draw-call, or triangle
+  code changed.
+
+Focused GREEN:
+
+```text
+node --test src/test/js/home-quant-planet-world.test.mjs
+```
+
+Result: 21 passing, 0 failing.
+
+### Asset/tool and prompt provenance
+
+The v2 bitmap was generated with Codex's built-in `image_gen.imagegen` tool.
+No external model name was surfaced. Exact prompt:
+
+```text
+Use case: stylized-concept
+Asset type: seamless equirectangular sphere texture for a 400–600px real-time Three.js miniature planet
+Primary request: Create an original simplified cel-animation miniature world panorama that stays crisp and readable when wrapped around a small rotating sphere. Use only 25–35 large landmarks; every shape must remain recognizable at thumbnail size.
+Scene/backdrop: edge-to-edge seamless 360-degree equirectangular world surface, no sky, no horizon, no frame. Left and right edges must tile.
+Subject: large crooked cream houses with thick charcoal outlines, broad pale stone cliff plates with a few contour lines, wide turquoise water channels, chunky forest-green canopy clusters, one or two large rust-orange industrial engines and pipe networks per region, strong bridges, antennas, a summit pavilion, and scattered large rock fragments. Distribute these bold landmarks evenly through every longitude; no empty field.
+Style/medium: flat hand-drawn cel animation background, bold graphite outlines, simplified graphic shapes, large color blocks, very limited internal hatching, high silhouette clarity, sophisticated animated-film art direction. Not isometric city concept art; not photorealistic; not noisy.
+Composition/framing: true 2:1 equirectangular texture. Use large macro forms, few objects, broad paths and water shapes. Avoid tiny repeated windows, micro-buildings, fine paper grain, and dense brown line noise.
+Lighting/mood: bright diffuse flat cel light, high readability.
+Color palette: dominant turquoise water and soft green land, cream buildings and pale gray-beige cliffs, dark forest green, saturated rust orange-red machinery, charcoal ink, small yellow accents. Keep tan/brown below 20% of the image. No broad olive blank areas.
+Constraints: no text, no letters, no UI, no people, no character, no logo, no watermark, no sky, no outer space, no border lines, no empty zones, no tiny detail, no photographic texture, seamless horizontal tiling.
+```
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| World GREEN | `node --test src/test/js/home-quant-planet-world.test.mjs`: 21 passing, 0 failing |
+| Renderer budget | `node --test src/test/js/home-quant-planet-composition.test.mjs`: 13 passing, 0 failing; renderer-real budget contract passed |
+| Full Node regression | `node --test src/test/js/*.test.mjs`: 107 passing, 0 failing |
+| Maven verification | `mvn.cmd "-Dmaven.repo.local=C:\dev\codex-demo\.m2\repository" test`: 38 tests, 0 failures/errors/skips, `BUILD SUCCESS` |
+| v1 reference audit | No v1 reference remains under `src/main` or `src/test`; only this report's historical round-2 record names the superseded draft |
+
+The preview was not restarted for this asset-only URL replacement. The root
+reviewer must make the final live 400–600px macro-detail comparison at several
+autonomous yaw timestamps before accepting Task 4 visually. Port 8080 was not
+modified.

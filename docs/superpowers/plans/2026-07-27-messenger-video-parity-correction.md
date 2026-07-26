@@ -243,7 +243,8 @@ If exposed primitives still read as sparse blocks rather than the reference's
 continuous illustrated world, use the approved hybrid surface-art correction:
 
 1. add the original project asset
-   `src/main/resources/static/images/quant-planet-panorama-v1.png`;
+   `src/main/resources/static/images/quant-planet-panorama-v2.png` and do not
+   ship the superseded micro-detail `v1` draft;
 2. write a failing world test that supplies a real Three.js texture and
    requires `ReferencePlanetBody` to use it with sRGB color, horizontal repeat,
    no vertical repeat, neutral material tint, and exactly-once disposal;

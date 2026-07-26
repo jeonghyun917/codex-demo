@@ -10,7 +10,7 @@ import {
 } from "./home-quant-planet-world-layout.js";
 
 export const QUANT_PLANET_PANORAMA_URL =
-    "/images/quant-planet-panorama-v1.png";
+    "/images/quant-planet-panorama-v2.png";
 
 const COLORS = Object.freeze({
     water: 0x78d7d0,

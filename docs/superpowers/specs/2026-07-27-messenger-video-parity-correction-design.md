@@ -73,13 +73,15 @@ a large undressed core face.
 The counted placement field and protruding Three.js meshes are not sufficient
 when their gaps still reveal a uniform primitive core. The irregular rotating
 core therefore uses the locally authored
-`/images/quant-planet-panorama-v1.png` as an equirectangular color map.
+`/images/quant-planet-panorama-v2.png` as an equirectangular color map.
 
-The panorama is original Quant artwork containing continuous hand-inked houses,
-cliffs, waterways, forest, utility towers, and rust machinery at every
-longitude. It contains no text, copied brand asset, remote dependency, or
-runtime API request. The texture rotates only because it is attached to the
-autonomous `PlanetRoot`; pointer input never changes it.
+The panorama is original Quant artwork containing 25–35 large, high-contrast
+houses, cliffs, waterways, forest clusters, utility towers, and rust machinery
+distributed across every longitude. Its macro forms and restrained hatching
+remain readable when the planet is rendered at 400–600px instead of collapsing
+into brown micro-detail. It contains no text, copied brand asset, remote
+dependency, or runtime API request. The texture rotates only because it is
+attached to the autonomous `PlanetRoot`; pointer input never changes it.
 
 Three-dimensional terrain, village, shrine, industrial, utility, canopy, and
 debris meshes remain above the mapped core to provide real silhouette,

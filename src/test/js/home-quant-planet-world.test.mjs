@@ -607,7 +607,7 @@ test("uses the local panorama URL only in browser-capable worlds", () => {
         }
     });
 
-    assert.deepEqual(urls, ["/images/quant-planet-panorama-v1.png"]);
+    assert.deepEqual(urls, ["/images/quant-planet-panorama-v2.png"]);
     assert.equal(
         browserWorld.group.getObjectByName("ReferencePlanetBody").material.map,
         texture
