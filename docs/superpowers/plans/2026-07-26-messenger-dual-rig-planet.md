@@ -112,7 +112,6 @@ test("advances autonomous planet yaw independently of pointer", () => {
         left.worldAngle,
         .25 + Math.PI * 2 * 9000 / REFERENCE_HERO.worldRevolutionMs
     );
-    assert.equal("dragAngle" in left, false);
 });
 
 test("reduced motion freezes both autonomous and pointer targets", () => {
@@ -150,9 +149,10 @@ test("mouse down and drag report pointer position without a drag angle", () => {
     });
 
     const state = controller.getState();
-    assert.deepEqual(state.pointer, { x: 1, y: .5 });
-    assert.equal("dragAngle" in state, false);
-    assert.equal("dragging" in state, false);
+    assert.deepEqual(state, {
+        pointer: { x: 1, y: .5 },
+        touching: false
+    });
     assert.deepEqual(surface.captureCalls, []);
 });
 
@@ -992,24 +992,25 @@ git commit -m "feat: rebuild dense full-rotation miniature planet"
 
 - [ ] **Step 1: Write failing shell and fallback contracts**
 
-Update the Java contract:
+Update the Java contract to exercise served assets and rendered markup:
 
 ```java
-assertTrue(template.contains(
-        "class=\"reference-title reference-title--fallback\""));
-assertTrue(css.contains(
-        ".planet-webgl-ready .reference-title--fallback"));
-assertEquals(
-        "0",
-        cssDeclaration(
-                cssRule(css,
-                        ".planet-webgl-ready .reference-title--fallback"),
-                "opacity"));
-assertTrue(entry.contains("./home-quant-planet-scene.js"));
-assertTrue(scene.contains("./home-quant-planet-glyphs.js"));
-assertTrue(glyphs.contains("./home-quant-planet-glyph-contours.js"));
-assertFalse(css.contains("cursor: grab"));
-assertFalse(css.contains("cursor: grabbing"));
+HttpResponse<String> response = getBody("/");
+Document document = parseRenderedHtml(response.body());
+Element title = elementsWithAttribute(
+        document.getDocumentElement(),
+        "img",
+        "data-reference-title").getFirst();
+assertTrue(List.of(title.getAttribute("class").split("\\s+"))
+        .contains("reference-title--fallback"));
+
+for (String asset : List.of(
+        "/js/home-quant-planet-glyph-contours.js",
+        "/js/home-quant-planet-glyphs.js")) {
+    HttpResponse<byte[]> served = getBytes(asset);
+    assertEquals(200, served.statusCode());
+    assertTrue(served.body().length > 0);
+}
 ```
 
 Extend fallback SVG checks with these required IDs:
@@ -1036,7 +1037,7 @@ mvn.cmd "-Dmaven.repo.local=C:\dev\codex-demo\.m2\repository" `
   "-Dtest=HomePageTemplateContractTest" test
 ```
 
-Expected: missing fallback-only class, new module references, dense SVG IDs, and old grab cursor behavior.
+Expected: missing fallback-only class, unserved new modules, and dense SVG IDs.
 
 - [ ] **Step 3: Update template and runtime-ready title behavior**
 
@@ -1083,6 +1084,8 @@ Add:
 The image retains current responsive widths for fallback states. The WebGL
 glyph layout is camera-fitted by the scene. Keep the button at the current safe
 area, maintain `44px` minimum height, and keep all document scrolling disabled.
+Verify the computed canvas cursor and fallback-title opacity in Task 7's real
+browser pass instead of asserting CSS source text.
 
 - [ ] **Step 5: Redraw the static fallback as a dense rounded planet**
 
