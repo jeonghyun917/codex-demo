@@ -114,6 +114,7 @@ function createSceneHarness() {
 const sceneProfile = (overrides = {}) => ({
     name: "high",
     webgl: true,
+    pointerEnabled: true,
     outlineLevel: 2,
     foliageCount: 34,
     cloudCount: 8,
@@ -338,6 +339,40 @@ test("real scene adds no render-time yaw beyond the runtime world angle", async 
     const laterRotation = scene.frames.at(-1).worldQuaternion;
 
     assert.ok(initialRotation.angleTo(laterRotation) < 1e-7);
+});
+
+test("applies pointer parallax only when the capability profile enables it", async (t) => {
+    const enabled = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile: sceneProfile({ pointerEnabled: true })
+    });
+    enabled.controller.setPointer({ x: -1, y: -.5 });
+    enabled.controller.render(0);
+    const enabledLeft = enabled.frames.at(-1);
+    enabled.controller.setPointer({ x: 1, y: .5 });
+    enabled.controller.render(0);
+    const enabledRight = enabled.frames.at(-1);
+
+    assert.ok(enabledLeft.position.distanceTo(enabledRight.position) > .1);
+
+    const disabled = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile: sceneProfile({
+            name: "balanced",
+            pointerEnabled: false
+        })
+    });
+    disabled.controller.setPointer({ x: -1, y: -.5 });
+    disabled.controller.render(0);
+    const disabledLeft = disabled.frames.at(-1);
+    disabled.controller.setPointer({ x: 1, y: .5 });
+    disabled.controller.render(0);
+    const disabledRight = disabled.frames.at(-1);
+
+    assert.ok(disabledLeft.position.distanceTo(disabledRight.position) < 1e-9);
+    assert.ok(disabledLeft.target.distanceTo(disabledRight.target) < 1e-9);
 });
 
 test("composes the primary silhouette at desktop and mobile occupancy", async (t) => {

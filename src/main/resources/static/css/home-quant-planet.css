@@ -222,6 +222,7 @@ a {
     min-height: 100dvh;
     overflow: hidden;
     isolation: isolate;
+    touch-action: none;
     background:
         radial-gradient(
             circle at 50% 43%,

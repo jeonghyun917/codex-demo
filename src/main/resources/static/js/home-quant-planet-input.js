@@ -17,6 +17,7 @@ const clampDragAngle = (value) =>
 
 export function createOrbitInputController({
     surface,
+    terminalTarget = globalThis,
     links = [],
     onChange,
     onCommit,
@@ -223,6 +224,12 @@ export function createOrbitInputController({
     }
 
     function handlePointerMove(event) {
+        if (
+            (dragging && event?.pointerId !== activePointerId)
+            || (!dragging && event?.isPrimary !== true)
+        ) {
+            return;
+        }
         pointer = normalizePointer(
             event?.clientX,
             event?.clientY,
@@ -280,15 +287,17 @@ export function createOrbitInputController({
         try {
             emitCommit();
         } finally {
-            if (pointerCaptured) {
-                releasePointer(pointerId);
-            }
+            const shouldReleaseCapture = pointerCaptured
+                && event?.type !== "lostpointercapture";
             activePointerId = null;
             captureAttempted = false;
             dragging = false;
             dragDistance = 0;
             gestureTarget = null;
             pointerCaptured = false;
+            if (shouldReleaseCapture) {
+                releasePointer(pointerId);
+            }
             updateIdleResume(wasInteracting);
             notify();
         }
@@ -413,8 +422,11 @@ export function createOrbitInputController({
         listen(surface, "pointermove", handlePointerMove);
         listen(surface, "pointerup", finishPointer);
         listen(surface, "pointercancel", finishPointer);
+        listen(surface, "lostpointercapture", finishPointer);
         listen(surface, "pointerleave", handleSurfaceLeave);
         listen(surface, "click", handleSurfaceClick);
+        listen(terminalTarget, "pointerup", finishPointer);
+        listen(terminalTarget, "pointercancel", finishPointer);
         productLinks.forEach((link, index) => {
             listen(link, "focus", () => handleFocus(index));
             listen(link, "blur", handleBlur);

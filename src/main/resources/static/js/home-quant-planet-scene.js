@@ -158,7 +158,9 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
                 }
             },
             setPointer(value) {
-                const next = value || { x: 0, y: 0 };
+                const next = profile.pointerEnabled
+                    ? value || { x: 0, y: 0 }
+                    : { x: 0, y: 0 };
                 if (next.x !== pointer.x || next.y !== pointer.y) {
                     pointer = next;
                     markDirty();
