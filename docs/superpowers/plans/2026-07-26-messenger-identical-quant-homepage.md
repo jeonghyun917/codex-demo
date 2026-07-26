@@ -890,6 +890,66 @@ Do not claim pixel or motion parity when same-browser evidence is unavailable.
 
 ---
 
+### Task 7: Final Review Remediation
+
+**Files:**
+
+- Modify:
+  `src/main/resources/static/js/home-quant-planet-runtime.js`
+- Modify:
+  `src/main/resources/static/css/home-quant-planet.css`
+- Add:
+  `src/main/resources/static/img/home-quant-planet-fallback.svg`
+- Modify:
+  `src/test/js/home-quant-planet-runtime.test.mjs`
+- Modify:
+  `src/test/java/com/kingyurina/demo/web/HomePageTemplateContractTest.java`
+
+- [ ] **Step 1: Add failing final-review regressions**
+
+Add focused tests proving:
+
+- ambient world rotation remains at the frontal pose until intro state is
+  `ready`, including a scene that resolves at or after the `3999ms` deadline;
+- release produces a visible, damped render offset that decays to zero during
+  `REFERENCE_HERO.settleMs` without changing the committed `dragAngle`;
+- the static fallback uses one checked-in local illustration with explicit
+  temple, industrial, utility, canopy, water, and debris landmarks;
+- the action cannot receive pointer or keyboard focus while visually hidden,
+  while no-JavaScript markup remains visible and focusable.
+
+- [ ] **Step 2: Gate ambient time on ready**
+
+Track ambient rotation time independently of runtime wall time. Advance it only
+after the intro has reached `ready`, so late scene readiness cannot replace the
+frontal fallback with a pre-rotated world.
+
+- [ ] **Step 3: Render the release settle**
+
+Derive a bounded release impulse from the final drag delta. Apply a transient
+damped render offset for `REFERENCE_HERO.settleMs`; do not mutate the input
+controller's committed `dragAngle` and do not snap to a sector.
+
+- [ ] **Step 4: Replace the placeholder fallback**
+
+Create an original local SVG illustration derived from the repository-authored
+procedural world groups. Preserve the same world sizing token and landmark
+distribution as the live miniature. Do not use or trace reference-site assets.
+
+- [ ] **Step 5: Gate hidden action interaction**
+
+Use a runtime-owned class or state so the action is not pointer-accessible or
+keyboard-focusable before its intro phase, then restore native anchor behavior
+when the action begins. The no-JavaScript default must remain interactive.
+
+- [ ] **Step 6: Verify and commit**
+
+Run the focused runtime and template tests, all Node and Maven suites, syntax
+checks, `git diff --check`, and the static asset HTTP contract. Commit only the
+five scoped implementation/test files plus the new SVG.
+
+---
+
 ## Completion Gate
 
 Before handoff:
