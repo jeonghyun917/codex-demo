@@ -49,6 +49,28 @@ function collectMeshPoints(root) {
     return points;
 }
 
+function projectedOccupancy(root) {
+    const points = collectMeshPoints(root);
+    const bounds = new THREE.Box3().setFromPoints(points);
+    const center = bounds.getCenter(new THREE.Vector3());
+    const width = bounds.max.x - bounds.min.x;
+    const height = bounds.max.y - bounds.min.y;
+    const quadrants = new Set();
+    points.forEach((point) => {
+        if (Math.abs(point.x - center.x) < 1e-6
+                || Math.abs(point.y - center.y) < 1e-6) {
+            return;
+        }
+        quadrants.add(`${point.x < center.x ? "left" : "right"}-${
+            point.y < center.y ? "lower" : "upper"
+        }`);
+    });
+    return {
+        widthToHeight: width / height,
+        occupiedQuadrants: quadrants.size
+    };
+}
+
 test("builds every authored reference silhouette group", (t) => {
     const world = createWorld(t);
 
@@ -65,7 +87,23 @@ test("builds every authored reference silhouette group", (t) => {
     }
 });
 
-test("uses only world and drag angles for deterministic primary yaw", (t) => {
+test("populates every azimuth sector with authored landmarks", (t) => {
+    const world = createWorld(t);
+    const bins = new Set();
+    world.group.traverse((object) => {
+        if (!object.userData?.landmarkAnchor) {
+            return;
+        }
+        const angle = Math.atan2(object.position.z, object.position.x);
+        bins.add(Math.floor(
+            (angle + Math.PI) / (Math.PI * 2) * 8
+        ) % 8);
+    });
+
+    assert.deepEqual([...bins].sort(), [0, 1, 2, 3, 4, 5, 6, 7]);
+});
+
+test("uses only the world angle for deterministic primary yaw", (t) => {
     const world = createWorld(t);
     const firstPose = {
         worldAngle: .75,
@@ -81,7 +119,7 @@ test("uses only world and drag angles for deterministic primary yaw", (t) => {
     world.group.updateMatrix();
 
     assert.equal(world.group.rotation.x, 0);
-    assert.equal(world.group.rotation.y, .5);
+    assert.equal(world.group.rotation.y, .75);
     assert.equal(world.group.rotation.z, 0);
     assert.deepEqual(world.group.matrix.elements, firstMatrix.elements);
 
@@ -92,8 +130,42 @@ test("uses only world and drag angles for deterministic primary yaw", (t) => {
         pointer: { x: 1, y: -1 }
     });
     world.group.updateMatrix();
-    assert.equal(world.group.rotation.y, .5);
-    assert.deepEqual(world.group.matrix.elements, firstMatrix.elements);
+    assert.equal(world.group.rotation.y, .25);
+    assert.notDeepEqual(world.group.matrix.elements, firstMatrix.elements);
+});
+
+test("planet yaw is unaffected by pointer-shaped extra input", (t) => {
+    const world = createWorld(t);
+    world.update({
+        worldAngle: .7,
+        pointer: { x: -1, y: 1 },
+        elapsedMs: 1000,
+        reduceMotion: false
+    });
+    const first = world.group.quaternion.clone();
+    world.update({
+        worldAngle: .7,
+        pointer: { x: 1, y: -1 },
+        elapsedMs: 1100,
+        reduceMotion: false
+    });
+
+    assert.deepEqual(world.group.quaternion.toArray(), first.toArray());
+});
+
+test("keeps a rounded occupied silhouette at eight yaw samples", (t) => {
+    const world = createWorld(t);
+    for (let index = 0; index < 8; index += 1) {
+        world.update({
+            worldAngle: index * Math.PI / 4,
+            elapsedMs: index * 1000,
+            reduceMotion: false
+        });
+        const coverage = projectedOccupancy(world.group);
+        assert.ok(coverage.widthToHeight >= .72);
+        assert.ok(coverage.widthToHeight <= 1.28);
+        assert.ok(coverage.occupiedQuadrants >= 4);
+    }
 });
 
 test("animates water and utility details deterministically unless motion is reduced", (t) => {

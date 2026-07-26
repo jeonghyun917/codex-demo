@@ -373,11 +373,25 @@ test("combines renderer-real rig diagnostics within the scene budget", async (t)
     scene.controller.render(pose());
     assert.deepEqual(scene.pixelRatios, [1.5]);
     assert.deepEqual(scene.controller.getDiagnostics(), {
-        drawCalls: 72,
-        triangles: 7471,
+        drawCalls: 70,
+        triangles: 9429,
         limits: { drawCalls: 75, triangles: 140000 },
         withinBudget: true
     });
+});
+
+test("keeps high-profile shadows inside the combined call budget", async (t) => {
+    const scene = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile: sceneProfile({ shadows: true })
+    });
+
+    scene.controller.render(pose());
+    const diagnostics = scene.controller.getDiagnostics();
+    assert.ok(diagnostics.drawCalls <= 75);
+    assert.ok(diagnostics.triangles <= 140000);
+    assert.equal(diagnostics.withinBudget, true);
 });
 
 test("refits glyph layout only when the viewport changes", async (t) => {
