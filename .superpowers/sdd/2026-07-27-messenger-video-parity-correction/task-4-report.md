@@ -136,3 +136,40 @@ Code commit: `cf6108c` (`fix: map original quant planet panorama`).
 The root reviewer must perform the final browser visual comparison at multiple
 autonomous yaw timestamps. Existing static, reduced-motion, and WebGL-failure
 fallback contracts remain covered by the regression suite.
+
+## Fix round 3: Unlit panorama and subdued overlays
+
+Code commit: `1342170` (`fix: preserve panorama artwork lighting`).
+
+### RED
+
+`node --test src/test/js/home-quant-planet-world.test.mjs` produced 19
+passing and 2 failing tests after the new gate was added. The injected panorama
+was still rendered by `MeshToonMaterial`, and the village outline family was
+not transparent. The new test also decomposes actual crown matrices and caps
+each axis at 75% of the corresponding authored foliage placement scale.
+
+### GREEN and budget
+
+- A mapped `ReferencePlanetBody` now swaps only to a tracked
+  `MeshBasicMaterial` with the same panorama map, white tint, and
+  `toneMapped: false`; no-texture and loader-failure worlds keep the existing
+  toon ground fallback.
+- The BackSide village outline material is transparent with opacity `0.30` and
+  `depthWrite: false`; its geometry remains 1.035 wide.
+- Crown matrices now use 72% of each authored placement scale. Trunks and all
+  density/placement counts remain unchanged.
+- Renderer-real diagnostics remain `69` calls and `23,337` triangles, inside
+  the `75` / `140,000` budget.
+
+| Check | Result |
+| --- | --- |
+| World GREEN | `node --test src/test/js/home-quant-planet-world.test.mjs`: 21 passing, 0 failing |
+| Full Node regression | `node --test src/test/js/*.test.mjs`: 107 passing, 0 failing |
+| Maven verification | 38 tests, 0 failures/errors/skips, `BUILD SUCCESS` |
+| Replacement 8081 preview | Only the old 8081 preview was replaced. New worktree preview PID 6860 returned HTTP 200 for `/`. Port 8080 was not modified. |
+
+### Follow-up
+
+The root reviewer must make the final live browser visual and canvas-diagnostic
+decision against the supplied video.
