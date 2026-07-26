@@ -4,6 +4,9 @@ import {
     createQuantPlanetRuntime,
     resolveQuantPlanetCapabilities
 } from "../../main/resources/static/js/home-quant-planet-runtime.js";
+import {
+    REFERENCE_TIMING
+} from "../../main/resources/static/js/home-quant-planet-composition.js";
 
 const HIGH_PROFILE = {
     name: "high",
@@ -71,8 +74,10 @@ function createClassList() {
 
 function createEventTarget(extra = {}) {
     const listeners = new Map();
+    const attributes = new Map();
     return {
         ...extra,
+        dataset: extra.dataset || {},
         listeners,
         addEventListener(type, listener) {
             const group = listeners.get(type) || new Set();
@@ -88,6 +93,15 @@ function createEventTarget(extra = {}) {
         },
         listenerCount(type) {
             return listeners.get(type)?.size || 0;
+        },
+        getAttribute(name) {
+            return attributes.has(name) ? attributes.get(name) : null;
+        },
+        removeAttribute(name) {
+            attributes.delete(name);
+        },
+        setAttribute(name, value) {
+            attributes.set(name, String(value));
         }
     };
 }
@@ -159,11 +173,16 @@ function createScene() {
 
 function createInputHarness() {
     let onChange = null;
+    let onCommit = null;
     return {
         connectCalls: 0,
         destroyCalls: 0,
-        createInput({ onChange: callback }) {
-            onChange = callback;
+        createInput({
+            onChange: changeCallback,
+            onCommit: commitCallback
+        }) {
+            onChange = changeCallback;
+            onCommit = commitCallback;
             return {
                 connect: () => {
                     this.connectCalls += 1;
@@ -173,6 +192,10 @@ function createInputHarness() {
                     this.destroyCalls += 1;
                 }
             };
+        },
+        commit(selection) {
+            assert.equal(typeof onCommit, "function");
+            onCommit(selection);
         },
         emit(state) {
             onChange({
@@ -190,7 +213,8 @@ function createInputHarness() {
 function createRuntimeHarness({
     profile = HIGH_PROFILE,
     motionDisabled = profile.name === "static",
-    useRealInput = false
+    useRealInput = false,
+    MotionAPI
 } = {}) {
     const root = {
         classList: createClassList(),
@@ -216,7 +240,8 @@ function createRuntimeHarness({
     const documentTarget = createEventTarget({ hidden: false });
     const windowTarget = createEventTarget({
         innerHeight: 900,
-        innerWidth: 1440
+        innerWidth: 1440,
+        Motion: MotionAPI
     });
     const frameQueue = createFrameQueue();
     const input = createInputHarness();
@@ -384,6 +409,92 @@ test("maps missing Motion to a connected six-route static fallback", () => {
     assert.equal(harness.sceneConstructionCalls(), 0);
     assert.equal(harness.frameQueue.frames.size, 0);
     assert.equal(harness.root.classList.contains("planet-intro-ready"), true);
+});
+
+test("applies active, adjacent, and hidden title states from one selection", () => {
+    const harness = createRuntimeHarness({
+        profile: STATIC_PROFILE,
+        motionDisabled: true
+    });
+
+    harness.input.emit({
+        selectedIndex: 2,
+        focused: true,
+        paused: true,
+        snapToSelected: true
+    });
+    const links = harness.productLinks;
+
+    assert.equal(links[2].dataset.productPosition, "active");
+    assert.equal(links[1].dataset.productPosition, "previous");
+    assert.equal(links[3].dataset.productPosition, "next");
+    assert.equal(links[0].dataset.productPosition, "hidden");
+    assert.equal(links[2].getAttribute("aria-current"), "page");
+    assert.equal(links[1].getAttribute("aria-current"), null);
+    assert.equal(harness.experience.dataset.selectedProduct, "2");
+});
+
+test("uses one committed angle for title selection and world rotation", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+    const dragAngle = -Math.PI * 2 / 3;
+
+    harness.input.commit({ selectedIndex: 2, dragAngle });
+
+    assert.equal(harness.productLinks[2].dataset.productPosition, "active");
+    assert.equal(harness.experience.dataset.selectedProduct, "2");
+    assert.equal(scene.dragAngles.at(-1), dragAngle);
+    assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("advances ambient world rotation on the named reference revolution", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+
+    harness.frameQueue.runNext(0);
+    harness.frameQueue.runNext(100);
+
+    assert.ok(Math.abs(
+        scene.dragAngles.at(-1)
+        - Math.PI * 2 * 100 / REFERENCE_TIMING.worldRevolutionMs
+    ) < 1e-9);
+    assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("uses reference snap timing when Motion is available", () => {
+    const animations = [];
+    const harness = createRuntimeHarness({
+        MotionAPI: {
+            animate(element, keyframes, options) {
+                const animation = {
+                    cancelCalls: 0,
+                    cancel() {
+                        this.cancelCalls += 1;
+                    }
+                };
+                animations.push({ animation, element, keyframes, options });
+                return animation;
+            }
+        }
+    });
+
+    harness.input.commit({
+        selectedIndex: 1,
+        dragAngle: -Math.PI / 3
+    });
+
+    assert.equal(animations.length, 6);
+    assert.ok(animations.every(({ options }) =>
+        options.duration === REFERENCE_TIMING.selectionSnapMs / 1000));
+    assert.equal(harness.productLinks[1].dataset.productPosition, "active");
+
+    harness.runtime.destroy();
+    assert.ok(animations.every(({ animation }) =>
+        animation.cancelCalls === 1));
 });
 
 test("keeps reduced-motion orbit stable until explicit drag repositions it", () => {

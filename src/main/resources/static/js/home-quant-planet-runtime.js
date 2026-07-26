@@ -1,15 +1,20 @@
 import {
     advanceRingAngle,
     createIntroState,
-    createNavigationRingState,
     createPageLifecycle,
     selectPlanetQualityProfile
 } from "./home-quant-planet-motion.js";
 import {
     createOrbitInputController
 } from "./home-quant-planet-input.js";
+import {
+    createProductSelection,
+    REFERENCE_TIMING
+} from "./home-quant-planet-composition.js";
 
 const INTRO_TIMEOUT_MS = 4000;
+const MAX_SCENE_ANGLE = Math.PI * 4;
+const TAU = Math.PI * 2;
 
 export function resolveQuantPlanetCapabilities({
     forceReduced = false,
@@ -74,8 +79,10 @@ export function createQuantPlanetRuntime({
         snapToSelected: false
     };
     let ringAngle = 0;
+    let worldAngle = 0;
     let lastFrameTime = null;
     let animationRunning = false;
+    const selectionAnimations = new Set();
     let introTimedOut = false;
     let runtimeFailed = false;
     let destroyed = false;
@@ -147,6 +154,71 @@ export function createQuantPlanetRuntime({
         root.dataset.productFront = String(state.frontIndex);
     }
 
+    function applyProductSelection(selection) {
+        productLinks.forEach((link, index) => {
+            const delta = (
+                index - selection.selectedIndex + productLinks.length
+            ) % productLinks.length;
+            const position = delta === 0 ? "active"
+                : delta === 1 ? "next"
+                    : delta === productLinks.length - 1
+                        ? "previous"
+                        : "hidden";
+            link.dataset.productPosition = position;
+            if (position === "active") {
+                link.setAttribute("aria-current", "page");
+            } else {
+                link.removeAttribute("aria-current");
+            }
+        });
+        experience.dataset.selectedProduct = String(
+            selection.selectedIndex
+        );
+    }
+
+    const opacityForPosition = (position) =>
+        position === "active" ? 1
+            : position === "previous" || position === "next" ? .36 : 0;
+
+    function cancelSelectionAnimations() {
+        selectionAnimations.forEach((entry) => {
+            entry.animation?.cancel?.();
+            entry.link?.style?.removeProperty?.("opacity");
+        });
+        selectionAnimations.clear();
+    }
+
+    function animateProductSelection(previousPositions) {
+        const MotionAPI = windowTarget?.Motion;
+        if (motionDisabled || !MotionAPI?.animate) {
+            return;
+        }
+        cancelSelectionAnimations();
+        productLinks.forEach((link, index) => {
+            const animation = MotionAPI.animate(link, {
+                opacity: [
+                    opacityForPosition(previousPositions[index]),
+                    opacityForPosition(link.dataset.productPosition)
+                ]
+            }, {
+                duration: REFERENCE_TIMING.selectionSnapMs / 1000,
+                easing: "ease-out"
+            });
+            const entry = { animation, link };
+            selectionAnimations.add(entry);
+            const clearFinishedAnimation = () => {
+                if (!selectionAnimations.delete(entry)) {
+                    return;
+                }
+                link.style?.removeProperty?.("opacity");
+            };
+            animation?.finished?.then?.(
+                clearFinishedAnimation,
+                clearFinishedAnimation
+            );
+        });
+    }
+
     const initialIntroState = staticMode
         ? createIntroState({
             elapsed: 0,
@@ -180,28 +252,63 @@ export function createQuantPlanetRuntime({
     }
 
     function currentRingState() {
-        return createNavigationRingState({
+        if (inputState.snapToSelected) {
+            return createProductSelection({
+                selectedIndex: inputState.selectedIndex,
+                snap: true,
+                count: productLinks.length
+            });
+        }
+        return createProductSelection({
             rotationAngle: ringAngle,
             dragAngle: inputState.dragAngle,
-            selectedIndex: inputState.selectedIndex,
-            snapToSelected: inputState.snapToSelected,
-            itemCount: productLinks.length
+            selectedIndex: 0,
+            snap: false,
+            count: productLinks.length
         });
     }
 
     function applyCurrentRingState() {
-        applyRingState(currentRingState());
+        const selection = currentRingState();
+        applyRingState(selection);
+        applyProductSelection(selection);
+        return selection;
+    }
+
+    function currentWorldAngle() {
+        let angle = inputState.dragAngle + worldAngle;
+        while (angle > MAX_SCENE_ANGLE) {
+            angle -= TAU;
+        }
+        while (angle < -MAX_SCENE_ANGLE) {
+            angle += TAU;
+        }
+        return angle;
     }
 
     inputController = createInput({
         surface: experience,
         links: productLinks,
+        onCommit(selection) {
+            const previousPositions = productLinks.map(
+                (link) => link.dataset.productPosition
+            );
+            ringAngle = 0;
+            inputState = {
+                ...inputState,
+                dragAngle: selection.dragAngle,
+                selectedIndex: selection.selectedIndex
+            };
+            applyCurrentRingState();
+            animateProductSelection(previousPositions);
+            scene?.setDragAngle(currentWorldAngle());
+        },
         onChange(state) {
             inputState = state;
             if (!animationRunning) {
                 applyCurrentRingState();
                 scene?.setPointer(inputState.pointer);
-                scene?.setDragAngle(inputState.dragAngle);
+                scene?.setDragAngle(currentWorldAngle());
             }
         }
     });
@@ -269,6 +376,7 @@ export function createQuantPlanetRuntime({
         destroyed = true;
         animationRunning = false;
         inputController?.destroy();
+        cancelSelectionAnimations();
         disposeScene();
         documentTarget.removeEventListener(
             "visibilitychange",
@@ -320,10 +428,20 @@ export function createQuantPlanetRuntime({
             inputState.paused,
             motionDisabled
         );
+        if (!motionDisabled) {
+            const worldDelta = Math.min(
+                Math.max(Number(deltaTime) || 0, 0),
+                100
+            );
+            worldAngle = (
+                worldAngle
+                + worldDelta / REFERENCE_TIMING.worldRevolutionMs * TAU
+            ) % TAU;
+        }
         applyCurrentRingState();
 
         scene?.setPointer(inputState.pointer);
-        scene?.setDragAngle(inputState.dragAngle);
+        scene?.setDragAngle(currentWorldAngle());
         const startedRenderAt = isLoopback ? now() : 0;
         try {
             const rendered = scene?.render(frameTime) || false;
@@ -410,7 +528,7 @@ export function createQuantPlanetRuntime({
         scene.resize();
         scene.setVisible(!documentTarget.hidden);
         scene.setPointer(inputState.pointer);
-        scene.setDragAngle(inputState.dragAngle);
+        scene.setDragAngle(currentWorldAngle());
         root.classList.remove("planet-webgl-failed");
         root.classList.add("planet-webgl-ready");
     }).catch(() => {

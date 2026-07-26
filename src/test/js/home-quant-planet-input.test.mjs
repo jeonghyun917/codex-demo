@@ -3,6 +3,10 @@ import test from "node:test";
 import {
     createOrbitInputController
 } from "../../main/resources/static/js/home-quant-planet-input.js";
+import {
+    createProductSelection,
+    REFERENCE_TIMING
+} from "../../main/resources/static/js/home-quant-planet-composition.js";
 
 function createFakeTarget() {
     const listeners = new Map();
@@ -43,22 +47,65 @@ function createFocusableTarget() {
     target.focusCalls = 0;
     target.focus = () => {
         target.focusCalls += 1;
+        target.emit("focus");
     };
     return target;
 }
 
-function createController() {
+function createTimerHarness() {
+    const tasks = new Map();
+    let nextId = 0;
+    let time = 0;
+    return {
+        clearTimeoutFn(id) {
+            tasks.delete(id);
+        },
+        setTimeoutFn(callback, delay) {
+            const id = ++nextId;
+            tasks.set(id, {
+                callback,
+                dueAt: time + Math.max(0, Number(delay) || 0)
+            });
+            return id;
+        },
+        advance(milliseconds) {
+            time += milliseconds;
+            [...tasks.entries()]
+                .filter(([, task]) => task.dueAt <= time)
+                .sort((left, right) => left[1].dueAt - right[1].dueAt)
+                .forEach(([id, task]) => {
+                    if (!tasks.delete(id)) {
+                        return;
+                    }
+                    task.callback();
+                });
+        },
+        pendingCount() {
+            return tasks.size;
+        }
+    };
+}
+
+function createController(options = {}) {
     const surface = createFakeTarget();
     const links = Array.from({ length: 6 }, createFocusableTarget);
+    const commits = [];
     const states = [];
+    const timers = options.timers || createTimerHarness();
     const controller = createOrbitInputController({
         surface,
         links,
+        clearTimeoutFn: timers.clearTimeoutFn,
+        onCommit(selection) {
+            commits.push(selection);
+        },
         onChange(state) {
             states.push(state);
-        }
+        },
+        setTimeoutFn: timers.setTimeoutFn,
+        ...options
     });
-    return { controller, links, states, surface };
+    return { commits, controller, links, states, surface, timers };
 }
 
 test("captures primary-pointer drag without registering wheel behavior", () => {
@@ -106,27 +153,38 @@ test("updates bounded pointer parallax without changing the orbit outside a drag
     assert.deepEqual(controller.getState().pointer, { x: 0, y: 0 });
 });
 
-test("leaves native product-link clicks out of drag capture", () => {
+test("preserves a native product-link click when no drag occurs", () => {
     const { controller, links, surface } = createController();
     controller.connect();
+    let pointerPrevented = false;
+    let clickPrevented = false;
 
-    surface.emit("pointerdown", {
+    const pointerEvent = {
         pointerId: 8,
         isPrimary: true,
         clientX: 120,
         button: 0,
         target: links[2],
         preventDefault() {
-            assert.fail("native link activation must not be prevented");
+            pointerPrevented = true;
+        }
+    };
+    links[2].emit("pointerdown", pointerEvent);
+    surface.emit("pointerdown", pointerEvent);
+    surface.emit("pointerup", { pointerId: 8, isPrimary: true });
+    links[2].emit("click", {
+        preventDefault() {
+            clickPrevented = true;
         }
     });
 
     assert.equal(controller.getState().dragging, false);
-    assert.deepEqual(surface.captureCalls, []);
+    assert.equal(pointerPrevented, false);
+    assert.equal(clickPrevented, false);
 });
 
-test("wraps arrow-key focus through all six product links", () => {
-    const { controller, links } = createController();
+test("arrow keys wrap, promote, and focus the adjacent product title", () => {
+    const { commits, controller, links } = createController();
     controller.connect();
 
     links[5].emit("keydown", {
@@ -140,10 +198,154 @@ test("wraps arrow-key focus through all six product links", () => {
 
     assert.equal(links[0].focusCalls, 1);
     assert.equal(links[5].focusCalls, 1);
+    assert.equal(controller.getState().selectedIndex, 5);
+    assert.deepEqual(
+        commits.map((selection) => selection.selectedIndex),
+        [0, 5]
+    );
+});
+
+test("commits a horizontal primary drag to the nearest wrapped sector", () => {
+    const { commits, controller, surface } = createController();
+    controller.connect();
+
+    surface.emit("pointerdown", {
+        pointerId: 31,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    surface.emit("pointermove", {
+        pointerId: 31,
+        isPrimary: true,
+        clientX: 300,
+        clientY: 150,
+        preventDefault() {}
+    });
+    surface.emit("pointerup", { pointerId: 31, isPrimary: true });
+
+    assert.equal(commits.length, 1);
+    assert.equal(commits[0].selectedIndex, 5);
+    assert.ok(Math.abs(commits[0].dragAngle - Math.PI / 3) < 1e-9);
+    assert.equal(controller.getState().selectedIndex, 5);
+    assert.equal(controller.getState().dragAngle, commits[0].dragAngle);
+});
+
+test("keeps keyboard promotion sector-aligned at bounded drag extremes", () => {
+    const { commits, controller, links, surface } = createController();
+    controller.connect();
+    surface.emit("pointerdown", {
+        pointerId: 34,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    surface.emit("pointermove", {
+        pointerId: 34,
+        isPrimary: true,
+        clientX: 3000,
+        clientY: 150,
+        preventDefault() {}
+    });
+    surface.emit("pointerup", { pointerId: 34, isPrimary: true });
+
+    links[0].emit("keydown", {
+        key: "ArrowLeft",
+        preventDefault() {}
+    });
+    const commit = commits.at(-1);
+    const snapped = createProductSelection({
+        dragAngle: commit.dragAngle,
+        selectedIndex: 0,
+        snap: true,
+        count: 6
+    });
+
+    assert.equal(commit.selectedIndex, 5);
+    assert.equal(snapped.selectedIndex, commit.selectedIndex);
+});
+
+test("suppresses the click synthesized after dragging a product title", () => {
+    const { commits, controller, links, surface } = createController();
+    controller.connect();
+    let pointerPrevented = false;
+    let clickPrevented = false;
+    let propagationStopped = false;
+    const pointerDown = {
+        pointerId: 32,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: links[2],
+        preventDefault() {
+            pointerPrevented = true;
+        }
+    };
+
+    links[2].emit("pointerdown", pointerDown);
+    surface.emit("pointerdown", pointerDown);
+    surface.emit("pointermove", {
+        pointerId: 32,
+        isPrimary: true,
+        clientX: 300,
+        clientY: 150,
+        preventDefault() {
+            pointerPrevented = true;
+        }
+    });
+    surface.emit("pointerup", { pointerId: 32, isPrimary: true });
+    links[2].emit("click", {
+        preventDefault() {
+            clickPrevented = true;
+        },
+        stopPropagation() {
+            propagationStopped = true;
+        }
+    });
+
+    assert.equal(pointerPrevented, true);
+    assert.equal(clickPrevented, true);
+    assert.equal(propagationStopped, true);
+    assert.equal(commits.length, 1);
+});
+
+test("delays idle auto-rotation until the reference resume interval", () => {
+    const timers = createTimerHarness();
+    const { controller, links, surface } = createController({ timers });
+    controller.connect();
+
+    links[1].emit("pointerenter");
+    assert.equal(controller.getState().paused, true);
+    links[1].emit("pointerleave", { relatedTarget: null });
+    assert.equal(controller.getState().paused, true);
+    assert.equal(timers.pendingCount(), 1);
+
+    timers.advance(REFERENCE_TIMING.idleResumeMs - 1);
+    assert.equal(controller.getState().paused, true);
+    timers.advance(1);
+    assert.equal(controller.getState().paused, false);
+
+    surface.emit("pointerdown", {
+        pointerId: 33,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    assert.equal(controller.getState().paused, true);
+    surface.emit("pointerup", { pointerId: 33, isPrimary: true });
+    assert.equal(controller.getState().paused, true);
+    timers.advance(REFERENCE_TIMING.idleResumeMs);
+    assert.equal(controller.getState().paused, false);
 });
 
 test("pauses and snaps while link focus or hover remains inside the orbit", () => {
-    const { controller, links } = createController();
+    const { controller, links, timers } = createController();
     controller.connect();
 
     links[2].emit("focus");
@@ -154,6 +356,8 @@ test("pauses and snaps while link focus or hover remains inside the orbit", () =
     links[2].emit("blur", { relatedTarget: links[4] });
     assert.equal(controller.getState().paused, true);
     links[4].emit("blur", { relatedTarget: null });
+    assert.equal(controller.getState().paused, true);
+    timers.advance(REFERENCE_TIMING.idleResumeMs);
     assert.equal(controller.getState().paused, false);
 
     links[3].emit("pointerenter");
@@ -162,6 +366,8 @@ test("pauses and snaps while link focus or hover remains inside the orbit", () =
     links[3].emit("pointerleave", { relatedTarget: links[1] });
     assert.equal(controller.getState().paused, true);
     links[1].emit("pointerleave", { relatedTarget: null });
+    assert.equal(controller.getState().paused, true);
+    timers.advance(REFERENCE_TIMING.idleResumeMs);
     assert.equal(controller.getState().paused, false);
 });
 
@@ -209,6 +415,40 @@ test("capture API failures cannot strand drag state or listeners", () => {
     assert.equal(controller.getState().dragging, false);
     assert.equal(surface.listenerCount(), 0);
     assert.ok(links.every((link) => link.listenerCount() === 0));
+});
+
+test("commit callback failures still release primary-pointer ownership", () => {
+    const { controller, surface } = createController({
+        onCommit() {
+            throw new Error("commit failed");
+        }
+    });
+    controller.connect();
+    surface.emit("pointerdown", {
+        pointerId: 35,
+        isPrimary: true,
+        clientX: 100,
+        button: 0,
+        target: surface,
+        preventDefault() {}
+    });
+    surface.emit("pointermove", {
+        pointerId: 35,
+        isPrimary: true,
+        clientX: 300,
+        clientY: 150,
+        preventDefault() {}
+    });
+
+    assert.throws(
+        () => surface.emit("pointerup", {
+            pointerId: 35,
+            isPrimary: true
+        }),
+        /commit failed/
+    );
+    assert.deepEqual(surface.releaseCalls, [35]);
+    assert.equal(controller.getState().dragging, false);
 });
 
 test("keeps the active primary drag when a non-primary pointer joins", () => {
@@ -259,7 +499,7 @@ test("keeps the active primary drag when a non-primary pointer joins", () => {
 });
 
 test("pauses for a native-link press without preventing activation", () => {
-    const { controller, links, surface } = createController();
+    const { controller, links, surface, timers } = createController();
     controller.connect();
     let prevented = false;
 
@@ -281,6 +521,8 @@ test("pauses for a native-link press without preventing activation", () => {
 
     links[2].emit("pointerup", { pointerId: 13, isPrimary: true });
     assert.equal(controller.getState().pressed, false);
+    assert.equal(controller.getState().paused, true);
+    timers.advance(REFERENCE_TIMING.idleResumeMs);
     assert.equal(controller.getState().paused, false);
 
     links[4].emit("pointerdown", {
@@ -294,5 +536,6 @@ test("pauses for a native-link press without preventing activation", () => {
         isPrimary: true
     });
     assert.equal(controller.getState().pressed, false);
+    timers.advance(REFERENCE_TIMING.idleResumeMs);
     assert.equal(controller.getState().paused, false);
 });
