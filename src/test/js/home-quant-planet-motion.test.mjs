@@ -1,21 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-    REFERENCE_TIMING
+    REFERENCE_HERO
 } from "../../main/resources/static/js/home-quant-planet-composition.js";
 import {
-    advanceRingAngle,
     clampUnit,
-    createCourierLoopPose,
-    createIntroState,
-    createNavigationRingState,
-    createOrbitPose,
+    createDomMotion,
+    createHeroIntroState,
+    createHeroPose,
     createPageLifecycle,
     normalizePointer,
     resolveLocalTestOverrides,
     selectPlanetQualityProfile,
-    shouldRenderFrame,
-    wrapIndex
+    shouldRenderFrame
 } from "../../main/resources/static/js/home-quant-planet-motion.js";
 
 test("selects bounded planet quality profiles", () => {
@@ -34,168 +31,125 @@ test("selects bounded planet quality profiles", () => {
     }).pixelRatio, 1.5);
 });
 
-test("progresses the intro only after readiness and exits on timeout", () => {
+test("orders loader, world, title, and action before becoming ready", () => {
+    const loader = createHeroIntroState({
+        elapsedMs: 400,
+        sceneReady: true,
+        reduceMotion: false
+    });
+    const world = createHeroIntroState({
+        elapsedMs: 900,
+        sceneReady: true,
+        reduceMotion: false
+    });
+    const title = createHeroIntroState({
+        elapsedMs: 1400,
+        sceneReady: true,
+        reduceMotion: false
+    });
+    const action = createHeroIntroState({
+        elapsedMs: 1800,
+        sceneReady: true,
+        reduceMotion: false
+    });
+
+    assert.ok(loader.loader > 0);
     assert.deepEqual(
-        createIntroState({
-            elapsed: 300, ready: false, readyElapsed: 0,
-            timedOut: false, reduceMotion: false
-        }),
-        {
-            phase: "mark", loaderOpacity: 1, markProgress: 0.08,
-            splitProgress: 0, revealProgress: 0, worldScale: 0.88,
-            interactionReady: false
-        }
+        [loader.world, loader.title, loader.action],
+        [0, 0, 0]
     );
-    assert.equal(createIntroState({
-        elapsed: 1900, ready: true, readyElapsed: 1050,
-        timedOut: false, reduceMotion: false
-    }).phase, "ready");
-    assert.equal(createIntroState({
-        elapsed: 4000, ready: false, readyElapsed: 0,
-        timedOut: true, reduceMotion: false
-    }).interactionReady, true);
+    assert.ok(world.world > 0);
+    assert.deepEqual([world.title, world.action], [0, 0]);
+    assert.ok(title.title > 0);
+    assert.equal(title.action, 0);
+    assert.ok(action.action > 0);
+    assert.equal(action.ready, false);
 });
 
-test("fast scene readiness cannot skip the mark or overlap split and reveal", () => {
-    const earlyReady = createIntroState({
-        elapsed: 500,
-        ready: true,
-        readyElapsed: 500,
-        timedOut: false,
+test("forces the complete hero ready at the 3999ms hard deadline", () => {
+    const beforeDeadline = createHeroIntroState({
+        elapsedMs: REFERENCE_HERO.introDeadlineMs - 1,
+        sceneReady: false,
         reduceMotion: false
     });
-    assert.equal(earlyReady.phase, "mark");
-    assert.ok(earlyReady.markProgress > 0 && earlyReady.markProgress < 1);
-    assert.equal(earlyReady.splitProgress, 0);
-    assert.equal(earlyReady.revealProgress, 0);
-
-    const halfwaySplit = createIntroState({
-        elapsed: 1075,
-        ready: true,
-        readyElapsed: 1075,
-        timedOut: false,
+    const deadline = createHeroIntroState({
+        elapsedMs: REFERENCE_HERO.introDeadlineMs,
+        sceneReady: false,
         reduceMotion: false
     });
-    assert.equal(halfwaySplit.phase, "split");
-    assert.equal(halfwaySplit.markProgress, 1);
-    assert.ok(halfwaySplit.splitProgress > 0);
-    assert.ok(halfwaySplit.splitProgress < 1);
-    assert.equal(halfwaySplit.revealProgress, 0);
-    assert.ok(halfwaySplit.loaderOpacity < 1);
 
-    const reveal = createIntroState({
-        elapsed: 1575,
-        ready: true,
-        readyElapsed: 1575,
-        timedOut: false,
-        reduceMotion: false
-    });
-    assert.equal(reveal.phase, "reveal");
-    assert.equal(reveal.splitProgress, 1);
-    assert.ok(reveal.revealProgress > 0);
-});
-
-test("reduced motion resolves directly to a stable ready composition", () => {
-    assert.deepEqual(createIntroState({
-        elapsed: 20, ready: true, readyElapsed: 0,
-        timedOut: false, reduceMotion: true
-    }), {
-        phase: "ready", loaderOpacity: 0, markProgress: 1,
-        splitProgress: 1, revealProgress: 1, worldScale: 1,
-        interactionReady: true
+    assert.equal(beforeDeadline.ready, false);
+    assert.deepEqual(deadline, {
+        phase: "ready",
+        loader: 1,
+        world: 1,
+        title: 1,
+        action: 1,
+        ready: true
     });
 });
 
-test("keeps fullscreen orbit bounded under extreme input", () => {
-    const pose = createOrbitPose({
-        time: 28000, dragAngle: 100,
-        pointer: { x: 8, y: -8 }, reduceMotion: false
-    });
-    assert.ok(pose.cameraDistance >= 8.2 && pose.cameraDistance <= 9.6);
-    assert.ok(Math.abs(pose.cameraYaw) <= Math.PI * 2);
-    assert.ok(Math.abs(pose.cameraPitch) <= .34);
-    assert.ok(Math.abs(pose.planetPitch) <= .18);
-    assert.ok(Number.isFinite(pose.planetYaw));
-});
-
-test("removes orbit pointer parallax in reduced motion", () => {
-    const pointerLeft = createOrbitPose({
-        time: 14000, dragAngle: .6,
-        pointer: { x: -1, y: -1 }, reduceMotion: true
-    });
-    const pointerRight = createOrbitPose({
-        time: 14000, dragAngle: .6,
-        pointer: { x: 1, y: 1 }, reduceMotion: true
-    });
-    assert.deepEqual(pointerLeft, pointerRight);
-});
-
-test("leaves all time-based planet yaw to the runtime world-angle owner", () => {
-    const initial = createOrbitPose({
-        time: 0,
-        dragAngle: .6,
-        pointer: { x: 0, y: 0 },
-        reduceMotion: false
-    });
-    const later = createOrbitPose({
-        time: REFERENCE_TIMING.worldRevolutionMs / 2,
-        dragAngle: .6,
-        pointer: { x: 0, y: 0 },
-        reduceMotion: false
-    });
-    const reducedLater = createOrbitPose({
-        time: REFERENCE_TIMING.worldRevolutionMs / 2,
-        dragAngle: .6,
-        pointer: { x: 0, y: 0 },
+test("reduced motion resolves directly to the final static hero", () => {
+    assert.deepEqual(createHeroIntroState({
+        elapsedMs: 0,
+        sceneReady: false,
         reduceMotion: true
+    }), {
+        phase: "ready",
+        loader: 1,
+        world: 1,
+        title: 1,
+        action: 1,
+        ready: true
     });
-
-    assert.equal(initial.planetYaw, .6);
-    assert.equal(later.planetYaw, initial.planetYaw);
-    assert.equal(reducedLater.planetYaw, initial.planetYaw);
 });
 
-test("wraps six product links and brings the selected item forward", () => {
-    assert.equal(wrapIndex(-1, 6), 5);
-    assert.equal(wrapIndex(6, 6), 0);
-    const state = createNavigationRingState({
-        rotationAngle: 0, dragAngle: 0, selectedIndex: 2,
-        snapToSelected: true, itemCount: 6
+test("completes one reference world revolution in 96 seconds", () => {
+    const start = createHeroPose({
+        elapsedMs: 0,
+        worldAngle: 0,
+        dragAngle: 0,
+        pointer: { x: 0, y: 0 },
+        reduceMotion: false
     });
-    assert.equal(state.items.length, 6);
-    assert.equal(state.frontIndex, 2);
-    assert.ok(state.items[2].depth > state.items[1].depth);
-    assert.ok(state.items.every((item) =>
-        Number.isFinite(item.angle)
-        && item.opacity >= .35 && item.opacity <= 1
-        && item.scale >= .72 && item.scale <= 1.12
-    ));
-});
-
-test("advances one 28-second revolution only while unpaused", () => {
-    const advanceFrames = (paused) => Array.from({ length: 280 }).reduce(
-        (angle) => advanceRingAngle(angle, 100, paused, false), 0
-    );
-    assert.ok(Math.abs(advanceFrames(false) - Math.PI * 2) < 1e-9);
-    assert.equal(advanceFrames(true), 0);
-    assert.equal(advanceRingAngle(1, 1000, false, true), 1);
+    const end = createHeroPose({
+        elapsedMs: REFERENCE_HERO.worldRevolutionMs,
+        worldAngle: 0,
+        dragAngle: 0,
+        pointer: { x: 0, y: 0 },
+        reduceMotion: false
+    });
     assert.ok(Math.abs(
-        advanceRingAngle(0, 100, false, false) - Math.PI * 2 / 280
+        (end.worldAngle - start.worldAngle) - Math.PI * 2
     ) < 1e-9);
 });
 
-test("loops the courier through all three landmarks with authored holds", () => {
-    const observe = createCourierLoopPose(23000, false);
-    const resolve = createCourierLoopPose(7000, false);
-    const act = createCourierLoopPose(15000, false);
-    assert.ok(observe.landmarkActivity.observe > .9);
-    assert.ok(resolve.landmarkActivity.resolve > .9);
-    assert.ok(act.landmarkActivity.act > .9);
-    assert.ok(act.idleBlend > .8);
-    assert.ok([observe, resolve, act].every((pose) =>
-        pose.routeProgress >= 0 && pose.routeProgress <= 1
-        && pose.walkPhase >= 0 && pose.walkPhase <= Math.PI * 2
-    ));
+test("preserves authored and drag angles while reduced motion removes ambience and parallax", () => {
+    const pose = createHeroPose({
+        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
+        worldAngle: .25,
+        dragAngle: -.7,
+        pointer: { x: .5, y: -.25 },
+        reduceMotion: false
+    });
+    const reduced = createHeroPose({
+        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
+        worldAngle: .25,
+        dragAngle: -.7,
+        pointer: { x: .5, y: -.25 },
+        reduceMotion: true
+    });
+
+    assert.ok(Math.abs(pose.worldAngle - (.25 + Math.PI)) < 1e-9);
+    assert.equal(pose.dragAngle, -.7);
+    assert.deepEqual(pose.pointer, { x: .5, y: -.25 });
+    assert.deepEqual(reduced, {
+        worldAngle: .25,
+        dragAngle: -.7,
+        pointer: { x: 0, y: 0 },
+        elapsedMs: REFERENCE_HERO.worldRevolutionMs / 2,
+        reduceMotion: true
+    });
 });
 
 test("normalizes pointer into a finite unit range", () => {
@@ -334,4 +288,41 @@ test("does not schedule an animation frame when a static lifecycle resumes from 
 
     lifecycle.handlePageHide({ persisted: false });
     assert.equal(calls.destroy, 1);
+});
+
+test("cancels every DOM Motion animation exactly once on destroy", () => {
+    const reveal = {
+        style: {
+            opacity: "0",
+            transform: "translateY(16px)"
+        }
+    };
+    let cancelCalls = 0;
+    const motion = createDomMotion({
+        MotionAPI: {
+            animate() {
+                return {
+                    cancel() {
+                        cancelCalls += 1;
+                    }
+                };
+            }
+        },
+        root: {
+            querySelectorAll() {
+                return [reveal];
+            }
+        },
+        reduceMotion: false
+    });
+
+    assert.deepEqual(reveal.style, {
+        opacity: "1",
+        transform: "none"
+    });
+    motion.reveal(reveal);
+    motion.destroy();
+    motion.destroy();
+
+    assert.equal(cancelCalls, 1);
 });

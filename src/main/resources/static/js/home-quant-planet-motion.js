@@ -1,17 +1,10 @@
 import {
-    REFERENCE_TIMING,
-    wrapIndex
+    REFERENCE_HERO
 } from "./home-quant-planet-composition.js";
-
-export { wrapIndex };
 
 export function clampUnit(value) {
     return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
 }
-
-const TAU = Math.PI * 2;
-const clamp = (value, min, max) =>
-    Math.min(Math.max(Number(value) || 0, min), max);
 
 export function normalizePointer(clientX, clientY, rect) {
     const width = Number.isFinite(rect?.width) && rect.width > 0 ? rect.width : 0;
@@ -37,9 +30,6 @@ export function resolveLocalTestOverrides({ hostname, search } = {}) {
         forceReduced: params.get("motion") === "reduce"
     };
 }
-
-const resolveRange = (value, start, end) =>
-    clampUnit((value - start) / Math.max(end - start, Number.EPSILON));
 
 const smoothStep = (value) => {
     const t = clampUnit(value);
@@ -69,155 +59,65 @@ export function selectPlanetQualityProfile(environment = {}) {
     };
 }
 
-export function advanceRingAngle(
-    angle = 0, deltaMs = 0, paused = false, reduceMotion = false
-) {
-    const current = Number.isFinite(angle) ? angle : 0;
-    if (paused || reduceMotion) return current;
-    const delta = clamp(deltaMs, 0, 100);
-    return current + delta / REFERENCE_TIMING.productRevolutionMs * TAU;
-}
-
-export function createNavigationRingState({
-    rotationAngle = 0, dragAngle = 0, selectedIndex = 0,
-    snapToSelected = false, itemCount = 6
-} = {}) {
-    const count = Math.max(1, Math.trunc(Number(itemCount)) || 1);
-    const selected = wrapIndex(selectedIndex, count);
-    const step = TAU / count;
-    const automatic = snapToSelected
-        ? -selected * step : Number(rotationAngle) || 0;
-    const baseAngle = automatic
-        + (snapToSelected ? 0 : clamp(dragAngle, -TAU * 2, TAU * 2));
-    const items = Array.from({ length: count }, (_, index) => {
-        const angle = baseAngle + index * step;
-        const depth = (Math.cos(angle) + 1) / 2;
-        return {
-            index, angle, depth,
-            opacity: .35 + depth * .65,
-            scale: .72 + depth * .40,
-            zIndex: Math.round(depth * 100)
-        };
-    });
-    const frontIndex = items.reduce((front, item) =>
-        item.depth > items[front].depth ? item.index : front, 0);
-    return { baseAngle, frontIndex, items };
-}
-
-export function createIntroState({
-    elapsed = 0, ready = false, readyElapsed = 0,
-    timedOut = false, reduceMotion = false
-} = {}) {
-    const total = Math.max(0, Number(elapsed) || 0);
-    const sinceReady = Math.max(0, Number(readyElapsed) || 0);
-    if (timedOut || (reduceMotion && ready)) {
-        return {
-            phase: "ready", loaderOpacity: 0, markProgress: 1,
-            splitProgress: 1, revealProgress: 1, worldScale: 1,
-            interactionReady: true
-        };
-    }
-    if (reduceMotion) {
-        return {
-            phase: "boot", loaderOpacity: 1, markProgress: 1,
-            splitProgress: 0, revealProgress: 0, worldScale: 1,
-            interactionReady: false
-        };
-    }
-    const markProgress = clamp((total - 250) / 625, 0, 1);
-    const markReadyElapsed = Math.max(0, total - 875);
-    const gatedReadyElapsed = ready
-        ? Math.min(sinceReady, markReadyElapsed)
-        : 0;
-    const splitProgress = ready
-        ? smoothStep(gatedReadyElapsed / 400)
-        : 0;
-    const revealProgress = ready
-        ? smoothStep((gatedReadyElapsed - 400) / 600)
-        : 0;
-    const interactionReady = ready
-        && markProgress >= 1
-        && revealProgress >= 1;
-    const phase = interactionReady ? "ready"
-        : total < 250 ? "boot"
-            : markProgress < 1 || !ready ? "mark"
-                : gatedReadyElapsed < 400 ? "split" : "reveal";
-    return {
-        phase,
-        loaderOpacity: 1 - splitProgress,
-        markProgress,
-        splitProgress,
-        revealProgress,
-        worldScale: .88 + splitProgress * .12,
-        interactionReady
-    };
-}
-
-export function createOrbitPose({
-    time = 0, dragAngle = 0, pointer = { x: 0, y: 0 },
+export function createHeroIntroState({
+    elapsedMs = 0,
+    sceneReady = false,
     reduceMotion = false
 } = {}) {
-    const pointerX = reduceMotion ? 0 : clamp(pointer?.x, -1, 1);
-    const pointerY = reduceMotion ? 0 : clamp(pointer?.y, -1, 1);
-    const drag = clamp(dragAngle, -TAU * 2, TAU * 2);
+    const elapsed = Math.max(0, Number(elapsedMs) || 0);
+    if (reduceMotion || elapsed >= REFERENCE_HERO.introDeadlineMs) {
+        return {
+            phase: "ready",
+            loader: 1,
+            world: 1,
+            title: 1,
+            action: 1,
+            ready: true
+        };
+    }
+
+    const loader = smoothStep(elapsed / 600);
+    const world = sceneReady
+        ? smoothStep((elapsed - 600) / 700)
+        : 0;
+    const title = sceneReady
+        ? smoothStep((elapsed - 1100) / 650)
+        : 0;
+    const action = sceneReady
+        ? smoothStep((elapsed - 1600) / 500)
+        : 0;
+    const ready = sceneReady && action >= 1;
+    const phase = ready ? "ready"
+        : action > 0 ? "action"
+            : title > 0 ? "title"
+                : world > 0 ? "world" : "loader";
+
     return {
-        cameraDistance: 8.9,
-        cameraYaw: clamp(drag * .18 + pointerX * .0698, -TAU, TAU),
-        cameraPitch: clamp(.12 + pointerY * .052, -.34, .34),
-        planetYaw: drag,
-        planetPitch: clamp(-.08 + pointerY * .02, -.18, .18),
-        planetRoll: pointerX * .018
+        phase,
+        loader,
+        world,
+        title,
+        action,
+        ready
     };
 }
 
-export function createCourierLoopPose(time = 0, reduceMotion = false) {
-    if (reduceMotion) {
-        return {
-            routeProgress: .5, routeAngle: .19, elevation: .195,
-            heading: .19 + Math.PI / 2, walkPhase: 0, idleBlend: 1,
-            routeActivity: .45,
-            landmarkActivity: { observe: 0, resolve: 1, act: 0 }
-        };
-    }
-    const elapsed = Math.max(0, Number(time) || 0);
-    const cycle = elapsed % 24000;
-    let routeProgress;
-    let direction = 1;
-    let idleBlend = 0;
-    if (cycle < 6000) {
-        routeProgress = .5 * smoothStep(cycle / 6000);
-    } else if (cycle < 8000) {
-        routeProgress = .5;
-        idleBlend = 1;
-    } else if (cycle < 14000) {
-        routeProgress = .5 + .5 * smoothStep((cycle - 8000) / 6000);
-    } else if (cycle < 16000) {
-        routeProgress = 1;
-        idleBlend = 1;
-    } else if (cycle < 22000) {
-        direction = -1;
-        routeProgress = 1 - smoothStep((cycle - 16000) / 6000);
-    } else {
-        direction = -1;
-        routeProgress = 0;
-        idleBlend = 1;
-    }
-    const routeAngle = -.9 + routeProgress * 2.18;
-    const observe = 1 - smoothStep(resolveRange(routeProgress, 0, .25));
-    const resolve = 1 - smoothStep(
-        clamp(Math.abs(routeProgress - .5) / .25, 0, 1)
-    );
-    const act = smoothStep(resolveRange(routeProgress, .75, 1));
-    const phase = (elapsed / 260) % TAU;
+export function createHeroPose({
+    elapsedMs = 0,
+    worldAngle = 0,
+    dragAngle = 0,
+    pointer = { x: 0, y: 0 },
+    reduceMotion = false
+} = {}) {
+    const ambient = reduceMotion
+        ? 0
+        : (elapsedMs / REFERENCE_HERO.worldRevolutionMs) * Math.PI * 2;
     return {
-        routeProgress,
-        routeAngle,
-        elevation: .17 + Math.sin(routeProgress * Math.PI) * .025,
-        heading: routeAngle + (direction > 0 ? Math.PI / 2 : -Math.PI / 2),
-        walkPhase: phase < 0 ? phase + TAU : phase,
-        idleBlend,
-        routeActivity: 1 - idleBlend * .55,
-        landmarkActivity: { observe, resolve, act }
+        worldAngle: worldAngle + ambient,
+        dragAngle,
+        pointer: reduceMotion ? { x: 0, y: 0 } : pointer,
+        elapsedMs,
+        reduceMotion
     };
 }
 
@@ -352,7 +252,6 @@ export function createDomMotion({ MotionAPI, root, reduceMotion } = {}) {
     if (!supportsMotion) {
         return {
             reveal: makeVisible,
-            setChapter(name) { root?.setAttribute?.("data-planet-chapter", name || ""); },
             destroy() {}
         };
     }
@@ -367,9 +266,6 @@ export function createDomMotion({ MotionAPI, root, reduceMotion } = {}) {
                 transform: ["translateY(16px)", "translateY(0)"]
             }, { duration: 0.56, easing: "ease-out" });
             animations.push(animation);
-        },
-        setChapter(name) {
-            root?.setAttribute?.("data-planet-chapter", name || "");
         },
         destroy() {
             animations.forEach((animation) => animation?.cancel?.());
