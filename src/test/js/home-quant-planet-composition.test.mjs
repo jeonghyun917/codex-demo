@@ -21,6 +21,129 @@ const localImports = (source) => Array.from(
     ([, specifier]) => specifier
 );
 
+function collectMeshPoints(root, predicate = () => true) {
+    const points = [];
+    const instanceMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+        if (!object.isMesh || object.visible === false || !predicate(object)) {
+            return;
+        }
+        const positions = object.geometry.attributes.position;
+        const appendPoints = (matrix) => {
+            for (let index = 0; index < positions.count; index += 1) {
+                points.push(new THREE.Vector3()
+                    .fromBufferAttribute(positions, index)
+                    .applyMatrix4(matrix));
+            }
+        };
+        if (object.isInstancedMesh) {
+            for (let index = 0; index < object.count; index += 1) {
+                object.getMatrixAt(index, instanceMatrix);
+                worldMatrix.multiplyMatrices(object.matrixWorld, instanceMatrix);
+                appendPoints(worldMatrix);
+            }
+            return;
+        }
+        appendPoints(object.matrixWorld);
+    });
+    return points;
+}
+
+function createSceneHarness() {
+    const frames = [];
+    class InspectableCamera extends THREE.PerspectiveCamera {
+        lookAt(...values) {
+            const [first] = values;
+            this.lookAtTarget = first?.isVector3
+                ? first.clone()
+                : new THREE.Vector3(...values);
+            super.lookAt(...values);
+        }
+    }
+    class TestRenderer {
+        constructor() {
+            this.shadowMap = {};
+            this.info = { render: { calls: 0, triangles: 0 } };
+        }
+        setPixelRatio() {}
+        setSize() {}
+        render(scene, camera) {
+            scene.updateMatrixWorld(true);
+            camera.updateMatrixWorld(true);
+            camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+            const planet = scene.getObjectByName("QuantPlanet");
+            const worldPoints = collectMeshPoints(planet);
+            const primaryPoints = collectMeshPoints(
+                planet,
+                (object) => object.name === "FacetedLand"
+                    || object.name === "FacetedLandOutline"
+                    || object.name === "ShallowWaterShell"
+            );
+            frames.push({
+                aspect: camera.aspect,
+                near: camera.near,
+                far: camera.far,
+                position: camera.position.clone(),
+                target: camera.lookAtTarget.clone(),
+                worldScale: planet.scale.x,
+                worldQuaternion: planet.quaternion.clone(),
+                worldPoints,
+                primaryProjected: primaryPoints.map((point) =>
+                    point.clone().project(camera)),
+                projected: worldPoints.map((point) =>
+                    point.clone().project(camera)),
+                depths: worldPoints.map((point) =>
+                    -point.clone().applyMatrix4(camera.matrixWorldInverse).z)
+            });
+        }
+        dispose() {}
+    }
+    return {
+        frames,
+        three: {
+            ...THREE,
+            PerspectiveCamera: InspectableCamera,
+            WebGLRenderer: TestRenderer
+        }
+    };
+}
+
+const sceneProfile = (overrides = {}) => ({
+    name: "high",
+    webgl: true,
+    outlineLevel: 2,
+    foliageCount: 34,
+    cloudCount: 8,
+    shadows: false,
+    pixelRatio: 1,
+    planetScale: 1,
+    ...overrides
+});
+
+async function createTestScene(t, {
+    width,
+    height,
+    profile = sceneProfile()
+}) {
+    const harness = createSceneHarness();
+    const canvas = { clientWidth: width, clientHeight: height };
+    const controller = await createQuantPlanetScene({
+        canvas,
+        profile,
+        three: harness.three
+    });
+    t.after(() => controller.dispose());
+    controller.resize();
+    return { ...harness, canvas, controller };
+}
+
+function projectedOccupancy(points, axis) {
+    const values = points.map((point) => point[axis]);
+    return (Math.max(...values) - Math.min(...values)) / 2;
+}
+
 test("keeps the composition dependency graph acyclic", async () => {
     const compositionUrl = new URL(
         "../../main/resources/static/js/home-quant-planet-composition.js",
@@ -83,74 +206,35 @@ test("fits a complete sphere against the stricter viewport field of view", () =>
 });
 
 test("refits the complete world after landscape and portrait resizes", async (t) => {
-    const renderedCameras = [];
-    class InspectableCamera extends THREE.PerspectiveCamera {
-        lookAt(...values) {
-            const [first] = values;
-            this.lookAtTarget = first?.isVector3
-                ? first.clone()
-                : new THREE.Vector3(...values);
-            super.lookAt(...values);
-        }
-    }
-    class TestRenderer {
-        constructor() {
-            this.shadowMap = {};
-            this.info = { render: { calls: 0, triangles: 0 } };
-        }
-        setPixelRatio() {}
-        setSize() {}
-        render(scene, camera) {
-            scene.updateMatrixWorld(true);
-            renderedCameras.push({
-                aspect: camera.aspect,
-                position: camera.position.clone(),
-                target: camera.lookAtTarget.clone()
-            });
-        }
-        dispose() {}
-    }
-    const testThree = {
-        ...THREE,
-        PerspectiveCamera: InspectableCamera,
-        WebGLRenderer: TestRenderer
-    };
-    const profile = {
-        name: "high",
-        webgl: true,
-        outlineLevel: 0,
-        foliageCount: 0,
-        cloudCount: 0,
-        shadows: false,
-        pixelRatio: 1,
-        planetScale: 1
-    };
-    const canvas = { clientWidth: 1440, clientHeight: 900 };
+    const profile = sceneProfile({ outlineLevel: 0, foliageCount: 0, cloudCount: 0 });
     const world = createQuantPlanetWorld(THREE, { profile });
     const envelope = world.getFramingEnvelope();
     world.dispose();
-    const controller = await createQuantPlanetScene({
-        canvas,
-        profile,
-        three: testThree
+    const { canvas, controller, frames } = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile
     });
-    t.after(() => controller.dispose());
 
-    controller.resize();
     assert.equal(controller.render(0), true);
     canvas.clientWidth = 375;
     canvas.clientHeight = 812;
     controller.resize();
     assert.equal(controller.render(0), true);
 
-    const [landscape, portrait] = renderedCameras;
+    const [landscape, portrait] = frames;
     assert.equal(landscape.aspect, 1440 / 900);
     assert.equal(portrait.aspect, 375 / 812);
-    [landscape, portrait].forEach(({ target }) => {
-        assert.deepEqual(target.toArray(), [
+    [landscape, portrait].forEach(({ target, worldQuaternion }) => {
+        const expectedTarget = new THREE.Vector3(
             envelope.center.x,
             envelope.center.y,
             envelope.center.z
+        ).applyQuaternion(worldQuaternion);
+        assert.deepEqual(target.toArray(), [
+            expectedTarget.x,
+            expectedTarget.y,
+            expectedTarget.z
         ]);
     });
     const landscapeDistance = landscape.position.distanceTo(landscape.target);
@@ -162,7 +246,114 @@ test("refits the complete world after landscape and portrait resizes", async (t)
     );
     const framedRadius = portraitDistance
         * Math.sin(Math.min(verticalFov, portraitHorizontalFov) / 2);
-    assert.ok(framedRadius >= envelope.radius * 1.18);
+    assert.ok(framedRadius >= envelope.radius);
+});
+
+test("scales the complete framing envelope with the scene world", async (t) => {
+    const full = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile: sceneProfile({ planetScale: 1 })
+    });
+    const balanced = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile: sceneProfile({ planetScale: .82 })
+    });
+    full.controller.render(0);
+    balanced.controller.render(0);
+    const fullFrame = full.frames.at(-1);
+    const balancedFrame = balanced.frames.at(-1);
+    const fullDistance = fullFrame.position.distanceTo(fullFrame.target);
+    const balancedDistance = balancedFrame.position.distanceTo(
+        balancedFrame.target
+    );
+
+    assert.ok(Math.abs(balancedDistance / fullDistance - .82) <= 1e-6);
+    assert.ok(Math.abs(
+        balancedFrame.target.length() / fullFrame.target.length() - .82
+    ) <= 1e-6);
+});
+
+test("derives safe portrait clip planes from fitted world bounds", async (t) => {
+    const scene = await createTestScene(t, {
+        width: 375,
+        height: 812
+    });
+    scene.controller.render(0);
+    const frame = scene.frames.at(-1);
+    const nearestDepth = Math.min(...frame.depths);
+    const farthestDepth = Math.max(...frame.depths);
+
+    assert.ok(frame.near > .1);
+    assert.ok(frame.near < nearestDepth);
+    assert.ok(frame.far > farthestDepth);
+});
+
+test("keeps actual transformed bounds visible at extreme orbit poses", async (t) => {
+    const scene = await createTestScene(t, {
+        width: 375,
+        height: 812,
+        profile: sceneProfile({ planetScale: .82 })
+    });
+    const fixtures = [
+        { pointer: { x: -1, y: -1 }, dragAngle: -Math.PI * 4, time: 0 },
+        { pointer: { x: 1, y: 1 }, dragAngle: Math.PI * 4, time: 14000 }
+    ];
+
+    fixtures.forEach(({ pointer, dragAngle, time }) => {
+        scene.controller.setPointer(pointer);
+        scene.controller.setDragAngle(dragAngle);
+        assert.equal(scene.controller.render(time), true);
+        const frame = scene.frames.at(-1);
+        frame.projected.forEach((point) => {
+            assert.ok(Number.isFinite(point.x));
+            assert.ok(Number.isFinite(point.y));
+            assert.ok(Number.isFinite(point.z));
+            assert.ok(Math.abs(point.x) <= 1 + 1e-6);
+            assert.ok(Math.abs(point.y) <= 1 + 1e-6);
+            assert.ok(Math.abs(point.z) <= 1 + 1e-6);
+        });
+    });
+});
+
+test("composes the primary silhouette at desktop and mobile occupancy", async (t) => {
+    const profile = sceneProfile({
+        name: "balanced",
+        outlineLevel: 1,
+        foliageCount: 18,
+        cloudCount: 5,
+        planetScale: .82
+    });
+    const desktop = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        profile
+    });
+    const mobile = await createTestScene(t, {
+        width: 375,
+        height: 812,
+        profile
+    });
+    desktop.controller.render(0);
+    mobile.controller.render(0);
+    const desktopOccupancy = projectedOccupancy(
+        desktop.frames.at(-1).primaryProjected,
+        "y"
+    );
+    const mobileOccupancy = projectedOccupancy(
+        mobile.frames.at(-1).primaryProjected,
+        "x"
+    );
+
+    assert.ok(
+        desktopOccupancy >= .58 && desktopOccupancy <= .68,
+        `desktop occupancy ${desktopOccupancy}`
+    );
+    assert.ok(
+        mobileOccupancy >= .68 && mobileOccupancy <= .82,
+        `mobile occupancy ${mobileOccupancy}`
+    );
 });
 
 test("snaps drag selection to one of six wrapped product scenes", () => {

@@ -22,6 +22,36 @@ function createWorld(t) {
     return world;
 }
 
+function collectMeshPoints(root) {
+    const points = [];
+    const instanceMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+        if (!object.isMesh || object.visible === false) {
+            return;
+        }
+        const positions = object.geometry.attributes.position;
+        const appendPoints = (matrix) => {
+            for (let index = 0; index < positions.count; index += 1) {
+                points.push(new THREE.Vector3()
+                    .fromBufferAttribute(positions, index)
+                    .applyMatrix4(matrix));
+            }
+        };
+        if (object.isInstancedMesh) {
+            for (let index = 0; index < object.count; index += 1) {
+                object.getMatrixAt(index, instanceMatrix);
+                worldMatrix.multiplyMatrices(object.matrixWorld, instanceMatrix);
+                appendPoints(worldMatrix);
+            }
+            return;
+        }
+        appendPoints(object.matrixWorld);
+    });
+    return points;
+}
+
 function update(world, courierPose, time = 1000) {
     world.update({
         orbitPose: {
@@ -123,6 +153,30 @@ test("exposes a complete framing envelope that includes upper landmarks", (t) =>
     assert.ok(envelope.center.y > 0);
     assert.ok(envelope.top >= 3.2);
     assert.ok(envelope.bottom <= -2.4);
+});
+
+test("fits the public envelope tightly to actual mesh and instance bounds", (t) => {
+    const world = createWorld(t);
+    const envelope = world.getFramingEnvelope();
+    const center = new THREE.Vector3(
+        envelope.center.x,
+        envelope.center.y,
+        envelope.center.z
+    );
+    const points = collectMeshPoints(world.group);
+    const actualRadius = Math.max(
+        ...points.map((point) => point.distanceTo(center))
+    );
+    const actualTop = Math.max(...points.map((point) => point.y));
+    const actualBottom = Math.min(...points.map((point) => point.y));
+
+    assert.ok(actualRadius <= envelope.radius + 1e-6);
+    assert.ok(envelope.radius - actualRadius <= .02);
+    assert.ok(Math.abs(envelope.top - actualTop) <= 1e-6);
+    assert.ok(Math.abs(envelope.bottom - actualBottom) <= 1e-6);
+
+    envelope.center.y = 999;
+    assert.notEqual(world.getFramingEnvelope().center.y, 999);
 });
 
 test("builds a rounded world body instead of an oblate front plate", (t) => {

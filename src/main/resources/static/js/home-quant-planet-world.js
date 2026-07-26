@@ -384,10 +384,13 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     clouds.name = "InstancedAtmosphericClouds";
     for (let index = 0; index < cloudCount; index += 1) {
         const angle = index * 2.17;
+        const radius = 3.25 + (index % 3) * .12;
+        const elevation = .25 + (index % 3) * .18;
+        const horizontalRadius = Math.cos(elevation) * radius;
         orientInstance(THREE, instanceMatrix, [
-            Math.sin(angle) * 3.65,
-            1.8 + (index % 3) * .55,
-            Math.cos(angle) * 3.45
+            Math.sin(angle) * horizontalRadius,
+            Math.sin(elevation) * radius,
+            Math.cos(angle) * horizontalRadius
         ], [.38 + (index % 2) * .18, .13, .24], [0, angle, .08]);
         clouds.setMatrixAt(index, instanceMatrix);
     }
@@ -475,17 +478,57 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
     courier.scale.setScalar(.72);
     courier.castShadow = Boolean(profile.shadows);
 
-    const framingBox = new THREE.Box3().setFromObject(planet);
-    const framingSphere = framingBox.getBoundingSphere(new THREE.Sphere());
+    const framingBox = new THREE.Box3();
+    const framingPoint = new THREE.Vector3();
+    const framingInstanceMatrix = new THREE.Matrix4();
+    const framingWorldMatrix = new THREE.Matrix4();
+    function forEachFramingPoint(visitor) {
+        planet.updateMatrixWorld(true);
+        planet.traverse((object) => {
+            if (!object.isMesh || object.visible === false) {
+                return;
+            }
+            const positions = object.geometry.attributes.position;
+            const includeGeometry = (matrix) => {
+                for (let index = 0; index < positions.count; index += 1) {
+                    framingPoint.fromBufferAttribute(positions, index)
+                        .applyMatrix4(matrix);
+                    visitor(framingPoint);
+                }
+            };
+            if (object.isInstancedMesh) {
+                for (let index = 0; index < object.count; index += 1) {
+                    object.getMatrixAt(index, framingInstanceMatrix);
+                    framingWorldMatrix.multiplyMatrices(
+                        object.matrixWorld,
+                        framingInstanceMatrix
+                    );
+                    includeGeometry(framingWorldMatrix);
+                }
+                return;
+            }
+            includeGeometry(object.matrixWorld);
+        });
+    }
+    forEachFramingPoint((point) => framingBox.expandByPoint(point));
+    const framingCenter = framingBox.getCenter(new THREE.Vector3());
+    let framingRadiusSquared = 0;
+    forEachFramingPoint((point) => {
+        framingRadiusSquared = Math.max(
+            framingRadiusSquared,
+            point.distanceToSquared(framingCenter)
+        );
+    });
+    const framingRadius = Math.sqrt(framingRadiusSquared);
 
     function getFramingEnvelope() {
         return {
             center: {
-                x: framingSphere.center.x,
-                y: framingSphere.center.y,
-                z: framingSphere.center.z
+                x: framingCenter.x,
+                y: framingCenter.y,
+                z: framingCenter.z
             },
-            radius: framingSphere.radius,
+            radius: framingRadius,
             top: framingBox.max.y,
             bottom: framingBox.min.y
         };

@@ -8,6 +8,7 @@ import { createQuantPlanetWorld } from "./home-quant-planet-world.js";
 
 const HIGH_LIMITS = Object.freeze({ drawCalls: 75, triangles: 140000 });
 const BALANCED_LIMITS = Object.freeze({ drawCalls: 65, triangles: 90000 });
+const framingMargin = (aspect) => aspect < .75 ? 1 : 1.1;
 
 function createStaticSceneController() {
     return {
@@ -68,16 +69,36 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
         scene.fog = new THREE.Fog(0xd9efe8, 11, 24);
         const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
         world = createQuantPlanetWorld(THREE, { profile });
-        world.group.scale.setScalar(profile.planetScale || 1);
+        const worldScale = Math.max(.001, Number(profile.planetScale) || 1);
+        world.group.scale.setScalar(worldScale);
         scene.add(world.group);
-        const envelope = world.getFramingEnvelope();
-        let framing = fitPerspectiveSphere({
-            center: envelope.center,
-            radius: envelope.radius,
-            aspect: 1,
-            verticalFovDegrees: 34,
-            margin: 1.18
-        });
+        const localEnvelope = world.getFramingEnvelope();
+        const envelope = {
+            center: {
+                x: localEnvelope.center.x * worldScale,
+                y: localEnvelope.center.y * worldScale,
+                z: localEnvelope.center.z * worldScale
+            },
+            radius: localEnvelope.radius * worldScale,
+            top: localEnvelope.top * worldScale,
+            bottom: localEnvelope.bottom * worldScale
+        };
+        function refitCamera(aspect) {
+            const next = fitPerspectiveSphere({
+                center: envelope.center,
+                radius: envelope.radius,
+                aspect,
+                verticalFovDegrees: 34,
+                margin: framingMargin(aspect)
+            });
+            const clipPadding = next.radius * 1.08;
+            camera.near = Math.max(.1, next.distance - clipPadding);
+            camera.far = next.distance + clipPadding;
+            camera.updateProjectionMatrix();
+            return next;
+        }
+        let framing = refitCamera(1);
+        const framingTarget = new THREE.Vector3();
 
         const hemisphere = new THREE.HemisphereLight(0xfff9ea, 0x71847e, 1.7);
         hemisphere.name = "SkyHemisphereFill";
@@ -120,14 +141,7 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
             const width = Math.max(1, canvas.clientWidth);
             const height = Math.max(1, canvas.clientHeight);
             camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            framing = fitPerspectiveSphere({
-                center: envelope.center,
-                radius: envelope.radius,
-                aspect: camera.aspect,
-                verticalFovDegrees: 34,
-                margin: 1.18
-            });
+            framing = refitCamera(camera.aspect);
             renderer.setSize(width, height, false);
             markDirty();
         }
@@ -175,20 +189,21 @@ export async function createQuantPlanetScene({ canvas, profile, three } = {}) {
                 const courierPose = createCourierLoopPose(time, false);
                 world.update({ orbitPose, courierPose, time });
 
-                const cosPitch = Math.cos(orbitPose.cameraPitch);
-                camera.position.set(
-                    framing.target.x + Math.sin(orbitPose.cameraYaw)
-                        * cosPitch * framing.distance,
-                    framing.target.y + Math.sin(orbitPose.cameraPitch)
-                        * framing.distance,
-                    framing.target.z + Math.cos(orbitPose.cameraYaw)
-                        * cosPitch * framing.distance
-                );
-                camera.lookAt(
+                framingTarget.set(
                     framing.target.x,
                     framing.target.y,
                     framing.target.z
+                ).applyQuaternion(world.group.quaternion);
+                const cosPitch = Math.cos(orbitPose.cameraPitch);
+                camera.position.set(
+                    framingTarget.x + Math.sin(orbitPose.cameraYaw)
+                        * cosPitch * framing.distance,
+                    framingTarget.y + Math.sin(orbitPose.cameraPitch)
+                        * framing.distance,
+                    framingTarget.z + Math.cos(orbitPose.cameraYaw)
+                        * cosPitch * framing.distance
                 );
+                camera.lookAt(framingTarget);
                 renderer.render(scene, camera);
                 dirty = false;
                 return true;
