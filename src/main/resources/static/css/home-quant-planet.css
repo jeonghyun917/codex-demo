@@ -564,6 +564,16 @@ a {
 .planet-webgl-ready .planet-fallback { opacity: 0; }
 .planet-webgl-failed .planet-fallback { opacity: 1; }
 
+.planet-webgl-ready .product-title[data-product-position="active"] {
+    visibility: visible;
+    opacity: 1;
+}
+
+.planet-webgl-ready .product-title:focus {
+    visibility: visible;
+    opacity: 1;
+}
+
 .product-orbit {
     position: absolute;
     z-index: var(--layer-content);
@@ -884,6 +894,14 @@ a {
 }
 
 @media (max-height: 540px) and (orientation: landscape) {
+    .planet-experience {
+        --planet-center-y: 39%;
+        --planet-diameter: min(78vh, 72vw);
+        --planet-radius: min(39vh, 36vw);
+        --planet-title-envelope: min(45.24vh, 41.76vw);
+        --planet-action-gap: clamp(.5rem, 1vh, .75rem);
+    }
+
     .home-semantic-summary {
         bottom: 2.5rem;
         width: 19rem;
@@ -903,9 +921,6 @@ a {
         padding-block: .4rem;
     }
 
-    .planet-scene {
-        top: 51%;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {

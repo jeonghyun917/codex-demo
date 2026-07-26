@@ -200,7 +200,15 @@ class HomePageTemplateContractTest {
         assertEquals("1", cssDeclaration(activeTitleRule, "opacity"));
         assertFalse(titleRule.contains("border-radius"));
         assertFalse(css.contains(".product-orbit__link"));
-        assertFalse(css.contains(".planet-webgl-ready .product-title"));
+        assertEquals(
+                "1",
+                cssDeclaration(
+                        cssRule(
+                                css,
+                                ".planet-webgl-ready "
+                                        + ".product-title"
+                                        + "[data-product-position=\"active\"]"),
+                        "opacity"));
 
         String actionRule = cssRule(css, ".planet-primary-action");
         assertEquals("absolute", cssDeclaration(actionRule, "position"));
@@ -404,21 +412,96 @@ class HomePageTemplateContractTest {
 
         for (String body : cssRuleBodiesWithSelectorTokens(
                 css, ".planet-webgl-ready", ".product-title")) {
-            String normalized = body.replaceAll("\\s+", " ");
-            assertFalse(normalized.matches(
-                    "(?s).*\\bdisplay\\s*:\\s*none\\b.*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\bvisibility\\s*:\\s*hidden\\b.*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\bopacity\\s*:\\s*0(?:\\D|$).*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\b(?:clip|clip-path)\\s*:.*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\bleft\\s*:\\s*-.*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\b(?:width|height)\\s*:\\s*1px\\b.*"));
-            assertFalse(normalized.matches(
-                    "(?s).*\\btransform\\s*:.*scale\\(0\\).*"));
+            assertCssDoesNotHideTitle(body);
+        }
+    }
+
+    @Test
+    void homepageShortLandscapeKeepsActionInsideViewport()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css");
+        String actionRule = cssRule(css, ".planet-primary-action");
+        String desktopExperience = cssRule(css, ".planet-experience");
+        String mobileExperience = cssRule(
+                cssAtRuleBlock(css, "@media (max-width: 767px)"),
+                ".planet-experience");
+        String shortLandscapeCss = cssAtRuleBlock(
+                css,
+                "@media (max-height: 540px) and (orientation: landscape)");
+        String shortExperience = cssRule(
+                shortLandscapeCss, ".planet-experience");
+
+        assertActionFitsViewport(
+                desktopExperience, actionRule, 1440, 900);
+        assertActionFitsViewport(
+                mobileExperience, actionRule, 390, 844);
+        assertActionFitsViewport(
+                shortExperience, actionRule, 1024, 320);
+        assertActionFitsViewport(
+                shortExperience, actionRule, 640, 320);
+        assertMinLengthRatioBetween(
+                cssDeclaration(
+                        shortExperience, "--planet-title-envelope"),
+                cssDeclaration(shortExperience, "--planet-diameter"),
+                .45,
+                .62);
+
+        List<String> scenePositionRules = cssRuleBodiesForExactSelector(
+                css, ".planet-scene").stream()
+                .filter(body -> hasCssDeclaration(body, "top"))
+                .toList();
+        assertTrue(scenePositionRules.size() >= 1);
+        for (String scenePositionRule : scenePositionRules) {
+            assertEquals(
+                    "var(--planet-center-y)",
+                    cssDeclaration(scenePositionRule, "top"));
+        }
+    }
+
+    @Test
+    void homepageWebglKeepsActiveTitleAndSemanticNarrativeVisible()
+            throws Exception {
+        Document homepage = parseRenderedHtml(getBody("/").body());
+        Element root = homepage.getDocumentElement();
+        Element semanticSummary = elementsWithAttribute(
+                root, "*", "data-home-semantic-summary").getFirst();
+        String narrative = "Observe the market. Resolve the signal. "
+                + "Act with context.";
+        List<Element> summaryNarrative = elementsWithTag(
+                semanticSummary, "p").stream()
+                .filter(paragraph -> narrative.equals(
+                        paragraph.getTextContent().strip()))
+                .toList();
+        List<Element> pageNarrative = elementsWithTag(root, "p").stream()
+                .filter(paragraph -> narrative.equals(
+                        paragraph.getTextContent().strip()))
+                .toList();
+        assertEquals(1, summaryNarrative.size());
+        assertEquals(1, pageNarrative.size());
+        assertTrue(summaryNarrative.getFirst().isSameNode(
+                pageNarrative.getFirst()));
+
+        String css = resource("static/css/home-quant-planet.css");
+        String webglActiveSelector = ".planet-webgl-ready "
+                + ".product-title[data-product-position=\"active\"]";
+        String webglFocusSelector = ".planet-webgl-ready "
+                + ".product-title:focus";
+        String webglActiveRule = cssRule(css, webglActiveSelector);
+        String webglFocusRule = cssRule(css, webglFocusSelector);
+        assertEquals("1", cssDeclaration(webglActiveRule, "opacity"));
+        assertEquals(
+                "visible",
+                cssDeclaration(webglActiveRule, "visibility"));
+        assertEquals("1", cssDeclaration(webglFocusRule, "opacity"));
+        assertEquals(
+                "visible",
+                cssDeclaration(webglFocusRule, "visibility"));
+
+        List<String> webglTitleRules = cssRuleBodiesWithSelectorTokens(
+                css, ".planet-webgl-ready", ".product-title");
+        assertEquals(2, webglTitleRules.size());
+        for (String body : webglTitleRules) {
+            assertCssDoesNotHideTitle(body);
         }
     }
 
@@ -692,6 +775,20 @@ class HomePageTemplateContractTest {
         return matches;
     }
 
+    private static List<Element> elementsWithTag(
+            Element root,
+            String tagName) {
+        List<Element> matches = new ArrayList<>();
+        NodeList descendants = root.getElementsByTagName(tagName);
+        for (int index = 0; index < descendants.getLength(); index++) {
+            Node node = descendants.item(index);
+            if (node instanceof Element element) {
+                matches.add(element);
+            }
+        }
+        return matches;
+    }
+
     private static String cssRule(String css, String selector) {
         Matcher matcher = Pattern.compile(
                 "(?s)(?:^|})\\s*" + Pattern.quote(selector)
@@ -772,6 +869,92 @@ class HomePageTemplateContractTest {
         assertTrue(verticalRadius.find());
         double radius = Double.parseDouble(verticalRadius.group(1));
         assertTrue(center + radius <= maximumViewportPercent);
+    }
+
+    private static void assertActionFitsViewport(
+            String experienceRule,
+            String actionRule,
+            double viewportWidth,
+            double viewportHeight) {
+        double center = resolveCssLength(
+                cssDeclaration(experienceRule, "--planet-center-y"),
+                viewportWidth,
+                viewportHeight);
+        double radius = resolveCssLength(
+                cssDeclaration(experienceRule, "--planet-radius"),
+                viewportWidth,
+                viewportHeight);
+        double gap = resolveCssLength(
+                cssDeclaration(experienceRule, "--planet-action-gap"),
+                viewportWidth,
+                viewportHeight);
+        double actionHeight = resolveCssLength(
+                cssDeclaration(actionRule, "min-height"),
+                viewportWidth,
+                viewportHeight);
+        assertTrue(gap > 0);
+        assertTrue(
+                center + radius + gap + actionHeight <= viewportHeight,
+                () -> "Action exceeds viewport: "
+                        + (center + radius + gap + actionHeight)
+                        + " > " + viewportHeight);
+    }
+
+    private static double resolveCssLength(
+            String value,
+            double viewportWidth,
+            double viewportHeight) {
+        String normalized = value.strip();
+        if (normalized.startsWith("min(")) {
+            String[] lengths = normalized.substring(
+                    4, normalized.length() - 1).split(",");
+            return Math.min(
+                    resolveCssLength(
+                            lengths[0], viewportWidth, viewportHeight),
+                    resolveCssLength(
+                            lengths[1], viewportWidth, viewportHeight));
+        }
+        if (normalized.startsWith("clamp(")) {
+            String[] lengths = normalized.substring(
+                    6, normalized.length() - 1).split(",");
+            double minimum = resolveCssLength(
+                    lengths[0], viewportWidth, viewportHeight);
+            double preferred = resolveCssLength(
+                    lengths[1], viewportWidth, viewportHeight);
+            double maximum = resolveCssLength(
+                    lengths[2], viewportWidth, viewportHeight);
+            return Math.max(minimum, Math.min(preferred, maximum));
+        }
+        Matcher length = Pattern.compile(
+                "([0-9.]+)(%|vh|vw|px|rem)")
+                .matcher(normalized);
+        assertTrue(length.matches(), () -> "Unsupported CSS length: " + value);
+        double amount = Double.parseDouble(length.group(1));
+        return switch (length.group(2)) {
+            case "%", "vh" -> amount * viewportHeight / 100;
+            case "vw" -> amount * viewportWidth / 100;
+            case "px" -> amount;
+            case "rem" -> amount * 16;
+            default -> throw new AssertionError("Unsupported CSS unit");
+        };
+    }
+
+    private static void assertCssDoesNotHideTitle(String body) {
+        String normalized = body.replaceAll("\\s+", " ");
+        assertFalse(normalized.matches(
+                "(?s).*\\bdisplay\\s*:\\s*none\\b.*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\bvisibility\\s*:\\s*hidden\\b.*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\bopacity\\s*:\\s*0(?:\\D|$).*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\b(?:clip|clip-path)\\s*:.*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\bleft\\s*:\\s*-.*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\b(?:width|height)\\s*:\\s*1px\\b.*"));
+        assertFalse(normalized.matches(
+                "(?s).*\\btransform\\s*:.*scale\\(0\\).*"));
     }
 
     private static List<String> cssRuleBodiesWithSelectorTokens(
