@@ -13,7 +13,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,7 +41,8 @@ class HomePageTemplateContractTest {
     private int port;
 
     @Test
-    void homepageReferenceTitleAssetIsTransparent() throws IOException {
+    void homepageReferenceTitleAssetIsTransparent()
+            throws IOException, NoSuchAlgorithmException {
         ClassPathResource resource = new ClassPathResource(
                 "static/img/home-messenger-reference-title.png");
         BufferedImage image = ImageIO.read(resource.getInputStream());
@@ -71,6 +75,12 @@ class HomePageTemplateContractTest {
         long totalPixels = (long) image.getWidth() * image.getHeight();
         assertTrue(transparentPixels > totalPixels / 10);
         assertTrue(visiblePixels > totalPixels / 10);
+        String digest = HexFormat.of().withUpperCase().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(resource.getContentAsByteArray()));
+        assertEquals(
+                "A7CD6FAC1D59F919243EBFC4DF4948A438A3981111D3D54D4B7DF638B1398163",
+                digest);
     }
 
     @Test
