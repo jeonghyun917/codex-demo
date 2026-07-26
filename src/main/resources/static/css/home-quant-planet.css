@@ -295,6 +295,15 @@ body {
     opacity: 1;
 }
 
+.planet-static-mode .planet-experience,
+.planet-reduced-motion .planet-experience,
+.planet-webgl-failed .planet-experience,
+.planet-intro-ready .planet-experience {
+    --intro-world-progress: 1;
+    --intro-title-progress: 1;
+    --intro-action-progress: 1;
+}
+
 @media (min-width: 1440px) and (min-height: 900px) {
     .planet-experience {
         --reference-world-size: min(84vh, 80vw);
@@ -361,6 +370,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .planet-experience {
+        --intro-world-progress: 1;
+        --intro-title-progress: 1;
+        --intro-action-progress: 1;
+    }
+
     .planet-scene,
     .reference-title,
     .planet-primary-action,

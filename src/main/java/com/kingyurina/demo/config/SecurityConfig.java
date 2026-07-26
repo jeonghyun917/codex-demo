@@ -30,6 +30,7 @@ public class SecurityConfig {
                                 pathPattern("/css/**"),
                                 pathPattern("/design-concepts/**"),
                                 pathPattern("/fonts/**"),
+                                pathPattern("/img/**"),
                                 pathPattern("/images/**"),
                                 pathPattern("/js/**"),
                                 pathPattern("/vendor/**"),

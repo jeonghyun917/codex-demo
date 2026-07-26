@@ -72,6 +72,13 @@ class HomePageTemplateContractTest {
     void homepageAssetsAreLocalAndPublicWhileUnrelatedPathsRemainProtected()
             throws Exception {
         assertEquals(200, get("/vendor/motion/motion.js").statusCode());
+        HttpResponse<byte[]> title = getBytes(
+                "/img/home-messenger-reference-title.png");
+        assertEquals(200, title.statusCode());
+        assertEquals(
+                "image/png",
+                title.headers().firstValue("Content-Type").orElse(""));
+        assertTrue(title.body().length > 0);
         assertEquals(403, get("/admin").statusCode());
 
         assertTrue(resource("static/vendor/motion/LICENSE.md")
@@ -100,6 +107,7 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "/img/home-messenger-reference-title.png",
                 titles.getFirst().getAttribute("src"));
+        assertTrue(titles.getFirst().hasAttribute("alt"));
         assertEquals("", titles.getFirst().getAttribute("alt"));
 
         List<Element> actions = elementsWithAttribute(
@@ -122,6 +130,33 @@ class HomePageTemplateContractTest {
         assertFalse(template.contains("metric"));
         assertFalse(template.contains("Product navigation"));
         assertFalse(template.contains("aria-label=\"Product navigation\""));
+    }
+
+    @Test
+    void homepageNoScriptMarkupKeepsOneCompleteAccessibleComposition()
+            throws Exception {
+        HttpResponse<String> response = getBody("/");
+        Document document = parseRenderedHtml(response.body());
+        Element root = document.getDocumentElement();
+        List<Element> titles = elementsWithAttribute(
+                root, "img", "data-reference-title");
+        List<Element> actions = elementsWithAttribute(
+                root, "a", "data-enter-quant");
+        List<Element> headings = elementsWithTag(root, "h1");
+
+        assertEquals(1, titles.size());
+        assertTrue(titles.getFirst().hasAttribute("alt"));
+        assertEquals("", titles.getFirst().getAttribute("alt"));
+        assertFalse(titles.getFirst().hasAttribute("hidden"));
+        assertEquals(1, headings.size());
+        assertEquals(
+                "Messenger",
+                headings.getFirst().getTextContent().strip());
+
+        assertEquals(1, actions.size());
+        assertEquals("/quant", actions.getFirst().getAttribute("href"));
+        assertEquals("ENTER", actions.getFirst().getTextContent().strip());
+        assertFalse(actions.getFirst().hasAttribute("hidden"));
     }
 
     @Test
@@ -213,6 +248,9 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "var(--reference-action-bottom)",
                 cssDeclaration(action, "bottom"));
+        assertEquals(
+                "clamp(112px, 9.5vw, 148px)",
+                cssDeclaration(action, "min-width"));
         assertEquals("44px", cssDeclaration(action, "min-height"));
         assertTrue(action.contains("var(--reference-action-yellow)"));
         assertTrue(css.contains(":focus-visible"));
@@ -224,6 +262,84 @@ class HomePageTemplateContractTest {
         assertFalse(css.contains(".home-brand"));
         assertFalse(css.contains(".planet-status"));
         assertFalse(css.contains(".planet-interaction-hint"));
+    }
+
+    @Test
+    void homepageFallbackStatesKeepTheSameCompleteComposition()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css");
+        String scene = cssRule(css, ".planet-scene");
+        String fallback = cssRuleContainingSelector(
+                css, ".planet-fallback");
+        String title = cssRule(css, ".reference-title");
+        String action = cssRule(css, ".planet-primary-action");
+
+        assertEquals(
+                "var(--reference-world-size)",
+                cssDeclaration(scene, "width"));
+        assertEquals(
+                "var(--reference-world-size)",
+                cssDeclaration(scene, "height"));
+        assertEquals("0", cssDeclaration(fallback, "inset"));
+        assertEquals("100%", cssDeclaration(fallback, "width"));
+        assertEquals("100%", cssDeclaration(fallback, "height"));
+        assertEquals(
+                "var(--reference-world-center-y)",
+                cssDeclaration(scene, "top"));
+        assertEquals(
+                "var(--reference-world-center-y)",
+                cssDeclaration(title, "top"));
+        assertEquals(
+                "var(--reference-title-width)",
+                cssDeclaration(title, "width"));
+        assertEquals(
+                "var(--reference-action-bottom)",
+                cssDeclaration(action, "bottom"));
+
+        for (String selector : List.of(
+                ".planet-static-mode .planet-experience",
+                ".planet-reduced-motion .planet-experience",
+                ".planet-webgl-failed .planet-experience")) {
+            String fallbackState = cssRuleContainingSelector(css, selector);
+            assertEquals(
+                    "1",
+                    cssDeclaration(
+                            fallbackState, "--intro-world-progress"));
+            assertEquals(
+                    "1",
+                    cssDeclaration(
+                            fallbackState, "--intro-title-progress"));
+            assertEquals(
+                    "1",
+                    cssDeclaration(
+                            fallbackState, "--intro-action-progress"));
+            assertFalse(fallbackState.contains("--reference-world-size"));
+            assertFalse(fallbackState.contains("--reference-title-width"));
+            assertFalse(fallbackState.contains("--reference-action-bottom"));
+        }
+    }
+
+    @Test
+    void homepageProductionHasNoScrollOrLegacyProductBehavior()
+            throws IOException {
+        String production = String.join("\n", List.of(
+                resource("templates/index.html"),
+                resource("static/css/home-quant-planet.css"),
+                resource("static/js/home-quant-planet.js"),
+                resource("static/js/home-quant-planet-composition.js"),
+                resource("static/js/home-quant-planet-input.js"),
+                resource("static/js/home-quant-planet-motion.js"),
+                resource("static/js/home-quant-planet-runtime.js"),
+                resource("static/js/home-quant-planet-scene.js"),
+                resource("static/js/home-quant-planet-world.js")));
+        String normalized = production.toLowerCase();
+
+        assertFalse(normalized.contains("wheel"));
+        assertFalse(normalized.contains("scroll"));
+        assertFalse(production.contains("PRODUCT_SCENES"));
+        assertFalse(production.contains("createProductSelection"));
+        assertFalse(production.contains("data-product-"));
+        assertFalse(production.contains("product-title"));
     }
 
     @Test
@@ -375,6 +491,25 @@ class HomePageTemplateContractTest {
         return matcher.group(1).strip().replaceAll("\\s+", " ");
     }
 
+    private static String cssRuleContainingSelector(
+            String css,
+            String selector) {
+        Matcher matcher = Pattern.compile(
+                "(?s)([^{}]+)\\{([^}]*)}")
+                .matcher(css);
+        while (matcher.find()) {
+            if (matcher.group(1).contains("@")) {
+                continue;
+            }
+            for (String candidate : matcher.group(1).split(",")) {
+                if (candidate.strip().equals(selector)) {
+                    return matcher.group(2);
+                }
+            }
+        }
+        throw new AssertionError("Missing CSS selector: " + selector);
+    }
+
     private HttpResponse<Void> get(String path)
             throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
@@ -395,5 +530,16 @@ class HomePageTemplateContractTest {
         return HttpClient.newHttpClient().send(
                 request,
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    }
+
+    private HttpResponse<byte[]> getBytes(String path)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://127.0.0.1:" + port + path))
+                .GET()
+                .build();
+        return HttpClient.newHttpClient().send(
+                request,
+                HttpResponse.BodyHandlers.ofByteArray());
     }
 }

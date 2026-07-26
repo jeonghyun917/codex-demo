@@ -532,6 +532,14 @@ test("maps missing Motion, reduced motion, and static query to static mode", () 
             motionDisabled: capabilities.motionDisabled
         });
         assertCompleteFallback(harness);
+        assert.equal(
+            harness.root.classList.contains("planet-static-mode"),
+            true
+        );
+        assert.equal(
+            harness.root.classList.contains("planet-reduced-motion"),
+            true
+        );
         assert.equal(harness.sceneConstructionCalls(), 0);
         assert.equal(harness.input.createCalls, 0);
         assert.equal(harness.frameQueue.frames.size, 0);
@@ -581,6 +589,27 @@ test("shows the complete fallback and retires WebGL on context loss", async () =
     assert.equal(scene.disposeCalls, 1);
     assert.equal(harness.input.destroyCalls, 1);
     assert.equal(harness.frameQueue.frames.size, 0);
+});
+
+test("publishes bounded loopback diagnostics without wheel or scroll listeners", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+
+    harness.frameQueue.runNext(16);
+
+    assert.equal(harness.canvas.dataset.renderMs, "0.00");
+    assert.equal(harness.canvas.dataset.drawCalls, "43");
+    assert.equal(harness.canvas.dataset.triangles, "7155");
+    for (const target of [
+        harness.canvas,
+        harness.documentTarget,
+        harness.windowTarget
+    ]) {
+        assert.equal(target.listenerCount("wheel"), 0);
+        assert.equal(target.listenerCount("scroll"), 0);
+    }
 });
 
 test("destroy cancels timer, Motion, input, scene, and RAF exactly once", async () => {

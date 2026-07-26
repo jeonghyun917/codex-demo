@@ -82,6 +82,12 @@ export function createQuantPlanetRuntime({
     let worldAngle = 0;
 
     root.classList.add("planet-runtime-starting");
+    if (staticMode) {
+        root.classList.add("planet-static-mode");
+    }
+    if (motionDisabled) {
+        root.classList.add("planet-reduced-motion");
+    }
 
     function applyIntroState(state) {
         root.dataset.introPhase = state.phase;
