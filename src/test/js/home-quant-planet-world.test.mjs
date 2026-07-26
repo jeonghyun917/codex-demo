@@ -13,6 +13,18 @@ const profile = {
     shadows: true
 };
 
+const balancedProfile = {
+    name: "balanced",
+    webgl: true,
+    pixelRatio: 1.25,
+    pointerEnabled: true,
+    shadows: false,
+    outlineLevel: 1,
+    foliageCount: 18,
+    cloudCount: 5,
+    planetScale: .82
+};
+
 function createWorld(t) {
     const world = createQuantPlanetWorld(THREE, { profile });
     t.after(() => world.dispose());
@@ -303,6 +315,39 @@ test("derives dense front-only coverage from rendered surface placements", (t) =
             `opposite yaw ${index} double-counted rear placements`
         );
     }
+});
+
+test("balanced profile preserves foliage density in every yaw sector", (t) => {
+    const world = createQuantPlanetWorld(THREE, {
+        profile: balancedProfile
+    });
+    t.after(() => world.dispose());
+    const density = world.getSurfaceDensity();
+
+    density.sectors.forEach((sector) => {
+        assert.ok(
+            sector.counts.foliageRock >= 6,
+            `balanced sector ${sector.index} has only `
+                + `${sector.counts.foliageRock} foliage/rock details`
+        );
+        assert.ok(sector.total >= 20);
+    });
+    density.boundarySamples.forEach((sample) => {
+        assert.ok(
+            sample.counts.foliageRock >= 6,
+            `balanced boundary ${sample.yawDegrees} has only `
+                + `${sample.counts.foliageRock} foliage/rock details`
+        );
+    });
+    density.frontViews.forEach((view) => {
+        assert.ok(view.total >= 70);
+        assert.equal(view.visibleCategoryCount, 4);
+        assert.equal(view.projectedQuadrants.length, 4);
+    });
+
+    const stats = world.getRenderStats();
+    assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
+    assert.ok(stats.triangles <= 140000);
 });
 
 test("animates water and utility details deterministically unless motion is reduced", (t) => {

@@ -104,3 +104,63 @@ calibration and the complete Maven verification also remain Task 4 work.
 ## Commit
 
 Implementation commit SHA: `cdffd23`
+
+## Fix round 1: balanced foliage distribution
+
+### Finding and correction
+
+The non-high foliage path selected the first `foliageCount` entries from the
+flattened belts. The real balanced profile (`foliageCount: 18`) therefore
+rendered only one foliage/rock placement in sector 0 and deleted detail from
+other later sectors instead of reducing it evenly.
+
+Non-high selection now prioritizes the authored continuous-canopy belt, groups
+candidate placements by their rendered `sectorIndex`, and selects them in
+round-robin sector order. The balanced profile enforces the contract minimum
+of six placements in each of eight sectors (48 total); additional requested
+placements remain evenly distributed. A zero-foliage static profile remains
+empty, while high still renders all authored foliage placements.
+
+### TDD evidence
+
+RED command:
+
+```text
+node --test src/test/js/home-quant-planet-world.test.mjs
+```
+
+Result: 16 passing, 1 failing. The new real-balanced-profile test failed with
+`balanced sector 0 has only 1 foliage/rock details`, reproducing the prefix
+slice bias.
+
+GREEN command:
+
+```text
+node --test src/test/js/home-quant-planet-world.test.mjs
+```
+
+Result: 17 passing, 0 failing, 0 warnings. Balanced sector foliage counts are
+`6, 6, 6, 6, 6, 6, 6, 6`; all eight 22.5-degree boundary samples also contain
+six foliage/rock details.
+
+Related homepage regression:
+
+```text
+node --test src/test/js/home-quant-planet-*.test.mjs
+```
+
+Result: 102 passing, 1 failing. The sole failure remains the previously
+documented Task 4 exact composition fixture (`72 / 9,465` expected versus
+renderer-real `68 / 22,041`, still `withinBudget: true`). No new related
+homepage regression was introduced by this fix.
+
+### Balanced and high budgets
+
+- Balanced: `38` mesh calls, `0` shadow calls, `17,374` triangles, `195`
+  rendered density placements, front-view totals `93` to `102`, maximum gap
+  `9 degrees`.
+- High: `39` mesh calls, `3` shadow calls, `21,725` triangles, `240` rendered
+  density placements, front-view totals `118` to `122`, maximum gap
+  `6.67 degrees`.
+- Both profiles remain below `75` calls including shadows and `140,000`
+  triangles.

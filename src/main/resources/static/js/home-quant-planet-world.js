@@ -349,6 +349,75 @@ function buildSurfaceDensity(placements) {
     });
 }
 
+function selectFoliagePlacements(profile) {
+    const allPlacements = FOREST_BELTS.flatMap(
+        (belt) => belt.placements
+    );
+    if (profile.name === "high") {
+        return Object.freeze(allPlacements);
+    }
+
+    const requestedCount = Math.max(
+        0,
+        Math.floor(profile.foliageCount ?? 18)
+    );
+    if (requestedCount === 0) {
+        return Object.freeze([]);
+    }
+
+    const minimumDenseCount = WORLD_DISTRICTS.length * 6;
+    const targetCount = Math.min(
+        allPlacements.length,
+        profile.name === "balanced"
+            ? Math.max(requestedCount, minimumDenseCount)
+            : requestedCount
+    );
+    const continuousBelt = FOREST_BELTS.find(
+        (belt) => belt.id === "continuous-canopy"
+    );
+    const continuousIds = new Set(
+        continuousBelt?.placements.map((placement) => placement.id)
+    );
+    const prioritizedPlacements = [
+        ...(continuousBelt?.placements ?? []),
+        ...allPlacements.filter(
+            (placement) => !continuousIds.has(placement.id)
+        )
+    ];
+    const placementsBySector = Array.from(
+        { length: WORLD_DISTRICTS.length },
+        () => []
+    );
+    prioritizedPlacements.forEach((placement) => {
+        placementsBySector[placement.sectorIndex].push(placement);
+    });
+
+    const selected = [];
+    for (
+        let round = 0;
+        selected.length < targetCount;
+        round += 1
+    ) {
+        let addedThisRound = false;
+        for (
+            let sectorIndex = 0;
+            sectorIndex < placementsBySector.length
+                && selected.length < targetCount;
+            sectorIndex += 1
+        ) {
+            const placement = placementsBySector[sectorIndex][round];
+            if (placement) {
+                selected.push(placement);
+                addedThisRound = true;
+            }
+        }
+        if (!addedThisRound) {
+            break;
+        }
+    }
+    return Object.freeze(selected);
+}
+
 function buildPlanetCore(THREE, resources, palette) {
     const group = new THREE.Group();
     group.name = "ReferencePlanetCore";
@@ -1231,15 +1300,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         const industrial = buildIndustrialCluster(THREE, resources, palette);
         const utility = buildUtilityCluster(THREE, resources, palette);
         const villages = buildVillageClusters(THREE, resources, palette);
-        const allFoliagePlacements = FOREST_BELTS.flatMap(
-            (belt) => belt.placements
-        );
-        const foliagePlacements = profile.name === "high"
-            ? allFoliagePlacements
-            : allFoliagePlacements.slice(
-                0,
-                Math.max(0, Math.floor(profile.foliageCount ?? 18))
-            );
+        const foliagePlacements = selectFoliagePlacements(profile);
         const canopy = buildLowerCanopy(
             THREE,
             resources,
