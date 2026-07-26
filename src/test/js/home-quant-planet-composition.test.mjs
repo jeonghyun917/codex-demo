@@ -72,6 +72,12 @@ function createSceneHarness() {
                 aspect: camera.aspect,
                 near: camera.near,
                 far: camera.far,
+                fog: scene.fog
+                    ? {
+                        near: scene.fog.near,
+                        far: scene.fog.far
+                    }
+                    : null,
                 position: camera.position.clone(),
                 target: camera.lookAtTarget.clone(),
                 worldScale: planet.scale.x,
@@ -272,4 +278,20 @@ test("caps renderer DPR and preserves diagnostics budgets", async (t) => {
         limits: { drawCalls: 75, triangles: 140000 },
         withinBudget: true
     });
+});
+
+test("keeps authored world colors unobscured at every fitted camera depth", async (t) => {
+    const scene = await createTestScene(t, {
+        width: 1190,
+        height: 1087
+    });
+
+    assert.equal(scene.controller.render(pose()), true);
+    scene.canvas.clientWidth = 375;
+    scene.canvas.clientHeight = 812;
+    scene.controller.resize();
+    assert.equal(scene.controller.render(pose()), true);
+
+    assert.equal(scene.frames[0].fog, null);
+    assert.equal(scene.frames[1].fog, null);
 });

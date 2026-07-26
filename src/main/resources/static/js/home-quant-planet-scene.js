@@ -89,7 +89,6 @@ export async function createQuantPlanetScene({
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0xd9efe8, 11, 24);
         const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
         world = createQuantPlanetWorld(THREE, { profile });
         const worldScale = Math.max(
