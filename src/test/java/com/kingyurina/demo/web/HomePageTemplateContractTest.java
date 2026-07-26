@@ -2,8 +2,10 @@ package com.kingyurina.demo.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.imageio.ImageIO;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,18 @@ class HomePageTemplateContractTest {
 
     @LocalServerPort
     private int port;
+
+    @Test
+    void homepageReferenceTitleAssetIsTransparent() throws IOException {
+        ClassPathResource resource = new ClassPathResource(
+                "static/img/home-messenger-reference-title.png");
+        BufferedImage image = ImageIO.read(resource.getInputStream());
+
+        assertNotNull(image);
+        assertTrue(image.getWidth() >= 900);
+        assertTrue(image.getHeight() >= 700);
+        assertTrue(image.getColorModel().hasAlpha());
+    }
 
     @Test
     void homepageAssetsArePublicWhileUnrelatedPathsRemainProtected() throws Exception {

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import * as THREE from "../../main/resources/static/js/vendor/three.module.js";
 import {
     PRODUCT_SCENES,
+    REFERENCE_HERO,
     REFERENCE_TIMING,
     createProductSelection,
     fitPerspectiveSphere,
@@ -172,6 +173,17 @@ test("keeps the composition dependency graph acyclic", async () => {
         composition: [],
         motion: ["composition"]
     });
+});
+
+test("defines one messenger reference hero without homepage routes", () => {
+    assert.deepEqual(REFERENCE_HERO, {
+        titleAssetUrl: "/img/home-messenger-reference-title.png",
+        introDeadlineMs: 3999,
+        worldRevolutionMs: 96000,
+        dragRadiansPerPixel: 0.0048,
+        settleMs: 720
+    });
+    assert.equal("routes" in REFERENCE_HERO, false);
 });
 
 test("defines the six original Quant product scenes and exact routes", () => {

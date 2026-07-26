@@ -3,6 +3,14 @@ const radians = (degrees) => degrees * Math.PI / 180;
 const clamp = (value, minimum, maximum) =>
     Math.min(Math.max(Number(value) || 0, minimum), maximum);
 
+export const REFERENCE_HERO = Object.freeze({
+    titleAssetUrl: "/img/home-messenger-reference-title.png",
+    introDeadlineMs: 3999,
+    worldRevolutionMs: 96000,
+    dragRadiansPerPixel: 0.0048,
+    settleMs: 720
+});
+
 export function wrapIndex(index, count = 6) {
     const length = Math.max(1, Math.trunc(Number(count)) || 1);
     return ((Math.trunc(Number(index)) || 0) % length + length) % length;
