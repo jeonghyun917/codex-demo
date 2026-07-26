@@ -68,6 +68,24 @@ silhouettes remain authored groups.
 The detailed field wraps across sector boundaries so no rotation sample reveals
 a large undressed core face.
 
+### Original panoramic surface art
+
+The counted placement field and protruding Three.js meshes are not sufficient
+when their gaps still reveal a uniform primitive core. The irregular rotating
+core therefore uses the locally authored
+`/images/quant-planet-panorama-v1.png` as an equirectangular color map.
+
+The panorama is original Quant artwork containing continuous hand-inked houses,
+cliffs, waterways, forest, utility towers, and rust machinery at every
+longitude. It contains no text, copied brand asset, remote dependency, or
+runtime API request. The texture rotates only because it is attached to the
+autonomous `PlanetRoot`; pointer input never changes it.
+
+Three-dimensional terrain, village, shrine, industrial, utility, canopy, and
+debris meshes remain above the mapped core to provide real silhouette,
+parallax, side depth, and shadows. Their outlines are restrained so they do not
+become black blocks over the detailed map.
+
 ## Behavioral Contracts
 
 - Planet yaw is a pure function of elapsed time and never consumes pointer,
@@ -135,6 +153,8 @@ variation at or below 15%, and the largest bare connected region at or below
 - rendered triangles remain at or below `140000`;
 - the established desktop diagnostic render time remains at or below `12ms`;
 - no per-frame geometry, material, or texture allocation is introduced;
+- the local panorama is loaded once, uses sRGB color, wraps horizontally, and
+  is disposed exactly once with the world;
 - reduced-motion and WebGL-failure screens retain the same final composition;
 - all owned resources remain exactly-once disposable.
 

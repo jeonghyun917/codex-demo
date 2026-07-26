@@ -9,6 +9,9 @@ import {
     WORLD_DISTRICTS
 } from "./home-quant-planet-world-layout.js";
 
+export const QUANT_PLANET_PANORAMA_URL =
+    "/images/quant-planet-panorama-v1.png";
+
 const COLORS = Object.freeze({
     water: 0x78d7d0,
     waterDeep: 0x338f91,
@@ -42,6 +45,35 @@ function createGradientMap(THREE) {
 
 function createToonMaterial(THREE, color, gradientMap, options = {}) {
     return new THREE.MeshToonMaterial({ color, gradientMap, ...options });
+}
+
+function applySurfaceTexture(THREE, body, texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
+    body.material.map = texture;
+    body.material.color.setHex(0xffffff);
+    body.material.needsUpdate = true;
+}
+
+function restorePlainSurface(body) {
+    body.material.map = null;
+    body.material.color.setHex(COLORS.ground);
+    body.material.needsUpdate = true;
+}
+
+function loadBrowserSurfaceTexture(THREE, textureLoader, onError) {
+    try {
+        return (textureLoader ?? new THREE.TextureLoader()).load(
+            QUANT_PLANET_PANORAMA_URL,
+            undefined,
+            undefined,
+            onError
+        );
+    } catch {
+        return null;
+    }
 }
 
 function createWaterMaterial(THREE) {
@@ -1167,7 +1199,12 @@ function buildFloatingDebris(THREE, resources, palette, placements) {
     return group;
 }
 
-export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
+export function createQuantPlanetWorld(THREE, {
+    profile = {},
+    surfaceTexture = null,
+    documentTarget = typeof document === "undefined" ? null : document,
+    textureLoader = null
+} = {}) {
     const geometries = new Set();
     const materials = new Set();
     const textures = new Set();
@@ -1214,7 +1251,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             geometry: {
                 box: ownGeometry(new THREE.BoxGeometry(1, 1, 1, 1, 1, 1)),
                 villageOutlineBox: ownGeometry(
-                    new THREE.BoxGeometry(1.12, 1.12, 1.12, 1, 1, 1)
+                    new THREE.BoxGeometry(1.035, 1.035, 1.035, 1, 1, 1)
                 ),
                 cylinder: ownGeometry(
                     new THREE.CylinderGeometry(1, 1, 1, 8, 1)
@@ -1323,6 +1360,25 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
         const content = new THREE.Group();
         content.name = "ReferencePlanetMiniature";
         const core = buildPlanetCore(THREE, resources, palette);
+        const body = core.getObjectByName("ReferencePlanetBody");
+        let browserTexture = null;
+        let browserTextureFailed = false;
+        if (!surfaceTexture && documentTarget) {
+            browserTexture = loadBrowserSurfaceTexture(
+                THREE,
+                textureLoader,
+                () => {
+                    browserTextureFailed = true;
+                    restorePlainSurface(body);
+                }
+            );
+        }
+        const resolvedSurfaceTexture = surfaceTexture
+            ?? (browserTextureFailed ? null : browserTexture);
+        if (resolvedSurfaceTexture) {
+            textures.add(resolvedSurfaceTexture);
+            applySurfaceTexture(THREE, body, resolvedSurfaceTexture);
+        }
         const waterBand = buildWaterBand(THREE, resources, palette);
         const temple = buildTemplePeak(THREE, resources, palette);
         const industrial = buildIndustrialCluster(THREE, resources, palette);

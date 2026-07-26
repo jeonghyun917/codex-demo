@@ -519,6 +519,72 @@ test("builds an irregular rounded reference core", (t) => {
     assert.ok(Math.max(...radii) / Math.min(...radii) <= 1.3);
 });
 
+test("maps an injected panorama onto the core with one owned texture disposal", () => {
+    const texture = new THREE.Texture();
+    let disposeCalls = 0;
+    texture.dispose = () => {
+        disposeCalls += 1;
+    };
+    const world = createQuantPlanetWorld(THREE, {
+        profile,
+        surfaceTexture: texture
+    });
+    const body = world.group.getObjectByName("ReferencePlanetBody");
+
+    assert.equal(body.material.map, texture);
+    assert.equal(texture.colorSpace, THREE.SRGBColorSpace);
+    assert.equal(texture.wrapS, THREE.RepeatWrapping);
+    assert.equal(texture.wrapT, THREE.ClampToEdgeWrapping);
+    assert.equal(body.material.color.getHex(), 0xffffff);
+
+    world.dispose();
+    world.dispose();
+    assert.equal(disposeCalls, 1);
+});
+
+test("uses the local panorama URL only in browser-capable worlds", () => {
+    const texture = new THREE.Texture();
+    const failedTexture = new THREE.Texture();
+    const urls = [];
+    const browserWorld = createQuantPlanetWorld(THREE, {
+        profile,
+        documentTarget: {},
+        textureLoader: {
+            load(url) {
+                urls.push(url);
+                return texture;
+            }
+        }
+    });
+    const fallbackWorld = createQuantPlanetWorld(THREE, {
+        profile,
+        documentTarget: null
+    });
+    const failedWorld = createQuantPlanetWorld(THREE, {
+        profile,
+        documentTarget: {},
+        textureLoader: {
+            load(url, onLoad, onProgress, onError) {
+                onError(new Error("texture load failed"));
+                return failedTexture;
+            }
+        }
+    });
+
+    assert.deepEqual(urls, ["/images/quant-planet-panorama-v1.png"]);
+    assert.equal(
+        browserWorld.group.getObjectByName("ReferencePlanetBody").material.map,
+        texture
+    );
+    for (const world of [fallbackWorld, failedWorld]) {
+        const body = world.group.getObjectByName("ReferencePlanetBody");
+        assert.equal(body.material.map, null);
+        assert.equal(body.material.color.getHex(), 0xa8bf78);
+        world.dispose();
+    }
+    browserWorld.dispose();
+});
+
 test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     const world = createWorld(t);
     [

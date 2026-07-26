@@ -239,6 +239,24 @@ uniform core, enter a visual-exposure RED/GREEN loop before continuing:
 4. verify the exposure test, world tests, full Node tests, and scene budget;
 5. rebuild and repeat the browser comparison before accepting the task.
 
+If exposed primitives still read as sparse blocks rather than the reference's
+continuous illustrated world, use the approved hybrid surface-art correction:
+
+1. add the original project asset
+   `src/main/resources/static/images/quant-planet-panorama-v1.png`;
+2. write a failing world test that supplies a real Three.js texture and
+   requires `ReferencePlanetBody` to use it with sRGB color, horizontal repeat,
+   no vertical repeat, neutral material tint, and exactly-once disposal;
+3. write a failing scene/browser contract for the exact local `/images/` URL
+   and ensure Node/static test environments retain the plain-color fallback;
+4. implement one-time local texture loading and apply it only to the rotating
+   core while keeping all protruding Three.js detail meshes;
+5. reduce the village outline inflation until it reads as a thin graphite edge
+   rather than a black backing plate;
+6. run world, full Node, Maven, lifecycle, and renderer-budget verification;
+7. rebuild 8081 and visually compare the mapped core at several autonomous yaw
+   timestamps before accepting the task.
+
 - [ ] **Step 4: Check runtime diagnostics**
 
 Read the page's diagnostic object and confirm draw calls plus shadows `<= 75`,
