@@ -600,8 +600,8 @@ test("combines renderer-real rig diagnostics within the scene budget", async (t)
     scene.controller.render(pose());
     assert.deepEqual(scene.pixelRatios, [1.5]);
     assert.deepEqual(scene.controller.getDiagnostics(), {
-        drawCalls: 68,
-        triangles: 22041,
+        drawCalls: 69,
+        triangles: 23337,
         limits: { drawCalls: 75, triangles: 140000 },
         withinBudget: true
     });

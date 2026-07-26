@@ -85,6 +85,29 @@ function authoredDistrictOccupancy(root) {
     };
 }
 
+function sectorForSurfacePosition(position) {
+    const yaw = (Math.atan2(position.z, position.x) * 180 / Math.PI + 360)
+        % 360;
+    return Math.floor((yaw + 22.5) / 45) % 8;
+}
+
+function instanceTransforms(mesh) {
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    return Array.from({ length: mesh.count }, (_, index) => {
+        mesh.getMatrixAt(index, matrix);
+        matrix.decompose(position, quaternion, scale);
+        return {
+            index,
+            position: position.clone(),
+            scale: scale.clone(),
+            matrix: matrix.clone()
+        };
+    });
+}
+
 test("builds every authored reference silhouette group", (t) => {
     const world = createWorld(t);
 
@@ -143,6 +166,61 @@ test("villages share one rendered building instance family", (t) => {
     );
     assert.equal(buildings?.isInstancedMesh, true);
     assert.ok(buildings.count >= 72);
+});
+
+test("exposes large village bodies and terrain shelves in every sector", (t) => {
+    const world = createWorld(t);
+    const buildings = world.group.getObjectByName(
+        "ReferenceVillageBuildingFamily"
+    );
+    const outlines = world.group.getObjectByName(
+        "ReferenceVillageOutlineFamily"
+    );
+    const terrain = world.group.getObjectByName("ReferenceTerrainPatches");
+
+    assert.equal(buildings?.isInstancedMesh, true);
+    assert.equal(outlines?.isInstancedMesh, true);
+    assert.equal(terrain?.isInstancedMesh, true);
+
+    const buildingBodies = instanceTransforms(buildings).filter(
+        ({ index }) => index % 3 === 0
+    );
+    const outlineBodies = instanceTransforms(outlines).filter(
+        ({ index }) => index % 3 === 0
+    );
+    assert.deepEqual(
+        outlineBodies.map(({ matrix }) => matrix.elements),
+        buildingBodies.map(({ matrix }) => matrix.elements),
+        "the graphite outline family must use the building body matrices"
+    );
+
+    for (let sector = 0; sector < 8; sector += 1) {
+        const visibleVillageBodies = buildingBodies.filter(({ position, scale }) =>
+            sectorForSurfacePosition(position) === sector
+                && scale.x >= .48
+                && scale.y >= .50
+                && position.length() >= 3.55
+        );
+        const visibleTerrain = instanceTransforms(terrain).filter(
+            ({ position, scale }) => {
+                const broadAxes = [scale.x, scale.y, scale.z]
+                    .map(Math.abs)
+                    .toSorted((left, right) => right - left);
+                return sectorForSurfacePosition(position) === sector
+                    && position.length() >= 3.48
+                    && broadAxes[0] >= .48
+                    && broadAxes[1] >= .38;
+            }
+        );
+        assert.ok(
+            visibleVillageBodies.length >= 3,
+            `sector ${sector} must expose three large village bodies`
+        );
+        assert.ok(
+            visibleTerrain.length >= 6,
+            `sector ${sector} must expose six broad terrain shelves`
+        );
+    }
 });
 
 test("uses only the world angle for deterministic primary yaw", (t) => {

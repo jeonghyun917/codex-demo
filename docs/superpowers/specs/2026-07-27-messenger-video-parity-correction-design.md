@@ -89,6 +89,16 @@ a large undressed core face.
   foliage/rock pieces, and five or more utility/silhouette details.
 - The maximum authored azimuth gap between neighboring surface details is at
   most 18 degrees.
+- Density counts alone do not qualify as visible detail. Every sector must have
+  at least three structure bodies with a minimum world-space width of 0.48,
+  height of 0.50, and center radius of 3.55 so the objects sit above the core
+  rather than inside it.
+- Every sector must expose at least six terrain masses whose center radius is
+  at least 3.48 and whose two broad axes are at least 0.48 and 0.38. Terrain
+  uses multiple stone, earth, and pale surface tones rather than one uniform
+  olive material.
+- The global village instance family has a matching instanced graphite outline
+  family. The extra outline call must remain inside the 75-call scene budget.
 - `getSurfaceDensity()` derives immutable sector, boundary, latitude-band, and
   front-hemisphere summaries from the same placement arrays that populate the
   rendered instanced families; opposite yaw samples partition, rather than
@@ -102,6 +112,9 @@ At desktop and portrait mobile sizes:
 
 - the planet fills the same dominant central area as the reference;
 - the world silhouette stays round, layered, and detailed through a full turn;
+- crooked houses, roof pieces, stone shelves, paths, pipes, and machinery read
+  as distinct objects at normal viewport scale instead of disappearing into
+  the core or a uniform tree ring;
 - nine glyphs visibly move as separate solid objects rather than a shared
   plane;
 - the strongest pointer poses show visibly different faces and depths per

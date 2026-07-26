@@ -444,6 +444,11 @@ function buildPlanetCore(THREE, resources, palette) {
     );
     terrain.name = "ReferenceTerrainPatches";
     const matrix = new THREE.Matrix4();
+    const terrainColors = [
+        new THREE.Color(COLORS.rock),
+        new THREE.Color(COLORS.groundShade),
+        new THREE.Color(0xc8bb8a)
+    ];
     TERRAIN_PATCHES.forEach((placement, index) => {
         orientSurfaceInstance(
             THREE,
@@ -453,6 +458,7 @@ function buildPlanetCore(THREE, resources, palette) {
             placement.rotation
         );
         terrain.setMatrixAt(index, matrix);
+        terrain.setColorAt(index, terrainColors[index % terrainColors.length]);
     });
     markInstancesDirty(terrain);
     tagSurfaceInstances(terrain, TERRAIN_PATCHES);
@@ -923,6 +929,12 @@ function buildVillageClusters(THREE, resources, palette) {
         VILLAGE_PLACEMENTS.length * 3
     );
     buildings.name = "ReferenceVillageBuildingFamily";
+    const outlines = new THREE.InstancedMesh(
+        resources.geometry.villageOutlineBox,
+        resources.villageOutline,
+        VILLAGE_PLACEMENTS.length * 3
+    );
+    outlines.name = "ReferenceVillageOutlineFamily";
     const matrix = new THREE.Matrix4();
     const architectureColor = new THREE.Color(COLORS.architecture);
     const roofColor = new THREE.Color(COLORS.coralShade);
@@ -936,6 +948,7 @@ function buildVillageClusters(THREE, resources, palette) {
             placement.rotation
         );
         buildings.setMatrixAt(instanceIndex, matrix);
+        outlines.setMatrixAt(instanceIndex, matrix);
         buildings.setColorAt(instanceIndex, architectureColor);
 
         const normal = new THREE.Vector3(...placement.position).normalize();
@@ -971,6 +984,10 @@ function buildVillageClusters(THREE, resources, palette) {
                 instanceIndex + (side === -1 ? 1 : 2),
                 matrix
             );
+            outlines.setMatrixAt(
+                instanceIndex + (side === -1 ? 1 : 2),
+                matrix
+            );
             buildings.setColorAt(
                 instanceIndex + (side === -1 ? 1 : 2),
                 roofColor
@@ -978,8 +995,9 @@ function buildVillageClusters(THREE, resources, palette) {
         }
     });
     markInstancesDirty(buildings);
+    markInstancesDirty(outlines);
     tagSurfaceInstances(buildings, VILLAGE_PLACEMENTS);
-    return { clusters, buildings };
+    return { clusters, buildings, outlines };
 }
 
 function buildSurfaceUtilityFamilies(THREE, resources, palette) {
@@ -1183,13 +1201,21 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
                 side: THREE.BackSide
             }))
             : null;
+        const villageOutline = ownMaterial(new THREE.MeshBasicMaterial({
+            color: COLORS.ink,
+            side: THREE.BackSide
+        }));
         const resources = {
             ownGeometry,
             shadows: Boolean(profile.shadows),
             outline,
             heroOutline: profile.outlineLevel > 1 ? outline : null,
+            villageOutline,
             geometry: {
                 box: ownGeometry(new THREE.BoxGeometry(1, 1, 1, 1, 1, 1)),
+                villageOutlineBox: ownGeometry(
+                    new THREE.BoxGeometry(1.12, 1.12, 1.12, 1, 1, 1)
+                ),
                 cylinder: ownGeometry(
                     new THREE.CylinderGeometry(1, 1, 1, 8, 1)
                 ),
@@ -1245,7 +1271,9 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
                 createToonMaterial(THREE, COLORS.ground, gradientMap)
             ),
             groundShade: ownMaterial(
-                createToonMaterial(THREE, COLORS.groundShade, gradientMap)
+                createToonMaterial(THREE, 0xffffff, gradientMap, {
+                    vertexColors: true
+                })
             ),
             architecture: ownMaterial(
                 createToonMaterial(THREE, COLORS.architecture, gradientMap)
@@ -1343,6 +1371,7 @@ export function createQuantPlanetWorld(THREE, { profile = {} } = {}) {
             industrial,
             utility.group,
             villages.buildings,
+            villages.outlines,
             ...villages.clusters.values(),
             canopy,
             debris,

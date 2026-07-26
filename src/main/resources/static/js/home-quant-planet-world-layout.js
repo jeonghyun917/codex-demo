@@ -240,11 +240,11 @@ const DENSE_TERRAIN_PATCHES = generatedPlacements({
     family: "terrain",
     yawOffsets: [-18, -11, -4, 4, 11, 18],
     latitudes: [-.46, .5, -.12, .28, -.32, .08],
-    radius: 3.34,
+    radius: 3.52,
     scaleForIndex: (index) => [
-        .38 + index % 3 * .07,
-        .11 + index % 2 * .025,
-        .3 + (index + 1) % 3 * .055
+        .58 + index % 3 * .07,
+        .16 + index % 2 * .03,
+        .46 + (index + 1) % 3 * .055
     ],
     rotationForIndex: (index, sectorIndex) => [
         (index % 2 ? -.08 : .08),
@@ -353,11 +353,11 @@ const DENSE_VILLAGE_PLACEMENTS = generatedPlacements({
     family: "village",
     yawOffsets: [-14, 0, 14],
     latitudes: [-.3, .12, .42],
-    radius: 3.5,
+    radius: 3.62,
     scaleForIndex: (index, sectorIndex) => [
-        .22 + (index + sectorIndex) % 3 * .025,
-        .3 + index * .035,
-        .22 + (index + 1) % 2 * .025
+        .52 + (index + sectorIndex) % 3 * .04,
+        .56 + index * .05,
+        .48 + (index + 1) % 2 * .05
     ],
     rotationForIndex: (index, sectorIndex) => [
         index % 2 ? -.05 : .05,

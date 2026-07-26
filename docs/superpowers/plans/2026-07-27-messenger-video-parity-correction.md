@@ -224,6 +224,21 @@ captures, measure planet-ring foreground occupancy `>= 40%`, detail-edge
 density `>= 22%`, sector variation `<= 15%`, and largest bare connected region
 `<= 12%` of the silhouette.
 
+If the numeric placement density passes but the browser still shows a broad
+uniform core, enter a visual-exposure RED/GREEN loop before continuing:
+
+1. add a real-instance test that inspects village body and terrain instance
+   matrices per sector;
+2. verify RED when any sector has fewer than three village bodies with
+   width `>= 0.48`, height `>= 0.50`, and center radius `>= 3.55`, or fewer
+   than six terrain instances with center radius `>= 3.48` and broad axes
+   `>= 0.48` and `>= 0.38`;
+3. enlarge and radially expose the existing placement families, add
+   vertex-colored terrain variation, and add one matching instanced graphite
+   outline family for villages;
+4. verify the exposure test, world tests, full Node tests, and scene budget;
+5. rebuild and repeat the browser comparison before accepting the task.
+
 - [ ] **Step 4: Check runtime diagnostics**
 
 Read the page's diagnostic object and confirm draw calls plus shadows `<= 75`,
