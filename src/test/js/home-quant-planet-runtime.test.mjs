@@ -193,7 +193,7 @@ function createScene() {
             this.disposeCalls += 1;
         },
         getDiagnostics() {
-            return { drawCalls: 43, triangles: 7155 };
+            return { drawCalls: 72, triangles: 7471 };
         },
         render(pose) {
             this.poses.push(structuredClone(pose));
@@ -702,8 +702,8 @@ test("publishes bounded loopback diagnostics without wheel or scroll listeners",
     harness.frameQueue.runNext(16);
 
     assert.equal(harness.canvas.dataset.renderMs, "0.00");
-    assert.equal(harness.canvas.dataset.drawCalls, "43");
-    assert.equal(harness.canvas.dataset.triangles, "7155");
+    assert.equal(harness.canvas.dataset.drawCalls, "72");
+    assert.equal(harness.canvas.dataset.triangles, "7471");
     for (const target of [
         harness.canvas,
         harness.documentTarget,

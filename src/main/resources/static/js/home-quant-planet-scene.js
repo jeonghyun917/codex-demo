@@ -2,8 +2,12 @@ import {
     shouldRenderFrame
 } from "./home-quant-planet-motion.js";
 import {
-    fitPerspectiveSphere
+    fitPerspectiveSphere,
+    REFERENCE_HERO
 } from "./home-quant-planet-composition.js";
+import {
+    createQuantGlyphRig
+} from "./home-quant-planet-glyphs.js";
 import {
     createQuantPlanetWorld
 } from "./home-quant-planet-world.js";
@@ -48,7 +52,8 @@ function createStaticSceneController() {
 export async function createQuantPlanetScene({
     canvas,
     profile,
-    three
+    three,
+    glyphFactory
 } = {}) {
     if (!canvas || !profile?.webgl || profile.name === "static") {
         return createStaticSceneController();
@@ -56,17 +61,32 @@ export async function createQuantPlanetScene({
 
     let renderer = null;
     let world = null;
+    let glyphs = null;
+    const cleanupAttempted = {
+        glyphs: false,
+        world: false,
+        renderer: false
+    };
 
-    function disposeInitializationResources() {
-        try {
-            world?.dispose();
-        } catch {
-            // Preserve the initialization failure after all cleanup attempts.
+    function disposeResources() {
+        let firstError = null;
+        for (const [name, resource] of [
+            ["glyphs", glyphs],
+            ["world", world],
+            ["renderer", renderer]
+        ]) {
+            if (!resource || cleanupAttempted[name]) {
+                continue;
+            }
+            cleanupAttempted[name] = true;
+            try {
+                resource.dispose();
+            } catch (error) {
+                firstError ||= error;
+            }
         }
-        try {
-            renderer?.dispose();
-        } catch {
-            // Preserve the initialization failure after all cleanup attempts.
+        if (firstError) {
+            throw firstError;
         }
     }
 
@@ -91,12 +111,17 @@ export async function createQuantPlanetScene({
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
         world = createQuantPlanetWorld(THREE, { profile });
+        const makeGlyphs = glyphFactory || createQuantGlyphRig;
+        glyphs = await makeGlyphs(THREE, {
+            profile,
+            assetUrl: REFERENCE_HERO.titleAssetUrl
+        });
         const worldScale = Math.max(
             .001,
             Number(profile.planetScale) || 1
         );
         world.group.scale.setScalar(worldScale);
-        scene.add(world.group);
+        scene.add(world.group, glyphs.group);
 
         const localEnvelope = world.getFramingEnvelope();
         const envelope = {
@@ -121,8 +146,26 @@ export async function createQuantPlanetScene({
             camera.updateProjectionMatrix();
             return next;
         }
-        let framing = refitCamera(1);
-        const framingTarget = new THREE.Vector3();
+        let framing;
+        function layoutForAspect(aspect) {
+            framing = refitCamera(aspect);
+            glyphs.setLayout({
+                center: envelope.center,
+                radius: envelope.radius,
+                aspect: camera.aspect
+            });
+            camera.position.set(
+                framing.target.x,
+                framing.target.y,
+                framing.target.z + framing.distance
+            );
+            camera.lookAt(
+                framing.target.x,
+                framing.target.y,
+                framing.target.z
+            );
+        }
+        layoutForAspect(1);
 
         const hemisphere = new THREE.HemisphereLight(
             0xfff9ea,
@@ -163,7 +206,7 @@ export async function createQuantPlanetScene({
             const width = Math.max(1, canvas.clientWidth);
             const height = Math.max(1, canvas.clientHeight);
             camera.aspect = width / height;
-            framing = refitCamera(camera.aspect);
+            layoutForAspect(camera.aspect);
             renderer.setSize(width, height, false);
             dirty = true;
         }
@@ -190,35 +233,32 @@ export async function createQuantPlanetScene({
                     return false;
                 }
 
-                world.update(pose);
-                const pointer = profile.pointerEnabled && !pose.reduceMotion
-                    ? pose.pointer || EMPTY_POSE.pointer
-                    : EMPTY_POSE.pointer;
-                const cameraYaw = (Number(pointer.x) || 0) * .055;
-                const cameraPitch = -(Number(pointer.y) || 0) * .04;
-
-                framingTarget.set(
-                    framing.target.x,
-                    framing.target.y,
-                    framing.target.z
-                ).applyQuaternion(world.group.quaternion);
-                const cosPitch = Math.cos(cameraPitch);
-                camera.position.set(
-                    framingTarget.x
-                        + Math.sin(cameraYaw) * cosPitch * framing.distance,
-                    framingTarget.y
-                        + Math.sin(cameraPitch) * framing.distance,
-                    framingTarget.z
-                        + Math.cos(cameraYaw) * cosPitch * framing.distance
-                );
-                camera.lookAt(framingTarget);
+                world.update({
+                    worldAngle: pose.worldAngle,
+                    elapsedMs: pose.elapsedMs,
+                    reduceMotion: pose.reduceMotion
+                });
+                glyphs.update({
+                    pointer: profile.pointerEnabled
+                        ? pose.pointer
+                        : EMPTY_POSE.pointer,
+                    elapsedMs: pose.elapsedMs,
+                    titleProgress: pose.titleProgress,
+                    reduceMotion: pose.reduceMotion
+                });
                 renderer.render(scene, camera);
                 dirty = false;
                 return true;
             },
             getDiagnostics() {
-                const drawCalls = renderer.info.render.calls;
-                const triangles = renderer.info.render.triangles;
+                const worldStats = world.getRenderStats();
+                const glyphStats = glyphs.getRenderStats();
+                const drawCalls = worldStats.drawCalls
+                    + worldStats.shadowCalls
+                    + glyphStats.drawCalls
+                    + glyphStats.shadowCalls;
+                const triangles = worldStats.triangles
+                    + glyphStats.triangles;
                 return {
                     drawCalls,
                     triangles,
@@ -232,15 +272,15 @@ export async function createQuantPlanetScene({
                     return;
                 }
                 disposed = true;
-                try {
-                    world.dispose();
-                } finally {
-                    renderer.dispose();
-                }
+                disposeResources();
             }
         };
     } catch (error) {
-        disposeInitializationResources();
+        try {
+            disposeResources();
+        } catch {
+            // Preserve the construction failure after all cleanup attempts.
+        }
         throw error;
     }
 }
