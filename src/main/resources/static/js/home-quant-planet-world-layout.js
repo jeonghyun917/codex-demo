@@ -5,6 +5,7 @@ function frozenVector(values) {
 function frozenPlacement({
     id,
     districtId,
+    parentId,
     clusterId,
     category,
     family,
@@ -16,6 +17,7 @@ function frozenPlacement({
     return Object.freeze({
         id,
         ...(districtId ? { districtId } : {}),
+        ...(parentId ? { parentId } : {}),
         ...(clusterId ? { clusterId } : {}),
         ...(category ? { category } : {}),
         ...(family ? { family } : {}),
@@ -633,10 +635,18 @@ export const PIPE_POLE_PLACEMENTS = Object.freeze(generatedPlacements({
     ]
 }));
 
-function detailPlacement(id, districtId, position, scale, rotation) {
+function detailPlacement(
+    id,
+    districtId,
+    position,
+    scale,
+    rotation,
+    parentId
+) {
     return frozenPlacement({
         id,
         districtId,
+        parentId,
         position,
         scale,
         rotation
@@ -715,25 +725,35 @@ function terrainEdgesForDistrict(districtId, count) {
     return TERRAIN_PATCHES
         .filter((placement) => placement.districtId === districtId)
         .slice(0, count)
-        .map((placement, index) => detailPlacement(
-            `retaining-edge-${districtId}-${index}`,
-            districtId,
-            surfaceOffset(
-                placement.position,
-                .075,
-                (index % 2 ? -.12 : .12)
-            ),
-            [
-                placement.scale[0] * (.46 + index % 2 * .08),
-                .035 + index % 3 * .008,
-                placement.scale[2] * .13
-            ],
-            [
-                placement.rotation[0],
-                placement.rotation[1] + index * .07,
-                placement.rotation[2] + (index % 2 ? -.05 : .05)
-            ]
-        ));
+        .map((placement, index) => {
+            const radialExtent = Math.hypot(
+                placement.scale[1],
+                Math.sin(Math.abs(placement.rotation[2]))
+                    * placement.scale[0],
+                Math.sin(Math.abs(placement.rotation[0]))
+                    * placement.scale[2]
+            );
+            return detailPlacement(
+                `retaining-edge-${districtId}-${index}`,
+                districtId,
+                surfaceOffset(
+                    placement.position,
+                    radialExtent + .045,
+                    (index % 2 ? -.12 : .12)
+                ),
+                [
+                    placement.scale[0] * (.46 + index % 2 * .08),
+                    .035 + index % 3 * .008,
+                    placement.scale[2] * .13
+                ],
+                [
+                    placement.rotation[0],
+                    placement.rotation[1] + index * .07,
+                    placement.rotation[2] + (index % 2 ? -.05 : .05)
+                ],
+                placement.id
+            );
+        });
 }
 
 function canopyDetailsForDistrict(
@@ -744,8 +764,15 @@ function canopyDetailsForDistrict(
     const placements = FOREST_BELTS
         .flatMap((belt) => belt.placements)
         .filter((placement) => placement.districtId === districtId);
-    const forks = placements.slice(0, forkCount).map(
-        (placement, index) => detailPlacement(
+    const continuousPlacements = FOREST_BELTS
+        .find((belt) => belt.id === "continuous-canopy")
+        .placements
+        .filter((placement) => placement.districtId === districtId);
+    const forks = Array.from({ length: forkCount }, (_, index) => {
+        const placement = continuousPlacements[
+            index % continuousPlacements.length
+        ];
+        return detailPlacement(
             `canopy-fork-${districtId}-${index}`,
             districtId,
             surfaceOffset(
@@ -762,9 +789,10 @@ function canopyDetailsForDistrict(
                 placement.rotation[0] + (index % 2 ? -.38 : .38),
                 placement.rotation[1] + index * .06,
                 placement.rotation[2] + (index % 3 - 1) * .14
-            ]
-        )
-    );
+            ],
+            placement.id
+        );
+    });
     const stones = placements.slice(-stoneCount).map(
         (placement, index) => detailPlacement(
             `under-canopy-stone-${districtId}-${index}`,
@@ -783,7 +811,8 @@ function canopyDetailsForDistrict(
                 placement.rotation[0] + index * .025,
                 placement.rotation[1] + index * .13,
                 placement.rotation[2]
-            ]
+            ],
+            placement.id
         )
     );
     return { forks, stones };
@@ -959,7 +988,7 @@ export const DETAIL_PLACEMENTS_BY_DISTRICT = Object.freeze({
             ...Array.from({ length: 6 }, (_, index) => detailPlacement(
                 `industrial-upper-band-${index}`,
                 "industrial-yard",
-                [-4.28 + index * .22, .62, 1.18],
+                [-4.28 + index * .22, .62, 1.86],
                 [
                     .035 + index % 2 * .008,
                     .68 + index % 2 * .035,
@@ -970,7 +999,7 @@ export const DETAIL_PLACEMENTS_BY_DISTRICT = Object.freeze({
             ...Array.from({ length: 6 }, (_, index) => detailPlacement(
                 `industrial-lower-band-${index}`,
                 "industrial-yard",
-                [-3.9 + index * .17, -.78, 1.22],
+                [-3.9 + index * .17, -.78, 1.81],
                 [
                     .032 + index % 2 * .007,
                     .56 + index % 3 * .025,

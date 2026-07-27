@@ -394,6 +394,9 @@ function createPackedMiniatureDetailPlacements(THREE) {
             count: familyPlacements.length,
             districtIds: Object.freeze(
                 familyPlacements.map((placement) => placement.districtId)
+            ),
+            parentIds: Object.freeze(
+                familyPlacements.map((placement) => placement.parentId)
             )
         });
     });

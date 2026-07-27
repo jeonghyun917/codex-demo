@@ -105,10 +105,108 @@ function instanceTransforms(mesh) {
         return {
             index,
             position: position.clone(),
+            quaternion: quaternion.clone(),
             scale: scale.clone(),
             matrix: matrix.clone()
         };
     });
+}
+
+function detailFamily(root, name) {
+    let mesh;
+    let range;
+    root.traverse((object) => {
+        const candidate = object.userData?.detailFamilyRanges?.[name];
+        if (candidate) {
+            mesh = object;
+            range = candidate;
+        }
+    });
+    return { mesh, range };
+}
+
+function instanceBoxCorners(mesh, index) {
+    mesh.geometry.computeBoundingBox();
+    const { min, max } = mesh.geometry.boundingBox;
+    const instanceMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    mesh.getMatrixAt(index, instanceMatrix);
+    worldMatrix.multiplyMatrices(mesh.matrixWorld, instanceMatrix);
+    return [
+        [min.x, min.y, min.z],
+        [min.x, min.y, max.z],
+        [min.x, max.y, min.z],
+        [min.x, max.y, max.z],
+        [max.x, min.y, min.z],
+        [max.x, min.y, max.z],
+        [max.x, max.y, min.z],
+        [max.x, max.y, max.z]
+    ].map((coordinates) =>
+        new THREE.Vector3(...coordinates).applyMatrix4(worldMatrix)
+    );
+}
+
+function countCornersInsideCylinder(corners, cylinder) {
+    const inverse = cylinder.matrixWorld.clone().invert();
+    const {
+        height,
+        radiusTop,
+        radiusBottom
+    } = cylinder.geometry.parameters;
+    return corners.filter((corner) => {
+        const point = corner.clone().applyMatrix4(inverse);
+        const heightRatio = point.y / height + .5;
+        const radius = radiusBottom
+            + (radiusTop - radiusBottom) * heightRatio;
+        return Math.abs(point.y) <= height / 2 + 1e-7
+            && Math.hypot(point.x, point.z) <= radius + 1e-7;
+    }).length;
+}
+
+function pointInsideConvexGeometry(point, geometry) {
+    const positions = geometry.attributes.position;
+    const index = geometry.index;
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    const triangleCount = (index?.count ?? positions.count) / 3;
+    for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+        const indices = [0, 1, 2].map((offset) =>
+            index
+                ? index.getX(triangle * 3 + offset)
+                : triangle * 3 + offset
+        );
+        a.fromBufferAttribute(positions, indices[0]);
+        b.fromBufferAttribute(positions, indices[1]);
+        c.fromBufferAttribute(positions, indices[2]);
+        normal.crossVectors(
+            b.clone().sub(a),
+            c.clone().sub(a)
+        ).normalize();
+        center.copy(a).add(b).add(c).multiplyScalar(1 / 3);
+        if (normal.dot(center) < 0) {
+            normal.negate();
+        }
+        if (normal.dot(point.clone().sub(a)) > 1e-7) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function countCornersInsideInstance(corners, mesh, index) {
+    const instanceMatrix = new THREE.Matrix4();
+    const worldMatrix = new THREE.Matrix4();
+    mesh.getMatrixAt(index, instanceMatrix);
+    worldMatrix.multiplyMatrices(mesh.matrixWorld, instanceMatrix).invert();
+    return corners.filter((corner) =>
+        pointInsideConvexGeometry(
+            corner.clone().applyMatrix4(worldMatrix),
+            mesh.geometry
+        )
+    ).length;
 }
 
 test("builds every authored reference silhouette group", (t) => {
@@ -760,15 +858,7 @@ test("authors the high-profile miniature detail families by district", (t) => {
     for (const [name, minimumCount] of Object.entries(
         expectedDetailCounts
     )) {
-        let mesh;
-        let range;
-        world.group.traverse((object) => {
-            const candidate = object.userData?.detailFamilyRanges?.[name];
-            if (candidate) {
-                mesh = object;
-                range = candidate;
-            }
-        });
+        const { mesh, range } = detailFamily(world.group, name);
         assert.ok(range, `Missing logical instance family ${name}`);
         assert.equal(mesh.isInstancedMesh, true, `${name} must be instanced`);
         assert.notEqual(mesh.visible, false, `${name} must remain visible`);
@@ -810,12 +900,111 @@ test("authors the high-profile miniature detail families by district", (t) => {
             scaleSignatures.size >= 2,
             `${name} must vary authored instance scale`
         );
+        const rotationSignatures = new Set(
+            instanceTransforms(mesh)
+                .slice(range.offset, range.offset + range.count)
+                .map(({ quaternion }) =>
+                    quaternion.toArray()
+                        .map((value) => value.toFixed(4))
+                        .join(":"))
+        );
+        assert.ok(
+            rotationSignatures.size >= 2,
+            `${name} must vary authored instance rotation`
+        );
         assert.deepEqual(
             [...new Set(range.districtIds)].toSorted(),
             expectedDistricts[name],
             `${name} must stay in its semantic districts`
         );
         assert.equal(range.districtIds.length, range.count);
+    }
+});
+
+test("keeps industrial barrel bands outside their opaque cylinders", (t) => {
+    const world = createWorld(t);
+    world.group.updateMatrixWorld(true);
+    const { mesh, range } = detailFamily(
+        world.group,
+        "ReferenceIndustrialBarrelBands"
+    );
+    const mainEngine = world.group.getObjectByName("ReferenceMainEngine");
+    const lowerEngine = world.group.getObjectByName("ReferenceLowerEngine");
+
+    assert.equal(range.count, 12);
+    for (let index = 0; index < range.count; index += 1) {
+        const corners = instanceBoxCorners(mesh, range.offset + index);
+        const parent = index < 6 ? mainEngine : lowerEngine;
+        const buriedCorners = countCornersInsideCylinder(corners, parent);
+        assert.ok(
+            buriedCorners < corners.length,
+            `barrel band ${index} is buried ${buriedCorners}/${
+                corners.length
+            } corners`
+        );
+    }
+});
+
+test("keeps retaining edges outside their authored terrain patches", (t) => {
+    const world = createWorld(t);
+    world.group.updateMatrixWorld(true);
+    const { mesh, range } = detailFamily(
+        world.group,
+        "ReferenceTerrainRetainingEdges"
+    );
+    const terrain = world.group.getObjectByName("ReferenceTerrainPatches");
+    const terrainIds = terrain.userData.surfaceDetailIds;
+
+    assert.equal(range.count, 14);
+    assert.equal(range.parentIds?.length, range.count);
+    range.parentIds.forEach((parentId, index) => {
+        const parentIndex = terrainIds.indexOf(parentId);
+        assert.notEqual(parentIndex, -1, `missing terrain parent ${parentId}`);
+        const corners = instanceBoxCorners(mesh, range.offset + index);
+        const buriedCorners = countCornersInsideInstance(
+            corners,
+            terrain,
+            parentIndex
+        );
+        assert.ok(
+            buriedCorners < corners.length,
+            `retaining edge ${index} is buried ${buriedCorners}/${
+                corners.length
+            } corners`
+        );
+    });
+});
+
+test("anchors canopy forks to selected high and balanced foliage", () => {
+    for (const selectedProfile of [profile, balancedProfile]) {
+        const world = createQuantPlanetWorld(THREE, {
+            profile: selectedProfile
+        });
+        try {
+            const { range } = detailFamily(
+                world.group,
+                "ReferenceCanopyForks"
+            );
+            const crowns = world.group.getObjectByName(
+                "ReferenceCanopyCrowns"
+            );
+            const selectedParentIds = new Set(
+                crowns.userData.surfaceDetailIds
+            );
+
+            assert.equal(range.count, 18);
+            assert.equal(range.parentIds?.length, range.count);
+            range.parentIds.forEach((parentId, index) => {
+                assert.ok(
+                    selectedParentIds.has(parentId),
+                    `${selectedProfile.name} fork ${index} floats from ${
+                        parentId
+                    }`
+                );
+            });
+        } finally {
+            world.dispose();
+        }
     }
 });
 
