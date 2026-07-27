@@ -30,7 +30,8 @@ body {
 
 .planet-experience {
     --reference-title-width: min(30vw, 52vh);
-    --reference-action-bottom: max(4.8vh, env(safe-area-inset-bottom));
+    --reference-action-bottom: max(10vh, env(safe-area-inset-bottom));
+    --reference-world-shift-y: -5dvh;
     --intro-world-progress: 0;
     --intro-title-progress: 0;
     --intro-action-progress: 0;
@@ -96,6 +97,7 @@ body {
     width: 100vw;
     height: 100dvh;
     opacity: 1;
+    transform: translateY(var(--reference-world-shift-y));
     transform-origin: 50% 50%;
     pointer-events: none;
 }
@@ -210,7 +212,9 @@ body {
 
 .planet-runtime-starting .planet-scene {
     opacity: var(--intro-world-progress);
-    transform: scale(calc(.82 + var(--intro-world-progress) * .18));
+    transform:
+        translateY(var(--reference-world-shift-y))
+        scale(calc(.82 + var(--intro-world-progress) * .18));
 }
 
 .planet-runtime-starting .reference-title {

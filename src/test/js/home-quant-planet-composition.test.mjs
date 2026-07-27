@@ -125,6 +125,16 @@ function trackDisposableResources(root) {
     return calls;
 }
 
+function finiteRange(values) {
+    return values.reduce(
+        (range, value) => ({
+            min: Math.min(range.min, value),
+            max: Math.max(range.max, value)
+        }),
+        { min: Infinity, max: -Infinity }
+    );
+}
+
 async function createReferenceGlyphRig(Three) {
     const group = new Three.Group();
     group.name = "ReferenceGlyphRig";
@@ -356,10 +366,10 @@ test("fits the complete public radius to reference viewport coverage", () => {
         verticalFovDegrees: 34
     });
 
-    assert.ok(landscape.coverage >= .68);
-    assert.ok(landscape.coverage <= .74);
-    assert.ok(portrait.coverage >= .68);
-    assert.ok(portrait.coverage <= .82);
+    assert.ok(landscape.coverage >= .96);
+    assert.ok(landscape.coverage <= .99);
+    assert.ok(portrait.coverage >= .96);
+    assert.ok(portrait.coverage <= .99);
     assert.equal(landscape.radius, 5.4);
     assert.equal(portrait.radius, 5.4);
 });
@@ -435,24 +445,68 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         const xs = frame.projected.map(({ x }) => x);
         const ys = frame.projected.map(({ y }) => y);
         assert.ok(
-            Math.min(...xs) >= -.94,
+            Math.min(...xs) >= -.98,
             `World clipped left at ${Math.min(...xs)}`
         );
         assert.ok(
-            Math.max(...xs) <= .94,
+            Math.max(...xs) <= .98,
             `World clipped right at ${Math.max(...xs)}`
         );
         assert.ok(
-            Math.min(...ys) >= -.94,
+            Math.min(...ys) >= -.98,
             `World clipped below at ${Math.min(...ys)}`
         );
         assert.ok(
-            Math.max(...ys) <= .86,
+            Math.max(...ys) <= .98,
             `World clipped above at ${Math.max(...ys)}`
         );
         assert.ok(frame.near < Math.min(...frame.depths));
         assert.ok(frame.far > Math.max(...frame.depths));
     });
+    const allYs = scene.frames.flatMap((frame) =>
+        frame.projected.map(({ y }) => y));
+    const allXs = scene.frames.flatMap((frame) =>
+        frame.projected.map(({ x }) => x));
+    const yRange = finiteRange(allYs);
+    const xRange = finiteRange(allXs);
+    const worldViewportHeight = (yRange.max - yRange.min) / 2;
+    const worldViewportWidth = (xRange.max - xRange.min) / 2;
+    assert.ok(
+        worldViewportHeight >= .81 && worldViewportHeight <= .87,
+        `Expected world height 0.81-0.87, got ${worldViewportHeight}`
+    );
+    assert.ok(
+        worldViewportWidth >= .48 && worldViewportWidth <= .55,
+        `Expected world width 0.48-0.55, got ${worldViewportWidth}`
+    );
+});
+
+test("keeps the complete portrait world near the reference mobile width",
+        async (t) => {
+    const scene = await createTestScene(t, {
+        width: 375,
+        height: 812
+    });
+
+    for (const worldAngle of [
+        0,
+        Math.PI / 2,
+        Math.PI,
+        Math.PI * 3 / 2
+    ]) {
+        assert.equal(scene.controller.render(pose({ worldAngle })), true);
+    }
+
+    const allXs = scene.frames.flatMap((frame) =>
+        frame.projected.map(({ x }) => x));
+    const xRange = finiteRange(allXs);
+    const worldViewportWidth = (xRange.max - xRange.min) / 2;
+    assert.ok(
+        worldViewportWidth >= .64 && worldViewportWidth <= .72,
+        `Expected world width 0.64-0.72, got ${worldViewportWidth}`
+    );
+    assert.ok(xRange.min >= -.9);
+    assert.ok(xRange.max <= .9);
 });
 
 test("sizes the nine glyphs independently to the reference foreground ratio",
@@ -464,16 +518,16 @@ test("sizes the nine glyphs independently to the reference foreground ratio",
 
     assert.equal(scene.controller.render(pose()), true);
     const frame = scene.frames.at(-1);
-    const glyphToEnvelopeRatio = frame.glyphLayoutRadius
-        / frame.worldRadius;
+    const glyphToFramingRatio = frame.glyphLayoutRadius
+        / frame.glyphDepthRadius;
 
     assert.ok(
-        glyphToEnvelopeRatio >= .62,
-        `Glyph ratio ${glyphToEnvelopeRatio} is too small`
+        glyphToFramingRatio >= .62,
+        `Glyph ratio ${glyphToFramingRatio} is too small`
     );
     assert.ok(
-        glyphToEnvelopeRatio <= .68,
-        `Glyph ratio ${glyphToEnvelopeRatio} is too large`
+        glyphToFramingRatio <= .68,
+        `Glyph ratio ${glyphToFramingRatio} is too large`
     );
     assert.ok(Math.abs(frame.glyphCenterProjected.x) < 1e-9);
     assert.ok(Math.abs(frame.glyphCenterProjected.y) < .08);

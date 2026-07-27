@@ -43,7 +43,7 @@ export function fitReferenceWorld({
     aspect = 1,
     verticalFovDegrees = 34
 } = {}) {
-    const coverage = aspect < .75 ? .76 : .72;
+    const coverage = .98;
     const margin = 1 / coverage;
     return {
         ...fitPerspectiveSphere({

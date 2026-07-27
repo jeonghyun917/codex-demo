@@ -240,8 +240,11 @@ class HomePageTemplateContractTest {
                 "min(30vw, 52vh)",
                 cssDeclaration(experience, "--reference-title-width"));
         assertEquals(
-                "max(4.8vh, env(safe-area-inset-bottom))",
+                "max(10vh, env(safe-area-inset-bottom))",
                 cssDeclaration(experience, "--reference-action-bottom"));
+        assertEquals(
+                "-5dvh",
+                cssDeclaration(experience, "--reference-world-shift-y"));
         assertEquals(
                 "0",
                 cssDeclaration(experience, "--intro-world-progress"));
@@ -349,6 +352,9 @@ class HomePageTemplateContractTest {
         assertEquals("0", cssDeclaration(scene, "inset"));
         assertEquals("100vw", cssDeclaration(scene, "width"));
         assertEquals("100dvh", cssDeclaration(scene, "height"));
+        assertEquals(
+                "translateY(var(--reference-world-shift-y))",
+                cssDeclaration(scene, "transform"));
         assertEquals("0", cssDeclaration(fallback, "inset"));
         assertEquals("100%", cssDeclaration(fallback, "width"));
         assertEquals("100%", cssDeclaration(fallback, "height"));
