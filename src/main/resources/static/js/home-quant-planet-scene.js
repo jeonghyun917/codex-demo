@@ -20,7 +20,7 @@ const BALANCED_LIMITS = Object.freeze({
     drawCalls: 65,
     triangles: 90000
 });
-const GLYPH_LAYOUT_RADIUS_RATIO = .504;
+const GLYPH_LAYOUT_RADIUS_RATIO = .65;
 
 const EMPTY_POSE = Object.freeze({
     worldAngle: 0,

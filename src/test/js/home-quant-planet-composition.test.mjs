@@ -455,6 +455,30 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
     });
 });
 
+test("sizes the nine glyphs independently to the reference foreground ratio",
+        async (t) => {
+    const scene = await createTestScene(t, {
+        width: 1440,
+        height: 900
+    });
+
+    assert.equal(scene.controller.render(pose()), true);
+    const frame = scene.frames.at(-1);
+    const glyphToEnvelopeRatio = frame.glyphLayoutRadius
+        / frame.worldRadius;
+
+    assert.ok(
+        glyphToEnvelopeRatio >= .62,
+        `Glyph ratio ${glyphToEnvelopeRatio} is too small`
+    );
+    assert.ok(
+        glyphToEnvelopeRatio <= .68,
+        `Glyph ratio ${glyphToEnvelopeRatio} is too large`
+    );
+    assert.ok(Math.abs(frame.glyphCenterProjected.x) < 1e-9);
+    assert.ok(Math.abs(frame.glyphCenterProjected.y) < .08);
+});
+
 test("pointer changes glyphs without changing planet or camera", async (t) => {
     const enabled = await createTestScene(t, {
         width: 1242,

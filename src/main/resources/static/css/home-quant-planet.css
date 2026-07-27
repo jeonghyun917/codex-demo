@@ -29,7 +29,7 @@ body {
 }
 
 .planet-experience {
-    --reference-title-width: min(48vw, 64vh);
+    --reference-title-width: min(30vw, 52vh);
     --reference-action-bottom: max(4.8vh, env(safe-area-inset-bottom));
     --intro-world-progress: 0;
     --intro-title-progress: 0;
@@ -152,8 +152,8 @@ body {
     left: 50%;
     bottom: var(--reference-action-bottom);
     display: inline-flex;
-    min-width: clamp(112px, 9.5vw, 148px);
-    min-height: 44px;
+    min-width: clamp(148px, 10vw, 190px);
+    min-height: 48px;
     padding: .72rem 1.55rem .66rem;
     align-items: center;
     justify-content: center;
@@ -269,7 +269,7 @@ body {
 
 @media (min-width: 1440px) and (min-height: 900px) {
     .planet-experience {
-        --reference-title-width: min(50vw, 66vh);
+        --reference-title-width: min(30vw, 52vh);
         --reference-action-bottom: max(5.2vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 45.5%;
     }
@@ -277,7 +277,7 @@ body {
 
 @media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
     .planet-experience {
-        --reference-title-width: min(54vw, 66vh);
+        --reference-title-width: min(34vw, 54vh);
         --reference-action-bottom: max(5.2vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 44.5%;
     }
@@ -285,7 +285,7 @@ body {
 
 @media (min-width: 600px) and (max-width: 768px) and (orientation: portrait) {
     .planet-experience {
-        --reference-title-width: min(82vw, 55vh);
+        --reference-title-width: min(74vw, 50vh);
         --reference-action-bottom: max(6vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 43%;
     }
@@ -293,7 +293,7 @@ body {
 
 @media (max-width: 599px) and (orientation: portrait) {
     .planet-experience {
-        --reference-title-width: min(92vw, 54vh);
+        --reference-title-width: min(82vw, 50vh);
         --reference-action-bottom: max(6vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 41.5%;
     }
@@ -306,7 +306,7 @@ body {
 
 @media (max-width: 375px) and (min-height: 700px) and (orientation: portrait) {
     .planet-experience {
-        --reference-title-width: min(94vw, 53vh);
+        --reference-title-width: min(84vw, 49vh);
         --reference-action-bottom: max(6.5vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 41%;
     }
@@ -314,7 +314,7 @@ body {
 
 @media (max-height: 520px) and (orientation: landscape) {
     .planet-experience {
-        --reference-title-width: min(46vw, 68vh);
+        --reference-title-width: min(32vw, 56vh);
         --reference-action-bottom: max(3vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 41%;
     }

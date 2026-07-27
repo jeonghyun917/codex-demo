@@ -237,7 +237,7 @@ class HomePageTemplateContractTest {
         assertFalse(scene.contains("var(--reference-world-size)"));
         assertFalse(normalized.contains("--reference-world-size"));
         assertEquals(
-                "min(48vw, 64vh)",
+                "min(30vw, 52vh)",
                 cssDeclaration(experience, "--reference-title-width"));
         assertEquals(
                 "max(4.8vh, env(safe-area-inset-bottom))",
@@ -275,9 +275,9 @@ class HomePageTemplateContractTest {
                 "var(--reference-action-bottom)",
                 cssDeclaration(action, "bottom"));
         assertEquals(
-                "clamp(112px, 9.5vw, 148px)",
+                "clamp(148px, 10vw, 190px)",
                 cssDeclaration(action, "min-width"));
-        assertEquals("44px", cssDeclaration(action, "min-height"));
+        assertEquals("48px", cssDeclaration(action, "min-height"));
         assertTrue(action.contains("var(--reference-action-yellow)"));
         assertEquals(
                 "none",
@@ -447,7 +447,7 @@ class HomePageTemplateContractTest {
         assertTrue(runtime.contains("REFERENCE_HERO"));
         assertTrue(scene.contains("world.update({"));
         assertTrue(scene.contains("glyphs.update({"));
-        assertTrue(scene.contains("fitPerspectiveSphere"));
+        assertTrue(scene.contains("fitReferenceWorld"));
         assertTrue(scene.contains("Math.min"));
         assertTrue(scene.contains("1.5"));
 
