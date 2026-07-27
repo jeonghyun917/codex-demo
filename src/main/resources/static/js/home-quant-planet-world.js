@@ -613,7 +613,57 @@ function buildPlanetCore(THREE, resources, palette) {
                     : COLORS.rock,
                 surface: true
             });
+            reliefPlacements.push({
+                family: "secondaryStrata",
+                position: new THREE.Vector3(...placement.position)
+                    .multiplyScalar(1.054)
+                    .addScaledVector(
+                        tangent,
+                        (index % 2 === 0 ? .16 : -.16)
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .31,
+                    .018,
+                    placement.scale[2] * .26
+                ],
+                rotation: placement.rotation,
+                color: index % 3 === 0
+                    ? COLORS.gold
+                    : COLORS.groundShade,
+                surface: true
+            });
         });
+    TERRAIN_PATCHES.slice(0, 12).forEach((placement, index) => {
+        const normal = new THREE.Vector3(...placement.position).normalize();
+        const tangent = new THREE.Vector3(
+            -normal.z,
+            0,
+            normal.x
+        ).normalize();
+        reliefPlacements.push({
+            family: "pathChips",
+            position: new THREE.Vector3(...placement.position)
+                .multiplyScalar(1.061)
+                .addScaledVector(
+                    tangent,
+                    (index % 3 - 1) * .14
+                )
+                .toArray(),
+            scale: [
+                .045 + (index % 2) * .018,
+                .018,
+                .035 + (index % 3) * .012
+            ],
+            rotation: [
+                placement.rotation[0],
+                placement.rotation[1] + index * .13,
+                placement.rotation[2]
+            ],
+            color: index % 4 === 0 ? COLORS.paper : COLORS.rock,
+            surface: true
+        });
+    });
     const relief = buildColoredInstanceFamily(THREE, {
         name: "ReferenceTerrainReliefDetails",
         geometry: resources.geometry.box,
@@ -744,6 +794,19 @@ function buildWaterBand(THREE, resources, palette) {
                 surface: true
             });
         }
+        for (const offset of [-.48, -.24, 0, .24, .48]) {
+            waterEdgePlacements.push({
+                family: "bridgePlanks",
+                position: new THREE.Vector3(...position)
+                    .addScaledVector(normal, .085)
+                    .addScaledVector(tangent, offset * scale[0])
+                    .toArray(),
+                scale: [.055, .018, scale[2] * .68],
+                rotation,
+                color: offset === 0 ? COLORS.gold : COLORS.paper,
+                surface: true
+            });
+        }
     });
     waterPlacements.forEach(([position], waterIndex) => {
         const normal = new THREE.Vector3(...position).normalize();
@@ -766,6 +829,23 @@ function buildWaterBand(THREE, resources, palette) {
                 ],
                 rotation: [0, offset * .5, waterIndex * .08],
                 color: offset === 0 ? COLORS.groundShade : COLORS.rock,
+                surface: true
+            });
+        }
+        for (const offset of [-.28, 0, .28]) {
+            waterEdgePlacements.push({
+                family: "foamAccents",
+                position: new THREE.Vector3(...position)
+                    .multiplyScalar(1.052)
+                    .addScaledVector(tangent, offset)
+                    .toArray(),
+                scale: [
+                    .12 + (waterIndex % 2) * .025,
+                    .014,
+                    .028
+                ],
+                rotation: [0, offset * .34, waterIndex * .08],
+                color: COLORS.paper,
                 surface: true
             });
         }
@@ -930,6 +1010,20 @@ function buildTemplePeak(THREE, resources, palette) {
                 scale: [.48 + index * .12, .045, .12],
                 rotation: [0, -.08, 0],
                 color: index === 1 ? COLORS.paper : COLORS.rock
+            })),
+            ...Array.from({ length: 8 }, (_, index) => ({
+                family: "eaveTeeth",
+                position: [-1.22 + index * .35, 4.65, 2.03],
+                scale: [.045, .09, .055],
+                rotation: [0, -.08, index % 2 === 0 ? -.05 : .05],
+                color: index % 3 === 0 ? COLORS.gold : COLORS.paper
+            })),
+            ...Array.from({ length: 3 }, (_, index) => ({
+                family: "stairBands",
+                position: [-.05, 4.03 - index * .11, 2.16 + index * .07],
+                scale: [.5 + index * .12, .018, .035],
+                rotation: [0, -.08, 0],
+                color: index === 1 ? COLORS.gold : COLORS.ink
             })),
             ...Array.from({ length: 5 }, (_, index) => ({
                 family: "columnBases",
@@ -1163,6 +1257,29 @@ function buildIndustrialCluster(THREE, resources, palette) {
             color: index % 2 === 0 ? COLORS.paper : COLORS.rock
         });
     }
+    for (let index = 0; index < 8; index += 1) {
+        const upper = index < 4;
+        industrialBoxPlacements.push({
+            family: "pipeClamps",
+            position: [
+                -4.48 + (index % 4) * .46,
+                upper ? .68 : -.76,
+                upper ? 1.74 : 1.7
+            ],
+            scale: [.055, .16, .035],
+            rotation: [0, 0, upper ? -.08 : .08],
+            color: index % 2 === 0 ? COLORS.gold : COLORS.paper
+        });
+    }
+    for (const x of [-3.32, -2.84]) {
+        industrialBoxPlacements.push({
+            family: "ladderRails",
+            position: [x, .02, 1.91],
+            scale: [.03, .54, .025],
+            rotation: [0, 0, -.03],
+            color: COLORS.ink
+        });
+    }
     const industrialBoxes = buildColoredInstanceFamily(THREE, {
         name: "ReferenceIndustrialBoxDetails",
         geometry: resources.geometry.box,
@@ -1391,6 +1508,28 @@ function buildUtilityCluster(THREE, resources, palette) {
                 scale: [.22, .025, .025],
                 rotation: [0, -.2, -.08],
                 color: index % 2 === 0 ? COLORS.gold : COLORS.paper
+            })),
+            ...Array.from({ length: 6 }, (_, index) => ({
+                family: "connectorBlocks",
+                position: [
+                    3.38 + (index % 3) * .2,
+                    1.12 + Math.floor(index / 3) * .27,
+                    1.31
+                ],
+                scale: [.075, .075, .065],
+                rotation: [0, 0, index % 2 === 0 ? -.1 : .1],
+                color: index % 2 === 0 ? COLORS.gold : COLORS.paper
+            })),
+            ...Array.from({ length: 4 }, (_, index) => ({
+                family: "roofBrackets",
+                position: [
+                    2.48 + index * .36,
+                    -.26,
+                    1.78 + (index % 2) * .08
+                ],
+                scale: [.045, .16, .055],
+                rotation: [0, .12, index % 2 === 0 ? -.14 : .14],
+                color: index % 2 === 0 ? COLORS.coral : COLORS.ink
             }))
         ]
     });
@@ -1538,6 +1677,40 @@ function buildVillageClusters(THREE, resources, palette) {
                 color: placementIndex % 2 === 0
                     ? COLORS.paper
                     : COLORS.gold,
+                surface: true
+            });
+            facadePlacements.push({
+                family: "windowCrossbars",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .12)
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .2
+                    )
+                    .toArray(),
+                scale: [
+                    .025,
+                    placement.scale[1] * .18,
+                    .032
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 3 === 0
+                    ? COLORS.paper
+                    : COLORS.gold,
+                surface: true
+            });
+            facadePlacements.push({
+                family: "canopySupports",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .04)
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .14
+                    )
+                    .toArray(),
+                scale: [.025, placement.scale[1] * .17, .025],
+                rotation: placement.rotation,
+                color: COLORS.ink,
                 surface: true
             });
         }

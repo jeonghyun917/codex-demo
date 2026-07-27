@@ -684,14 +684,20 @@ test("packs readable landmark details into four instanced families", (t) => {
     assert.ok(industrialBoxes.userData.detailFamilyCounts.panelSeams >= 6);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.ladderRungs >= 5);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.gaugeTicks >= 6);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.pipeClamps >= 8);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.ladderRails >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.mastFeet >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.dishBracket >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.windowFrames >= 4);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.ladderRungs >= 5);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.connectorBlocks >= 6);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.roofBrackets >= 4);
     assert.ok(templeBoxes.userData.detailFamilyCounts.roofTrim >= 3);
     assert.ok(templeBoxes.userData.detailFamilyCounts.rockLedges >= 3);
     assert.ok(templeBoxes.userData.detailFamilyCounts.eaveBrackets >= 6);
     assert.ok(templeBoxes.userData.detailFamilyCounts.steps >= 3);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.eaveTeeth >= 8);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.stairBands >= 3);
 
     const stats = world.getRenderStats();
     assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
@@ -722,11 +728,17 @@ test("packs village water and terrain relief into three detail families",
     assert.ok(village.userData.detailFamilyCounts.roofTrim > 0);
     assert.ok(village.userData.detailFamilyCounts.windowSills >= 20);
     assert.ok(village.userData.detailFamilyCounts.doorCanopies >= 10);
+    assert.ok(village.userData.detailFamilyCounts.windowCrossbars >= 20);
+    assert.ok(village.userData.detailFamilyCounts.canopySupports >= 20);
     assert.ok(water.userData.detailFamilyCounts.bridgeRails >= 8);
     assert.ok(water.userData.detailFamilyCounts.bankStones >= 12);
     assert.ok(water.userData.detailFamilyCounts.bridgeTies >= 16);
+    assert.ok(water.userData.detailFamilyCounts.bridgePlanks >= 20);
+    assert.ok(water.userData.detailFamilyCounts.foamAccents >= 12);
     assert.ok(terrain.userData.detailFamilyCounts.cliffLedges >= 8);
     assert.ok(terrain.userData.detailFamilyCounts.cliffStrata >= 8);
+    assert.ok(terrain.userData.detailFamilyCounts.secondaryStrata >= 8);
+    assert.ok(terrain.userData.detailFamilyCounts.pathChips >= 12);
 
     const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
     const crownScaleSignatures = new Set(
