@@ -240,10 +240,12 @@ test("disposes every rear-field resource exactly once", () => {
         profile: { name: "balanced" }
     });
     const resources = new Set();
+    const meshes = [];
     field.group.traverse((object) => {
         if (!object.isInstancedMesh) {
             return;
         }
+        meshes.push(object);
         resources.add(object.geometry);
         resources.add(object.material);
     });
@@ -256,10 +258,26 @@ test("disposes every rear-field resource exactly once", () => {
             dispose();
         };
     });
+    const meshDisposeCounts = new Map();
+    meshes.forEach((mesh) => {
+        const dispose = mesh.dispose.bind(mesh);
+        meshDisposeCounts.set(mesh, 0);
+        mesh.dispose = () => {
+            meshDisposeCounts.set(
+                mesh,
+                meshDisposeCounts.get(mesh) + 1
+            );
+            dispose();
+        };
+    });
 
     field.dispose();
     field.dispose();
 
+    assert.equal(meshes.length, 5);
+    assert.ok(
+        [...meshDisposeCounts.values()].every((count) => count === 1)
+    );
     assert.equal(resources.size, 10);
     assert.ok([...disposeCounts.values()].every((count) => count === 1));
 });
@@ -276,6 +294,13 @@ test("rolls back every allocated resource after partial construction failure", (
         /injected rear-field construction failure/
     );
     assert.ok(fault.allocations.length > 0);
+    const allocatedMeshes = fault.allocations.filter(
+        (resource) => resource.isInstancedMesh
+    );
+    assert.ok(allocatedMeshes.length > 0);
+    assert.ok(
+        allocatedMeshes.every((mesh) => mesh.disposeCount === 1)
+    );
     assert.ok(
         fault.allocations.every((resource) => resource.disposeCount === 1)
     );

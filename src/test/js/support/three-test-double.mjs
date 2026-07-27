@@ -36,6 +36,7 @@ export function createTrackingThree(THREE, {
                 : TrackedDodecahedronGeometry,
             ExtrudeGeometry: trackDisposable(THREE.ExtrudeGeometry),
             IcosahedronGeometry: trackDisposable(THREE.IcosahedronGeometry),
+            InstancedMesh: trackDisposable(THREE.InstancedMesh),
             TorusGeometry: trackDisposable(THREE.TorusGeometry),
             MeshToonMaterial: trackDisposable(THREE.MeshToonMaterial)
         },

@@ -151,3 +151,37 @@ already verified the three initial responsive browser modes; the new resize
 behavior is covered by runtime/scene production tests that assert one scene
 construction and `high → low → balanced → high` plus low-first-to-high
 transitions.
+
+## Minor Cleanup: Instanced Mesh Disposal
+
+### TDD RED
+
+The focused rear-field suite contained eight tests. Before the production
+cleanup, six passed and the two disposal contracts failed:
+
+- repeated controller disposal did not dispatch `dispose()` for any of the
+  five owned `InstancedMesh` objects;
+- construction rollback did not dispose the meshes allocated before the
+  injected cloud-geometry failure.
+
+### Implementation and GREEN
+
+- Rear-field ownership now tracks every `InstancedMesh` immediately after
+  construction.
+- The shared normal/rollback cleanup attempts each mesh `dispose()` exactly
+  once, then preserves the existing exactly-once geometry/material cleanup,
+  and finally clears the group.
+- Cleanup remains idempotent and continues releasing independent resources if
+  one mesh disposal throws.
+
+Verification:
+
+- Focused rear-field JavaScript: 8/8 passed.
+- Full JavaScript: 146/146 passed.
+- Full Maven: 42/42 passed.
+- `git diff --check`: passed with only the repository's LF-to-CRLF checkout
+  warnings.
+- Normal repeated disposal: 5/5 meshes and 10/10 geometry/material resources
+  disposed exactly once.
+- Injected partial-construction rollback: every allocated mesh, geometry, and
+  material disposed exactly once.
