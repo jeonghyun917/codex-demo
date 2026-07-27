@@ -46,10 +46,10 @@ The link stays keyboard-accessible and continues to navigate to `/quant`.
 
 ### Idle
 
-The button performs an infrequent mechanical twitch rather than continuous
-bobbing:
+The button performs a brief mechanical twitch once per second rather than
+continuous bobbing:
 
-1. remain still from 0% through 72% of a 5.6-second cycle;
+1. remain still from 0% through 72% of a 1-second cycle;
 2. at 73%, nudge up by 1px and rotate by 0.4 degrees;
 3. settle at 75%;
 4. at 77%, perform a 0.5px counter-nudge at -0.2 degrees;
