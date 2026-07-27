@@ -1320,7 +1320,6 @@ export function createQuantPlanetWorld(THREE, {
             ),
             groundShade: ownMaterial(new THREE.MeshBasicMaterial({
                 color: 0xffffff,
-                vertexColors: true,
                 toneMapped: false
             })),
             architecture: ownMaterial(
@@ -1328,7 +1327,6 @@ export function createQuantPlanetWorld(THREE, {
             ),
             village: ownMaterial(new THREE.MeshBasicMaterial({
                 color: 0xffffff,
-                vertexColors: true,
                 toneMapped: false
             })),
             paper: ownMaterial(
@@ -1350,7 +1348,6 @@ export function createQuantPlanetWorld(THREE, {
                     0xffffff,
                     gradientMap,
                     {
-                        vertexColors: true,
                         emissive: COLORS.foliageDark,
                         emissiveIntensity: .8
                     }

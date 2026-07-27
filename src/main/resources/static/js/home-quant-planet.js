@@ -7,7 +7,7 @@ import {
 } from "./home-quant-planet-runtime.js";
 import {
     createQuantPlanetScene
-} from "./home-quant-planet-scene.js";
+} from "./home-quant-planet-scene.js?v=2026072715";
 
 const LOOPBACK_HOSTS = new Set([
     "localhost",

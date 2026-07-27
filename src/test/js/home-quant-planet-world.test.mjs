@@ -651,6 +651,23 @@ test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     });
 });
 
+test("applies instance colors without multiplying missing vertex colors", (t) => {
+    const world = createWorld(t);
+    [
+        "ReferenceTerrainPatches",
+        "ReferenceVillageBuildingFamily",
+        "ReferenceCanopyCrowns"
+    ].forEach((name) => {
+        const mesh = world.group.getObjectByName(name);
+        assert.ok(mesh.instanceColor, `${name} must expose instance colors`);
+        assert.equal(
+            mesh.material.vertexColors,
+            false,
+            `${name} must not multiply a missing geometry color attribute`
+        );
+    });
+});
+
 test("keeps canopy instance greens above the crushed-black floor", (t) => {
     const world = createWorld(t);
     const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
