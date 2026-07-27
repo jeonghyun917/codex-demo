@@ -208,7 +208,8 @@ function enableInstanceOpacity(material) {
 export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
     const group = new THREE.Group();
     group.name = "QuantPlanetRearField";
-    const placements = createRearFieldLayout(profile);
+    let placements = createRearFieldLayout(profile);
+    const maximumPlacements = createRearFieldLayout({ name: "high" });
     const geometries = new Set();
     const materials = new Set();
     const families = [];
@@ -221,6 +222,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
     const color = new THREE.Color();
     let disposed = false;
     let debugState = Object.freeze([]);
+    let lastPose = {};
 
     function ownGeometry(geometry) {
         geometries.add(geometry);
@@ -255,9 +257,13 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             const authoredPlacements = placements.filter((placement) =>
                 definition.layoutFamilies.includes(placement.family)
             );
+            const maximumFamilyPlacements = maximumPlacements.filter(
+                (placement) =>
+                    definition.layoutFamilies.includes(placement.family)
+            );
             const geometry = ownGeometry(definition.geometry(THREE));
             const opacityAttribute = new THREE.InstancedBufferAttribute(
-                new Float32Array(authoredPlacements.length).fill(1),
+                new Float32Array(maximumFamilyPlacements.length).fill(1),
                 1
             );
             geometry.setAttribute("instanceOpacity", opacityAttribute);
@@ -266,8 +272,9 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
                 ownMaterial(enableInstanceOpacity(
                     definition.material(THREE, definition.color)
                 )),
-                authoredPlacements.length
+                maximumFamilyPlacements.length
             );
+            mesh.count = authoredPlacements.length;
             mesh.name = definition.name;
             mesh.castShadow = false;
             mesh.receiveShadow = false;
@@ -285,6 +292,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             if (disposed) {
                 return;
             }
+            lastPose = { ...pose };
             const nextDebugState = [];
             for (const family of families) {
                 family.placements.forEach((placement, index) => {
@@ -314,6 +322,22 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             debugState = Object.freeze(nextDebugState);
         }
 
+        function setProfile(nextProfile = {}) {
+            if (disposed) {
+                return;
+            }
+            placements = createRearFieldLayout(nextProfile);
+            for (const family of families) {
+                family.placements = placements.filter((placement) =>
+                    family.definition.layoutFamilies.includes(
+                        placement.family
+                    )
+                );
+                family.mesh.count = family.placements.length;
+            }
+            update(lastPose);
+        }
+
         function getRenderStats() {
             let ancestor = group;
             while (ancestor) {
@@ -338,6 +362,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
         return {
             group,
             update,
+            setProfile,
             getRenderStats,
             getDebugState: () => debugState,
             dispose: disposeTrackedResources

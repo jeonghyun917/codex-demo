@@ -147,6 +147,94 @@ test("writes seam opacity into the instanced shader alpha path", () => {
     field.dispose();
 });
 
+test("writes zero rendered alpha for every current-pose ENTER-zone occupant",
+        () => {
+    let occupantSamples = 0;
+    for (const profileName of ["high", "balanced", "low"]) {
+        const field = createQuantPlanetRearField(THREE, {
+            profile: { name: profileName }
+        });
+        const layout = createRearFieldLayout({ name: profileName });
+        for (const elapsedMs of [0, 12000, 24000, 36000, 48000, 64000]) {
+            field.update({ elapsedMs, reduceMotion: false });
+            const stateById = new Map(field.getDebugState().map(
+                (item) => [item.id, item]
+            ));
+            for (
+                const [meshName, layoutFamilies]
+                of Object.entries(REAR_FAMILY_LAYOUTS)
+            ) {
+                const mesh = field.group.getObjectByName(meshName);
+                const opacity = mesh.geometry.getAttribute(
+                    "instanceOpacity"
+                );
+                layout.filter((placement) =>
+                    layoutFamilies.includes(placement.family)
+                ).forEach((placement, index) => {
+                    const state = stateById.get(placement.id);
+                    if (
+                        Math.abs(state.position[0]) < 1.6
+                        && state.position[1] < -1.2
+                    ) {
+                        occupantSamples += 1;
+                        assert.ok(
+                            opacity.getX(index) <= 1e-6,
+                            `${profileName}/${elapsedMs}/${placement.id}`
+                        );
+                    }
+                });
+            }
+        }
+        field.dispose();
+    }
+    assert.ok(
+        occupantSamples > 0,
+        "test phases must exercise geometric quiet-zone occupants"
+    );
+});
+
+test("reprofiles one max-capacity field from low through high", () => {
+    const field = createQuantPlanetRearField(THREE, {
+        profile: { name: "low" }
+    });
+    const resources = new Set();
+    field.group.traverse((object) => {
+        if (object.isInstancedMesh) {
+            resources.add(object.geometry);
+            resources.add(object.material);
+        }
+    });
+    const assertProfile = (name, expectedCount) => {
+        field.setProfile({ name });
+        field.update({ elapsedMs: 24000, reduceMotion: false });
+        assert.equal(field.getDebugState().length, expectedCount);
+        assert.equal(
+            field.group.children.reduce(
+                (sum, mesh) => sum + mesh.count,
+                0
+            ),
+            expectedCount
+        );
+        const stats = field.getRenderStats();
+        assert.ok(stats.drawCalls <= 5);
+        assert.ok(stats.triangles <= 5000);
+    };
+
+    assertProfile("high", 42);
+    assertProfile("balanced", 30);
+    assertProfile("low", 18);
+    assertProfile("high", 42);
+    const resourcesAfter = new Set();
+    field.group.traverse((object) => {
+        if (object.isInstancedMesh) {
+            resourcesAfter.add(object.geometry);
+            resourcesAfter.add(object.material);
+        }
+    });
+    assert.deepEqual(resourcesAfter, resources);
+    field.dispose();
+});
+
 test("disposes every rear-field resource exactly once", () => {
     const field = createQuantPlanetRearField(THREE, {
         profile: { name: "balanced" }

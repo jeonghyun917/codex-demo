@@ -113,3 +113,27 @@ test("keeps the reduced-motion authored field outside the ENTER quiet zone",
         []
     );
 });
+
+test("fades smoothly around the current-pose ENTER quiet zone", () => {
+    const placement = {
+        band: "mid",
+        phase: 0,
+        radius: 0,
+        verticalRatio: 0,
+        rearDepth: -5,
+        depthBreath: 0,
+        rotation: [0, 0, 0],
+        spinPeriodMs: 10000
+    };
+    const opacityAtY = (verticalOffset) => sampleRearFieldTransform({
+        ...placement,
+        verticalOffset
+    }, {
+        elapsedMs: 0,
+        reduceMotion: false
+    }).opacity;
+
+    assert.equal(opacityAtY(-1.3), 0);
+    assert.ok(opacityAtY(-1) > 0 && opacityAtY(-1) < 1);
+    assert.equal(opacityAtY(-.6), 1);
+});

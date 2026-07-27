@@ -190,6 +190,7 @@ function createScene() {
     return {
         disposeCalls: 0,
         poses: [],
+        rearProfiles: [],
         resizeCalls: 0,
         visibleValues: [],
         dispose() {
@@ -204,6 +205,9 @@ function createScene() {
         },
         resize() {
             this.resizeCalls += 1;
+        },
+        setRearProfile(profile) {
+            this.rearProfiles.push(structuredClone(profile));
         },
         setVisible(value) {
             this.visibleValues.push(value);
@@ -931,6 +935,57 @@ test("coalesces a resize burst into one resize on the existing frame", async () 
     harness.frameQueue.runNext(32);
     assert.equal(scene.resizeCalls, 3);
     assert.equal(harness.frameQueue.frames.size, 1);
+});
+
+test("reprofiles only the rear field across coalesced viewport resizes",
+        async () => {
+    const harness = createRuntimeHarness({
+        rearProfile: { name: "high" },
+        viewportWidth: 1920,
+        viewportHeight: 1080
+    });
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+
+    const resizeTo = (width, height, frameTime) => {
+        harness.windowTarget.innerWidth = width;
+        harness.windowTarget.innerHeight = height;
+        harness.windowTarget.emit("resize");
+        harness.windowTarget.emit("resize");
+        harness.frameQueue.runNext(frameTime);
+    };
+    resizeTo(375, 812, 16);
+    resizeTo(768, 1024, 32);
+    resizeTo(1920, 1080, 48);
+
+    assert.deepEqual(
+        scene.rearProfiles.map((profile) => profile.name),
+        ["low", "balanced", "high"]
+    );
+    assert.equal(harness.sceneConstructionCalls(), 1);
+    assert.equal(scene.resizeCalls, 4);
+    harness.runtime.destroy();
+
+    const lowFirst = createRuntimeHarness({
+        rearProfile: { name: "low" },
+        viewportWidth: 375,
+        viewportHeight: 812
+    });
+    const lowScene = createScene();
+    lowFirst.sceneDeferred.resolve(lowScene);
+    await flushPromises();
+    lowFirst.windowTarget.innerWidth = 1920;
+    lowFirst.windowTarget.innerHeight = 1080;
+    lowFirst.windowTarget.emit("resize");
+    lowFirst.frameQueue.runNext(16);
+
+    assert.deepEqual(
+        lowScene.rearProfiles.map((profile) => profile.name),
+        ["high"]
+    );
+    assert.equal(lowFirst.sceneConstructionCalls(), 1);
+    lowFirst.runtime.destroy();
 });
 
 test("destroy cancels timer, Motion, input, scene, and RAF exactly once", async () => {

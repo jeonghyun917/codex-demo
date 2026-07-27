@@ -285,6 +285,13 @@ export async function createQuantPlanetScene({
 
         return {
             resize,
+            setRearProfile(nextProfile) {
+                if (disposed) {
+                    return;
+                }
+                rearField.setProfile?.(nextProfile);
+                dirty = true;
+            },
             setVisible(value) {
                 const next = Boolean(value);
                 if (next !== visible) {

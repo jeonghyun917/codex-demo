@@ -128,6 +128,20 @@ const ALL_PLACEMENTS = Object.freeze(
     REAR_FIELD_SEEDS.map(placementFromSeed)
 );
 
+function smoothstep(edge0, edge1, value) {
+    const unit = Math.min(
+        1,
+        Math.max(0, (value - edge0) / (edge1 - edge0))
+    );
+    return unit * unit * (3 - 2 * unit);
+}
+
+function enterQuietZoneOpacity(x, y) {
+    const horizontalOutside = smoothstep(1.6, 2.1, Math.abs(x));
+    const verticalOutside = smoothstep(-1.2, -.7, y);
+    return Math.max(horizontalOutside, verticalOutside);
+}
+
 export function createRearFieldLayout(profile = {}) {
     const name = typeof profile?.name === "string"
         ? profile.name
@@ -148,11 +162,13 @@ export function sampleRearFieldTransform(placement, pose = {}) {
     const depthBreath = reduceMotion
         ? 0
         : -Math.abs(Math.cos(phase)) * placement.depthBreath;
+    const x = Math.sin(phase) * placement.radius;
+    const y = placement.verticalOffset
+        + Math.cos(phase) * placement.radius * placement.verticalRatio;
     return {
         position: [
-            Math.sin(phase) * placement.radius,
-            placement.verticalOffset
-                + Math.cos(phase) * placement.radius * placement.verticalRatio,
+            x,
+            y,
             placement.rearDepth + depthBreath
         ],
         rotation: [
@@ -162,5 +178,6 @@ export function sampleRearFieldTransform(placement, pose = {}) {
                 + elapsedMs / placement.spinPeriodMs * Math.PI * 2
         ],
         opacity: Math.min(1, Math.max(0, seamDistance * 3.2))
+            * enterQuietZoneOpacity(x, y)
     };
 }

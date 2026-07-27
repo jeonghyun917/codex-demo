@@ -90,3 +90,64 @@ the production-module diagnostics and full automated suite above.
 No functional regression is known. The only incomplete evidence is live
 browser visual inspection because no browser backend was attached to this
 session.
+
+## Round 2: Dynamic Quiet Zone and Resize Reprofiling
+
+### TDD RED
+
+The focused JavaScript suite was expanded to 64 tests. Before production
+changes, 59 passed and the five new contracts failed:
+
+- scene-to-rear profile mutation was missing;
+- the quiet-zone edge had no smooth current-pose opacity multiplier;
+- moving quiet-zone occupants retained visible instance alpha;
+- the rear controller had no bounded `setProfile` path;
+- coalesced runtime resize did not forward responsive rear profiles.
+
+### Implementation
+
+- Current-pose seam opacity is multiplied by a two-axis smoothstep mask. The
+  protected core (`|x| < 1.6`, `y < -1.2`) is exactly transparent, while the
+  outer horizontal and vertical margins fade smoothly back to full opacity.
+- Each of the five rear instanced meshes now allocates high-profile capacity
+  once. `setProfile` only selects active placements, updates `mesh.count`, and
+  refreshes existing instance matrices/colors/opacity attributes.
+- The scene exposes `setRearProfile` without rebuilding the renderer, world,
+  glyph rig, camera, or scene.
+- Runtime resize keeps the existing RAF coalescing behavior, derives the next
+  rear profile from the fixed world capability plus current viewport, and
+  forwards only changed rear profiles. It also reconciles a viewport change
+  that occurs while asynchronous scene construction is in flight.
+
+### Round 2 GREEN
+
+- Focused JavaScript: 64/64 passed.
+- Full JavaScript: 146/146 passed.
+- Full Maven: 42/42 passed.
+- `git diff --check`: passed with only the repository's LF-to-CRLF checkout
+  warnings.
+- Existing reduced-motion freeze, seam/wrap, cloud-opacity, construction
+  rollback, disposal, framing, planet-scale, and scene-budget tests remain
+  green.
+
+At `0`, `12`, `24`, `36`, `48`, and `64` seconds, the sampled geometric
+quiet-zone occupant counts were:
+
+| Rear profile | Occupants by sampled time | Maximum rendered alpha |
+| --- | --- | ---: |
+| high | 0 / 4 / 1 / 2 / 1 / 2 | 0 |
+| balanced | 0 / 4 / 0 / 0 / 0 / 2 | 0 |
+| low | 0 / 2 / 0 / 0 / 0 / 1 | 0 |
+
+One live rear controller was reprofiled
+`low → high → balanced → low → high`. It retained the same 10 owned GPU
+resources throughout. Active object counts remained `18 / 42 / 30 / 18 / 42`;
+rear render work remained five draw calls and `904 / 1775 / 1380 / 904 / 1775`
+triangles.
+
+The subagent browser runtime still had no attached browser backend, so Round 2
+live resize automation could not be collected there. The main agent had
+already verified the three initial responsive browser modes; the new resize
+behavior is covered by runtime/scene production tests that assert one scene
+construction and `high → low → balanced → high` plus low-first-to-high
+transitions.

@@ -250,12 +250,17 @@ function createRearFieldProbe(Three, {
 } = {}) {
     const group = new Three.Group();
     group.name = "ReferenceRearField";
+    const profiles = [];
     const updates = [];
     let renderStats = { ...stats };
     let disposeCalls = 0;
     return {
         group,
+        profiles,
         updates,
+        setProfile(profile) {
+            profiles.push({ ...profile });
+        },
         update(nextPose) {
             updates.push({ ...nextPose });
         },
@@ -549,18 +554,22 @@ test("owns the rear field behind the planet and forwards autonomous pose only",
 test("constructs rear density from the responsive profile, not world quality",
         async (t) => {
     let receivedProfile = null;
-    await createTestScene(t, {
+    let rearField = null;
+    const scene = await createTestScene(t, {
         width: 375,
         height: 812,
         profile: sceneProfile({ name: "high" }),
         rearProfile: { name: "low" },
         rearFieldFactory(Three, options) {
             receivedProfile = options.profile;
-            return createRearFieldProbe(Three);
+            rearField = createRearFieldProbe(Three);
+            return rearField;
         }
     });
 
     assert.deepEqual(receivedProfile, { name: "low" });
+    scene.controller.setRearProfile({ name: "high" });
+    assert.deepEqual(rearField.profiles, [{ name: "high" }]);
 });
 
 test("refits complete world bounds after landscape and portrait resizes", async (t) => {

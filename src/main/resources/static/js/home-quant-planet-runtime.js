@@ -102,11 +102,12 @@ export function createQuantPlanetRuntime({
     documentTarget,
     windowTarget
 } = {}) {
-    const resolvedRearProfile = rearProfile || selectRearFieldProfile({
+    let resolvedRearProfile = rearProfile || selectRearFieldProfile({
         qualityProfile: profile,
         viewportWidth: windowTarget?.innerWidth,
         viewportHeight: windowTarget?.innerHeight
     });
+    let sceneConstructionRearProfile = null;
     const staticMode = motionDisabled
         || profile?.name === "static"
         || !profile?.webgl;
@@ -299,6 +300,7 @@ export function createQuantPlanetRuntime({
         }
         lastFrameTime = null;
         resizePending = false;
+        syncRearProfile();
         scene?.resize?.();
         scene?.setVisible?.(!documentTarget.hidden);
     }
@@ -378,12 +380,27 @@ export function createQuantPlanetRuntime({
         };
     }
 
+    function syncRearProfile() {
+        const nextProfile = selectRearFieldProfile({
+            qualityProfile: profile,
+            viewportWidth: windowTarget?.innerWidth,
+            viewportHeight: windowTarget?.innerHeight
+        });
+        if (nextProfile.name === resolvedRearProfile.name) {
+            return false;
+        }
+        resolvedRearProfile = nextProfile;
+        scene?.setRearProfile?.(resolvedRearProfile);
+        return true;
+    }
+
     function tick(time) {
         if (destroyed || runtimeFailed) {
             return;
         }
         if (resizePending) {
             resizePending = false;
+            syncRearProfile();
             scene?.resize?.();
         }
         const frameTime = Number.isFinite(time) ? time : now();
@@ -514,6 +531,7 @@ export function createQuantPlanetRuntime({
     let scenePromise = null;
     if (!staticMode) {
         try {
+            sceneConstructionRearProfile = resolvedRearProfile;
             scenePromise = Promise.resolve(createScene({
                 canvas,
                 profile,
@@ -537,6 +555,14 @@ export function createQuantPlanetRuntime({
         sceneReady = true;
         resizePending = false;
         ambientFrameTime = null;
+        const profileChangedAfterConstruction = syncRearProfile();
+        if (
+            !profileChangedAfterConstruction
+            && sceneConstructionRearProfile?.name
+            !== resolvedRearProfile.name
+        ) {
+            scene.setRearProfile?.(resolvedRearProfile);
+        }
         scene.resize?.();
         scene.setVisible?.(!documentTarget.hidden);
         root.classList.remove("planet-webgl-failed");
