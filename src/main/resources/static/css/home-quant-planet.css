@@ -149,48 +149,184 @@ body {
 }
 
 .planet-primary-action {
+    --hatch-face: var(--reference-action-yellow);
     position: absolute;
     z-index: 40;
     left: 50%;
     bottom: var(--reference-action-bottom);
     display: inline-flex;
-    min-width: clamp(148px, 10vw, 190px);
-    min-height: 48px;
-    padding: .72rem 1.55rem .66rem;
+    min-width: clamp(156px, 11vw, 196px);
+    min-height: 54px;
+    padding: .72rem 1.65rem .88rem;
     align-items: center;
     justify-content: center;
-    border: 4px solid var(--reference-ink);
-    border-radius: 2px;
-    color: var(--reference-ink);
-    background: var(--reference-action-yellow);
-    box-shadow: 0 7px 0 var(--reference-ink);
+    overflow: hidden;
+    isolation: isolate;
+    border: 0;
+    border-radius: 0;
+    color: var(--reference-paper);
+    background: var(--reference-ink);
+    box-shadow: none;
+    clip-path: polygon(8% 0, 92% 0, 100% 24%, 100% 76%, 92% 100%, 8% 100%, 0 76%, 0 24%);
+    filter: drop-shadow(0 5px 0 rgba(37, 50, 56, .38));
     font-size: clamp(.78rem, .9vw, 1rem);
     font-weight: 900;
     line-height: 1;
     letter-spacing: .16em;
     text-decoration: none;
     transform: translateX(-50%);
+    transform-origin: 50% 72%;
+    animation-name: enter-hatch-twitch;
+    animation-duration: 1s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    cursor: pointer;
+    touch-action: manipulation;
     transition:
-        transform 130ms ease,
-        box-shadow 130ms ease,
-        background-color 130ms ease;
+        transform 180ms cubic-bezier(.2, .8, .2, 1),
+        filter 180ms ease;
+}
+
+.planet-primary-action::before,
+.planet-primary-action::after {
+    position: absolute;
+    display: block;
+    content: "";
+    pointer-events: none;
+}
+
+.planet-primary-action::before {
+    z-index: 2;
+    inset: 3px 5px 10px;
+    border: 2px solid #4d3a20;
+    clip-path: polygon(
+        7% 0,
+        93% 0,
+        100% 24%,
+        100% 76%,
+        93% 100%,
+        7% 100%,
+        0 76%,
+        0 24%
+    );
+    background:
+        radial-gradient(
+            circle at 9% 26%,
+            #fff2ba 0 3px,
+            #253238 4px 6px,
+            transparent 7px
+        ),
+        radial-gradient(
+            circle at 91% 26%,
+            #fff2ba 0 3px,
+            #253238 4px 6px,
+            transparent 7px
+        ),
+        radial-gradient(
+            circle at 9% 74%,
+            #fff2ba 0 3px,
+            #253238 4px 6px,
+            transparent 7px
+        ),
+        radial-gradient(
+            circle at 91% 74%,
+            #fff2ba 0 3px,
+            #253238 4px 6px,
+            transparent 7px
+        ),
+        linear-gradient(
+            180deg,
+            #ffdc57 0 12%,
+            var(--hatch-face) 58%,
+            #c9851d 100%
+        );
+    box-shadow:
+        inset 0 3px 0 rgba(255, 248, 203, .55),
+        inset 0 -3px 0 rgba(116, 69, 25, .28);
+    transition:
+        inset 130ms ease,
+        filter 180ms ease;
+}
+
+.planet-primary-action::after {
+    z-index: 1;
+    right: 4px;
+    bottom: 1px;
+    left: 4px;
+    height: 13px;
+    background:
+        linear-gradient(
+            90deg,
+            #b96a24 0 13%,
+            var(--reference-ink) 13% 87%,
+            #b96a24 87% 100%
+        );
+    transition: height 130ms ease;
+}
+
+.planet-primary-action__label {
+    position: relative;
+    z-index: 3;
+    display: inline-block;
+    color: var(--reference-paper);
+    text-shadow:
+        -2px -2px 0 var(--reference-ink),
+        2px -2px 0 var(--reference-ink),
+        -2px 2px 0 var(--reference-ink),
+        2px 2px 0 var(--reference-ink);
+    transform: translateY(-3px);
+    transition: transform 130ms ease;
 }
 
 .planet-primary-action:hover,
 .planet-primary-action:focus-visible {
-    background: #ffe56c;
-    box-shadow: 0 4px 0 var(--reference-ink);
-    transform: translate(-50%, 3px);
+    animation: none;
+    filter:
+        drop-shadow(0 8px 0 rgba(37, 50, 56, .32))
+        brightness(1.06);
+    transform: translate(-50%, -3px);
 }
 
 .planet-primary-action:focus-visible {
     outline: 3px solid var(--reference-paper);
-    outline-offset: 4px;
+    outline-offset: 5px;
 }
 
 .planet-primary-action:active {
-    box-shadow: 0 1px 0 var(--reference-ink);
+    animation: none;
+    filter: drop-shadow(0 1px 0 rgba(37, 50, 56, .28));
     transform: translate(-50%, 6px);
+    transition-duration: 90ms;
+}
+
+.planet-primary-action:active::before {
+    inset: 5px 5px 4px;
+}
+
+.planet-primary-action:active::after {
+    height: 1px;
+}
+
+.planet-primary-action:active .planet-primary-action__label {
+    transform: translateY(1px);
+}
+
+@keyframes enter-hatch-twitch {
+    0%,
+    72%,
+    75%,
+    80%,
+    100% {
+        transform: translateX(-50%);
+    }
+
+    73% {
+        transform: translate(-50%, -1px) rotate(.4deg);
+    }
+
+    77% {
+        transform: translate(-50%, .5px) rotate(-.2deg);
+    }
 }
 
 .home-semantic-summary {
@@ -225,6 +361,7 @@ body {
 }
 
 .planet-runtime-starting .planet-primary-action {
+    animation: none;
     opacity: var(--intro-action-progress);
     transform:
         translate(-50%, calc(20px * (1 - var(--intro-action-progress))));
@@ -303,7 +440,8 @@ body {
     }
 
     .planet-primary-action {
-        min-width: 116px;
+        min-width: 126px;
+        min-height: 48px;
         padding-inline: 1.3rem;
     }
 }
@@ -324,9 +462,9 @@ body {
     }
 
     .planet-primary-action {
-        min-width: 106px;
+        min-width: 132px;
+        min-height: 48px;
         padding: .58rem 1.25rem .52rem;
-        box-shadow: 0 5px 0 var(--reference-ink);
     }
 }
 
@@ -339,9 +477,19 @@ body {
 
     .planet-scene,
     .reference-title,
-    .planet-primary-action,
     .planet-fallback,
     [data-home-canvas] {
+        transition: none;
+    }
+
+    .planet-primary-action {
+        animation: none;
+        transition: none;
+    }
+
+    .planet-primary-action::before,
+    .planet-primary-action::after,
+    .planet-primary-action__label {
         transition: none;
     }
 }

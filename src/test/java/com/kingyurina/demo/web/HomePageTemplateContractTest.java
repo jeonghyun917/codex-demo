@@ -134,6 +134,13 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "ENTER",
                 actions.getFirst().getTextContent().strip());
+        List<Element> actionLabels = elementsWithTag(
+                actions.getFirst(), "span");
+        assertEquals(1, actionLabels.size());
+        assertEquals(
+                "planet-primary-action__label",
+                actionLabels.getFirst().getAttribute("class"));
+        assertEquals("ENTER", actionLabels.getFirst().getTextContent().strip());
         assertEquals("main", actions.getFirst().getParentNode().getNodeName());
 
         assertEquals(1, elementsWithTag(root, "a").size());
@@ -278,9 +285,9 @@ class HomePageTemplateContractTest {
                 "var(--reference-action-bottom)",
                 cssDeclaration(action, "bottom"));
         assertEquals(
-                "clamp(148px, 10vw, 190px)",
+                "clamp(156px, 11vw, 196px)",
                 cssDeclaration(action, "min-width"));
-        assertEquals("48px", cssDeclaration(action, "min-height"));
+        assertEquals("54px", cssDeclaration(action, "min-height"));
         assertTrue(action.contains("var(--reference-action-yellow)"));
         assertEquals(
                 "none",
@@ -294,6 +301,37 @@ class HomePageTemplateContractTest {
         assertFalse(css.contains(".home-brand"));
         assertFalse(css.contains(".planet-status"));
         assertFalse(css.contains(".planet-interaction-hint"));
+    }
+
+    @Test
+    void homepageEnterActionUsesTheApprovedIndustrialHatchMotion()
+            throws IOException {
+        String css = resource("static/css/home-quant-planet.css");
+        String normalized = css.replaceAll("\\s+", " ");
+        String action = cssRule(css, ".planet-primary-action");
+        String before = cssRule(css, ".planet-primary-action::before");
+        String after = cssRule(css, ".planet-primary-action::after");
+        String hover = cssRuleContainingSelector(
+                css, ".planet-primary-action:hover");
+        String active = cssRule(css, ".planet-primary-action:active");
+
+        assertEquals("1s", cssDeclaration(action, "animation-duration"));
+        assertEquals(
+                "enter-hatch-twitch",
+                cssDeclaration(action, "animation-name"));
+        assertEquals(
+                "polygon(8% 0, 92% 0, 100% 24%, 100% 76%, "
+                        + "92% 100%, 8% 100%, 0 76%, 0 24%)",
+                cssDeclaration(action, "clip-path"));
+        assertTrue(before.contains("radial-gradient"));
+        assertTrue(after.contains("var(--reference-ink)"));
+        assertTrue(hover.contains("translate(-50%, -3px)"));
+        assertTrue(active.contains("translate(-50%, 6px)"));
+        assertTrue(css.contains("@keyframes enter-hatch-twitch"));
+        assertTrue(normalized.contains(
+                "@media (prefers-reduced-motion: reduce)"));
+        assertTrue(normalized.contains(
+                ".planet-primary-action { animation: none;"));
     }
 
     @Test
