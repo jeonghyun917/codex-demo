@@ -99,6 +99,8 @@ height, matching the Messenger video's dominant hero scale. The nine-glyph
 title grows with the same camera move and remains centered over the world.
 The desktop square scene therefore uses `min(100dvh, 78vw)`; the ratio is
 measured against the outer viewport, not merely against the internal canvas.
+Large-desktop, tablet-landscape, and short-landscape overrides preserve the
+same `100dvh` height basis and vary only their width caps.
 Because the panorama already supplies hand-drawn ink, repeated village backing
 outlines retain their diagnostic transforms but are not rendered, while canopy
 crowns use no more than 55% of their authored scale. This prevents overlapping

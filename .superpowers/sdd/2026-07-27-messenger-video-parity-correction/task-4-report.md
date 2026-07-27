@@ -330,3 +330,9 @@ tightened and failed 10/11 against the old CSS. Production now uses a square
 `min(100dvh, 78vw)` scene, and the composition fixture uses the resulting
 720×720 client size. This makes the measured 75–82% contract describe the
 actual desktop viewport.
+
+Targeted re-review then found three landscape media overrides that still used
+84/78/72vh. A new failing Java cascade contract covered all three. Large
+desktop, tablet landscape, and short landscape now use `100dvh` with their
+existing width caps, so every landscape breakpoint preserves the same
+outer-viewport framing basis.

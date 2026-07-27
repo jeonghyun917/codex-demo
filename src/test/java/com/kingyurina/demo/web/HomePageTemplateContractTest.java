@@ -233,6 +233,15 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "min(100dvh, 78vw)",
                 cssDeclaration(experience, "--reference-world-size"));
+        assertTrue(normalized.contains(
+                "--reference-world-size: min(100dvh, 80vw)"));
+        assertTrue(normalized.contains(
+                "--reference-world-size: min(100dvh, 82vw)"));
+        assertTrue(normalized.contains(
+                "--reference-world-size: min(100dvh, 72vw)"));
+        assertFalse(normalized.contains("--reference-world-size: min(84vh"));
+        assertFalse(normalized.contains("--reference-world-size: min(78vh"));
+        assertFalse(normalized.contains("--reference-world-size: min(72vh"));
         assertEquals(
                 "min(48vw, 64vh)",
                 cssDeclaration(experience, "--reference-title-width"));

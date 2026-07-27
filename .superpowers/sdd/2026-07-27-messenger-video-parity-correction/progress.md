@@ -11,6 +11,7 @@ Task 3: in progress
 Task 3: fix round 1/5 (1 addressed, 0 open; commits 6ec9d64..7469bd6)
 Task 3: complete (commits 0d563bf..7469bd6, review clean)
 Task 4: in progress
+Task 4: framing re-review Important addressed — every landscape media override now preserves the 100dvh height basis
 Task 4: final review Important addressed — desktop CSS scene raised from 82vh to 100dvh and framing fixture now uses the real square client size
 Task 4: root live-browser acceptance correction complete — duplicate backing hidden; repeated world and glyph colors no longer depend on key-light orientation
 Task 4: root browser acceptance correction — disable stacked village backing draw pass after 0.08 opacity still accumulated into an opaque ring

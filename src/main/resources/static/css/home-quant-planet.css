@@ -274,7 +274,7 @@ body {
 
 @media (min-width: 1440px) and (min-height: 900px) {
     .planet-experience {
-        --reference-world-size: min(84vh, 80vw);
+        --reference-world-size: min(100dvh, 80vw);
         --reference-title-width: min(50vw, 66vh);
         --reference-action-bottom: max(5.2vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 45.5%;
@@ -283,7 +283,7 @@ body {
 
 @media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
     .planet-experience {
-        --reference-world-size: min(78vh, 82vw);
+        --reference-world-size: min(100dvh, 82vw);
         --reference-title-width: min(54vw, 66vh);
         --reference-action-bottom: max(5.2vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 44.5%;
@@ -324,7 +324,7 @@ body {
 
 @media (max-height: 520px) and (orientation: landscape) {
     .planet-experience {
-        --reference-world-size: min(72vh, 72vw);
+        --reference-world-size: min(100dvh, 72vw);
         --reference-title-width: min(46vw, 68vh);
         --reference-action-bottom: max(3vh, env(safe-area-inset-bottom));
         --reference-world-center-y: 41%;
