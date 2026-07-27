@@ -16,8 +16,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -375,29 +378,208 @@ class HomePageTemplateContractTest {
                     () -> "Missing fallback landmark: " + landmark);
         }
 
-        Element planetArtwork = elementWithId(svg, "fallback-planet-artwork");
-        assertEquals(
-                "translate(-70 -112) scale(1.2)",
-                planetArtwork.getAttribute("transform"));
-        for (String rearGroup : List.of(
-                "fallback-rear-rocks",
-                "fallback-rear-scraps",
-                "fallback-rear-rings",
-                "fallback-rear-atmosphere",
-                "fallback-rear-flecks")) {
-            Element rear = elementWithId(svg, rearGroup);
-            assertTrue(
-                    (rear.compareDocumentPosition(planetArtwork)
-                            & Node.DOCUMENT_POSITION_FOLLOWING) != 0,
-                    () -> rearGroup + " must stay behind the planet artwork");
-        }
-
         String css = resource("static/css/home-quant-planet.css");
         String fallbackRule = cssRule(css, ".planet-fallback");
         assertEquals(
                 "url(\"/img/home-quant-planet-fallback.svg\")",
                 cssDeclaration(fallbackRule, "background-image"));
         assertEquals("contain", cssDeclaration(fallbackRule, "background-size"));
+    }
+
+    @Test
+    void homepageFallbackRearFieldHasDiverseLowContrastGeometryBehindThePlanet()
+            throws Exception {
+        Element svg = parseXml(resource(
+                "static/img/home-quant-planet-fallback.svg"))
+                .getDocumentElement();
+        Element artwork = elementWithId(svg, "fallback-planet-artwork");
+        List<Element> topLevel = directElementChildren(svg);
+        int artworkIndex = topLevel.indexOf(artwork);
+        List<String> rearIds = List.of(
+                "fallback-rear-rocks",
+                "fallback-rear-scraps",
+                "fallback-rear-rings",
+                "fallback-rear-atmosphere",
+                "fallback-rear-flecks");
+        Map<String, Integer> minimumGeometry = Map.of(
+                "fallback-rear-rocks", 4,
+                "fallback-rear-scraps", 4,
+                "fallback-rear-rings", 3,
+                "fallback-rear-atmosphere", 4,
+                "fallback-rear-flecks", 6);
+        List<SvgBounds> allGeometry = new ArrayList<>();
+        Set<String> familyStyles = new HashSet<>();
+
+        assertTrue(artworkIndex >= 0);
+        for (String id : rearIds) {
+            Element group = elementWithId(svg, id);
+            assertTrue(
+                    group.getParentNode() == svg,
+                    () -> id + " must be a direct SVG sibling");
+            assertTrue(
+                    topLevel.indexOf(group) < artworkIndex,
+                    () -> id + " must paint before the planet artwork");
+
+            List<Element> geometry = directElementChildren(group).stream()
+                    .filter(element -> "path".equals(element.getTagName()))
+                    .toList();
+            assertTrue(
+                    geometry.size() >= minimumGeometry.get(id),
+                    () -> id + " needs multiple authored silhouettes");
+            List<SvgBounds> bounds = geometry.stream()
+                    .map(HomePageTemplateContractTest::pathBounds)
+                    .toList();
+            assertTrue(
+                    bounds.stream().allMatch(bound ->
+                            bound.width() > 4 && bound.height() > 4),
+                    () -> id + " contains empty or degenerate geometry");
+            assertTrue(
+                    bounds.stream()
+                            .map(HomePageTemplateContractTest::sizeTier)
+                            .distinct()
+                            .count() >= 2,
+                    () -> id + " needs more than one visible size");
+            allGeometry.addAll(bounds);
+            familyStyles.add(String.join("|",
+                    group.getAttribute("fill"),
+                    group.getAttribute("stroke"),
+                    group.getAttribute("stroke-width"),
+                    group.getAttribute("opacity")));
+        }
+
+        assertTrue(familyStyles.size() >= 4);
+        assertTrue(
+                allGeometry.stream().map(HomePageTemplateContractTest::sizeTier)
+                        .distinct().count() >= 5,
+                "Rear field needs at least five visible size tiers");
+        assertTrue(allGeometry.stream().anyMatch(bound -> bound.centerX() < 160));
+        assertTrue(allGeometry.stream().anyMatch(bound -> bound.centerX() > 640));
+        assertTrue(allGeometry.stream().anyMatch(bound -> bound.centerY() < 120));
+        assertTrue(allGeometry.stream().anyMatch(bound -> bound.centerY() > 680));
+        long mirrored = allGeometry.stream()
+                .filter(bound -> hasMirroredPeer(bound, allGeometry, 800))
+                .count();
+        assertTrue(
+                mirrored * 2 < allGeometry.size(),
+                "Rear field must remain visibly asymmetric");
+
+        String css = resource("static/css/home-quant-planet.css");
+        int field = parseHexColor(cssDeclaration(
+                cssRule(css, ":root"), "--reference-field"));
+        Element atmosphere = elementWithId(
+                svg, "fallback-rear-atmosphere");
+        double groupOpacity = opacity(atmosphere, 1);
+        for (Element cloud : directElementChildren(atmosphere)) {
+            int fill = parseHexColor(inheritedAttribute(
+                    cloud, atmosphere, "fill"));
+            double effectiveOpacity = groupOpacity * opacity(cloud, 1);
+            assertTrue(
+                    effectiveOpacity <= .3,
+                    "Atmospheric clouds must stay low opacity");
+            assertTrue(
+                    contrastRatio(fill, field) <= 1.5,
+                    "Atmospheric clouds must stay near the field color");
+        }
+    }
+
+    @Test
+    void homepageFallbackScaleLayersAndResponsiveActionStayInsideSafeBounds()
+            throws Exception {
+        Element svg = parseXml(resource(
+                "static/img/home-quant-planet-fallback.svg"))
+                .getDocumentElement();
+        Element artwork = elementWithId(svg, "fallback-planet-artwork");
+        SvgTransform transform = svgTransform(
+                artwork.getAttribute("transform"));
+        assertTrue(transform.scale() >= 1.17 && transform.scale() <= 1.23);
+
+        long scaledGroups = elementsWithTag(svg, "g").stream()
+                .filter(element ->
+                        element.getAttribute("transform").contains("scale("))
+                .count();
+        assertEquals(1, scaledGroups);
+        SvgBounds sourceArtwork = geometryBounds(artwork);
+        SvgBounds fittedArtwork = transform.apply(sourceArtwork);
+        assertTrue(fittedArtwork.minX() >= 0);
+        assertTrue(fittedArtwork.minY() >= 0);
+        assertTrue(fittedArtwork.maxX() <= 800);
+        assertTrue(fittedArtwork.maxY() <= 760);
+
+        String css = resource("static/css/home-quant-planet.css");
+        int sceneZ = Integer.parseInt(cssDeclaration(
+                cssRule(css, ".planet-scene"), "z-index"));
+        int titleZ = Integer.parseInt(cssDeclaration(
+                cssRule(css, ".reference-title"), "z-index"));
+        int actionZ = Integer.parseInt(cssDeclaration(
+                cssRule(css, ".planet-primary-action"), "z-index"));
+        assertTrue(sceneZ < titleZ && titleZ < actionZ);
+
+        String experience = cssRule(css, ".planet-experience");
+        String scene = cssRule(css, ".planet-scene");
+        String fallback = cssRule(css, ".planet-fallback");
+        assertEquals("fixed", cssDeclaration(experience, "position"));
+        assertEquals("hidden", cssDeclaration(experience, "overflow"));
+        assertEquals("hidden", cssDeclaration(scene, "overflow"));
+        assertEquals("layout paint", cssDeclaration(scene, "contain"));
+        assertEquals("paint", cssDeclaration(fallback, "contain"));
+        assertEquals("contain", cssDeclaration(fallback, "background-size"));
+
+        List<ResponsiveActionCase> cases = List.of(
+                new ResponsiveActionCase(
+                        1280, 720, null, 10, 54),
+                new ResponsiveActionCase(
+                        1440, 900,
+                        "(min-width: 1440px) and (min-height: 900px)",
+                        5.2, 54),
+                new ResponsiveActionCase(
+                        1920, 1080,
+                        "(min-width: 1440px) and (min-height: 900px)",
+                        5.2, 54),
+                new ResponsiveActionCase(
+                        768, 1024,
+                        "(min-width: 600px) and (max-width: 768px) "
+                                + "and (orientation: portrait)",
+                        6, 54),
+                new ResponsiveActionCase(
+                        375, 812,
+                        "(max-width: 375px) and (min-height: 700px) "
+                                + "and (orientation: portrait)",
+                        6.5, 48));
+        for (ResponsiveActionCase viewport : cases) {
+            String responsiveExperience = viewport.mediaQuery() == null
+                    ? experience
+                    : cssMediaRule(
+                            css,
+                            viewport.mediaQuery(),
+                            ".planet-experience");
+            double bottomVh = leadingVh(cssDeclaration(
+                    responsiveExperience, "--reference-action-bottom"));
+            assertEquals(viewport.bottomVh(), bottomVh, .001);
+            double actionTop = viewport.height()
+                    - viewport.height() * bottomVh / 100
+                    - viewport.actionHeight();
+            assertTrue(
+                    actionTop >= 16,
+                    () -> "ENTER clips at " + viewport.width()
+                            + "x" + viewport.height());
+        }
+    }
+
+    @Test
+    void homepagePlanetAssetCacheVersionsStayInLockstep() throws IOException {
+        String template = resource("templates/index.html");
+        Matcher matcher = Pattern.compile(
+                "home-quant-planet\\.(?:css|js)[^\\r\\n]*?"
+                        + "(?:v='|[?&]v=)([0-9]+)")
+                .matcher(template);
+        List<String> versions = new ArrayList<>();
+        while (matcher.find()) {
+            versions.add(matcher.group(1));
+        }
+
+        assertEquals(4, versions.size());
+        assertEquals(1, new HashSet<>(versions).size());
+        assertTrue(versions.getFirst().length() >= 10);
     }
 
     @Test
@@ -558,6 +740,370 @@ class HomePageTemplateContractTest {
         assertFalse(world.contains("ResolveWorks"));
         assertFalse(world.contains("DecisionGate"));
         assertFalse(world.contains("QuantCourier"));
+    }
+
+    private static List<Element> directElementChildren(Element parent) {
+        List<Element> children = new ArrayList<>();
+        NodeList nodes = parent.getChildNodes();
+        for (int index = 0; index < nodes.getLength(); index++) {
+            if (nodes.item(index) instanceof Element element) {
+                children.add(element);
+            }
+        }
+        return children;
+    }
+
+    private static SvgBounds pathBounds(Element path) {
+        Matcher matcher = Pattern.compile(
+                "[A-Za-z]|[-+]?(?:\\d*\\.\\d+|\\d+\\.?\\d*)"
+                        + "(?:[eE][-+]?\\d+)?")
+                .matcher(path.getAttribute("d"));
+        List<String> tokens = new ArrayList<>();
+        while (matcher.find()) {
+            tokens.add(matcher.group());
+        }
+
+        double currentX = 0;
+        double currentY = 0;
+        double startX = 0;
+        double startY = 0;
+        double lastControlX = 0;
+        double lastControlY = 0;
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        char command = 0;
+        char previousCommand = 0;
+        int index = 0;
+        while (index < tokens.size()) {
+            String token = tokens.get(index);
+            if (Character.isLetter(token.charAt(0))) {
+                command = token.charAt(0);
+                index++;
+                if (Character.toUpperCase(command) == 'Z') {
+                    currentX = startX;
+                    currentY = startY;
+                    lastControlX = currentX;
+                    lastControlY = currentY;
+                    previousCommand = 'Z';
+                    continue;
+                }
+            }
+            boolean relative = Character.isLowerCase(command);
+            char normalizedCommand = Character.toUpperCase(command);
+            switch (normalizedCommand) {
+                case 'M', 'L' -> {
+                    double x = Double.parseDouble(tokens.get(index++));
+                    double y = Double.parseDouble(tokens.get(index++));
+                    if (relative) {
+                        x += currentX;
+                        y += currentY;
+                    }
+                    currentX = x;
+                    currentY = y;
+                    if (Character.toUpperCase(command) == 'M') {
+                        startX = x;
+                        startY = y;
+                        command = relative ? 'l' : 'L';
+                    }
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                    lastControlX = currentX;
+                    lastControlY = currentY;
+                }
+                case 'C' -> {
+                    double originX = currentX;
+                    double originY = currentY;
+                    for (int point = 0; point < 3; point++) {
+                        double x = Double.parseDouble(tokens.get(index++));
+                        double y = Double.parseDouble(tokens.get(index++));
+                        if (relative) {
+                            x += originX;
+                            y += originY;
+                        }
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                        if (point == 1) {
+                            lastControlX = x;
+                            lastControlY = y;
+                        }
+                        if (point == 2) {
+                            currentX = x;
+                            currentY = y;
+                        }
+                    }
+                }
+                case 'S' -> {
+                    double originX = currentX;
+                    double originY = currentY;
+                    double reflectedX = previousCommand == 'C'
+                            || previousCommand == 'S'
+                            ? currentX * 2 - lastControlX
+                            : currentX;
+                    double reflectedY = previousCommand == 'C'
+                            || previousCommand == 'S'
+                            ? currentY * 2 - lastControlY
+                            : currentY;
+                    minX = Math.min(minX, reflectedX);
+                    minY = Math.min(minY, reflectedY);
+                    maxX = Math.max(maxX, reflectedX);
+                    maxY = Math.max(maxY, reflectedY);
+                    double controlX = Double.parseDouble(
+                            tokens.get(index++));
+                    double controlY = Double.parseDouble(
+                            tokens.get(index++));
+                    double endX = Double.parseDouble(tokens.get(index++));
+                    double endY = Double.parseDouble(tokens.get(index++));
+                    if (relative) {
+                        controlX += originX;
+                        controlY += originY;
+                        endX += originX;
+                        endY += originY;
+                    }
+                    minX = Math.min(minX, Math.min(controlX, endX));
+                    minY = Math.min(minY, Math.min(controlY, endY));
+                    maxX = Math.max(maxX, Math.max(controlX, endX));
+                    maxY = Math.max(maxY, Math.max(controlY, endY));
+                    lastControlX = controlX;
+                    lastControlY = controlY;
+                    currentX = endX;
+                    currentY = endY;
+                }
+                case 'H' -> {
+                    double x = Double.parseDouble(tokens.get(index++));
+                    currentX = relative ? currentX + x : x;
+                    minX = Math.min(minX, currentX);
+                    maxX = Math.max(maxX, currentX);
+                    minY = Math.min(minY, currentY);
+                    maxY = Math.max(maxY, currentY);
+                    lastControlX = currentX;
+                    lastControlY = currentY;
+                }
+                case 'V' -> {
+                    double y = Double.parseDouble(tokens.get(index++));
+                    currentY = relative ? currentY + y : y;
+                    minX = Math.min(minX, currentX);
+                    maxX = Math.max(maxX, currentX);
+                    minY = Math.min(minY, currentY);
+                    maxY = Math.max(maxY, currentY);
+                    lastControlX = currentX;
+                    lastControlY = currentY;
+                }
+                default -> throw new AssertionError(
+                        "Unsupported fallback path command: " + command);
+            }
+            previousCommand = normalizedCommand;
+        }
+        return new SvgBounds(minX, minY, maxX, maxY);
+    }
+
+    private static SvgBounds geometryBounds(Element root) {
+        List<SvgBounds> bounds = new ArrayList<>();
+        NodeList geometry = root.getElementsByTagName("*");
+        for (int index = 0; index < geometry.getLength(); index++) {
+            if (!(geometry.item(index) instanceof Element element)) {
+                continue;
+            }
+            switch (element.getTagName()) {
+                case "path" -> bounds.add(pathBounds(element));
+                case "circle" -> {
+                    double x = Double.parseDouble(element.getAttribute("cx"));
+                    double y = Double.parseDouble(element.getAttribute("cy"));
+                    double radius = Double.parseDouble(
+                            element.getAttribute("r"));
+                    bounds.add(new SvgBounds(
+                            x - radius, y - radius,
+                            x + radius, y + radius));
+                }
+                case "ellipse" -> {
+                    double x = Double.parseDouble(element.getAttribute("cx"));
+                    double y = Double.parseDouble(element.getAttribute("cy"));
+                    double radiusX = Double.parseDouble(
+                            element.getAttribute("rx"));
+                    double radiusY = Double.parseDouble(
+                            element.getAttribute("ry"));
+                    bounds.add(new SvgBounds(
+                            x - radiusX, y - radiusY,
+                            x + radiusX, y + radiusY));
+                }
+                default -> {
+                }
+            }
+        }
+        assertFalse(bounds.isEmpty());
+        return bounds.stream().reduce(SvgBounds::union).orElseThrow();
+    }
+
+    private static long sizeTier(SvgBounds bounds) {
+        return Math.round(Math.log(bounds.area()) / Math.log(1.65));
+    }
+
+    private static boolean hasMirroredPeer(
+            SvgBounds source,
+            List<SvgBounds> candidates,
+            double viewBoxWidth) {
+        return candidates.stream().anyMatch(candidate -> {
+            if (candidate == source) {
+                return false;
+            }
+            double areaRatio = candidate.area() / source.area();
+            return Math.abs(candidate.centerX() + source.centerX()
+                    - viewBoxWidth) <= 12
+                    && Math.abs(candidate.centerY() - source.centerY()) <= 12
+                    && areaRatio >= .65
+                    && areaRatio <= 1.55;
+        });
+    }
+
+    private static double opacity(Element element, double fallback) {
+        String value = element.getAttribute("opacity");
+        return value.isBlank() ? fallback : Double.parseDouble(value);
+    }
+
+    private static String inheritedAttribute(
+            Element child,
+            Element parent,
+            String attribute) {
+        String value = child.getAttribute(attribute);
+        return value.isBlank() ? parent.getAttribute(attribute) : value;
+    }
+
+    private static int parseHexColor(String value) {
+        String normalized = value.strip();
+        assertTrue(normalized.matches("#[0-9a-fA-F]{6}"));
+        return Integer.parseInt(normalized.substring(1), 16);
+    }
+
+    private static double contrastRatio(int first, int second) {
+        double firstLuminance = relativeLuminance(first);
+        double secondLuminance = relativeLuminance(second);
+        return (Math.max(firstLuminance, secondLuminance) + .05)
+                / (Math.min(firstLuminance, secondLuminance) + .05);
+    }
+
+    private static double relativeLuminance(int color) {
+        double red = linearChannel((color >> 16) & 0xff);
+        double green = linearChannel((color >> 8) & 0xff);
+        double blue = linearChannel(color & 0xff);
+        return .2126 * red + .7152 * green + .0722 * blue;
+    }
+
+    private static double linearChannel(int channel) {
+        double value = channel / 255d;
+        return value <= .04045
+                ? value / 12.92
+                : Math.pow((value + .055) / 1.055, 2.4);
+    }
+
+    private static SvgTransform svgTransform(String value) {
+        Matcher translate = Pattern.compile(
+                "translate\\(\\s*([-+.\\d]+)[ ,]+([-+.\\d]+)\\s*\\)")
+                .matcher(value);
+        Matcher scale = Pattern.compile(
+                "scale\\(\\s*([-+.\\d]+)\\s*\\)")
+                .matcher(value);
+        assertTrue(translate.find());
+        assertTrue(scale.find());
+        return new SvgTransform(
+                Double.parseDouble(translate.group(1)),
+                Double.parseDouble(translate.group(2)),
+                Double.parseDouble(scale.group(1)));
+    }
+
+    private static String cssMediaRule(
+            String css,
+            String mediaQuery,
+            String selector) {
+        String marker = "@media " + mediaQuery;
+        int markerIndex = css.indexOf(marker);
+        assertTrue(markerIndex >= 0, () -> "Missing media query: " + mediaQuery);
+        int open = css.indexOf('{', markerIndex + marker.length());
+        assertTrue(open >= 0);
+        int close = matchingBrace(css, open);
+        return cssRule(css.substring(open + 1, close), selector);
+    }
+
+    private static int matchingBrace(String source, int open) {
+        int depth = 0;
+        for (int index = open; index < source.length(); index++) {
+            if (source.charAt(index) == '{') {
+                depth++;
+            } else if (source.charAt(index) == '}') {
+                depth--;
+                if (depth == 0) {
+                    return index;
+                }
+            }
+        }
+        throw new AssertionError("Unclosed CSS block");
+    }
+
+    private static double leadingVh(String value) {
+        Matcher matcher = Pattern.compile(
+                "max\\(\\s*([0-9]+(?:\\.[0-9]+)?)vh\\s*,")
+                .matcher(value);
+        assertTrue(matcher.find(), () -> "Missing vh safe inset: " + value);
+        return Double.parseDouble(matcher.group(1));
+    }
+
+    private record SvgBounds(
+            double minX,
+            double minY,
+            double maxX,
+            double maxY) {
+        double width() {
+            return maxX - minX;
+        }
+
+        double height() {
+            return maxY - minY;
+        }
+
+        double area() {
+            return width() * height();
+        }
+
+        double centerX() {
+            return (minX + maxX) / 2;
+        }
+
+        double centerY() {
+            return (minY + maxY) / 2;
+        }
+
+        SvgBounds union(SvgBounds other) {
+            return new SvgBounds(
+                    Math.min(minX, other.minX),
+                    Math.min(minY, other.minY),
+                    Math.max(maxX, other.maxX),
+                    Math.max(maxY, other.maxY));
+        }
+    }
+
+    private record SvgTransform(
+            double translateX,
+            double translateY,
+            double scale) {
+        SvgBounds apply(SvgBounds source) {
+            return new SvgBounds(
+                    source.minX() * scale + translateX,
+                    source.minY() * scale + translateY,
+                    source.maxX() * scale + translateX,
+                    source.maxY() * scale + translateY);
+        }
+    }
+
+    private record ResponsiveActionCase(
+            int width,
+            int height,
+            String mediaQuery,
+            double bottomVh,
+            int actionHeight) {
     }
 
     private static int occurrences(String source, String target) {

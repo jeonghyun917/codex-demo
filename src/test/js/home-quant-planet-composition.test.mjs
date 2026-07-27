@@ -612,11 +612,11 @@ test("keeps the planet uniformly round across wide and narrow viewports",
 test("keeps the enlarged structural planet and foreground safe at target viewports",
         async (t) => {
     const viewports = [
-        [1280, 720],
-        [1440, 900],
-        [1920, 1080],
-        [768, 1024],
-        [375, 812]
+        { width: 1280, height: 720, actionBottomVh: 10, actionHeight: 54 },
+        { width: 1440, height: 900, actionBottomVh: 5.2, actionHeight: 54 },
+        { width: 1920, height: 1080, actionBottomVh: 5.2, actionHeight: 54 },
+        { width: 768, height: 1024, actionBottomVh: 6, actionHeight: 54 },
+        { width: 375, height: 812, actionBottomVh: 6.5, actionHeight: 48 }
     ];
     const angles = [
         0,
@@ -624,21 +624,21 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
         Math.PI,
         Math.PI * 3 / 2
     ];
+    const sceneShiftVh = -5;
 
-    for (const [width, height] of viewports) {
+    for (const {
+        width,
+        height,
+        actionBottomVh,
+        actionHeight
+    } of viewports) {
         const scene = await createTestScene(t, {
             width,
             height,
             glyphFactory: createProductionGlyphRig
         });
-        const actionBottomRatio = width <= 375
-            ? .065
-            : width <= 768
-                ? .06
-                : .052;
-        const actionHeight = width <= 599 ? 48 : 54;
         const actionSafeTop = height
-            - height * actionBottomRatio
+            - height * actionBottomVh / 100
             - actionHeight
             - 16;
         for (const worldAngle of angles) {
@@ -699,7 +699,8 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
                 `Nine glyphs entered the ENTER safe area at `
                     + `${width}x${height}`
             );
-            const glyphBottomPixels = (glyphY.max + 1) * height / 2;
+            const glyphBottomPixels = (1 - glyphY.min) * height / 2
+                + height * sceneShiftVh / 100;
             assert.ok(
                 glyphBottomPixels <= actionSafeTop,
                 `Nine glyphs crossed the measured ENTER safe area at `
