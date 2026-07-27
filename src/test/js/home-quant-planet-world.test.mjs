@@ -937,7 +937,7 @@ test("keeps industrial barrel bands outside their opaque cylinders", (t) => {
         const parent = index < 6 ? mainEngine : lowerEngine;
         const buriedCorners = countCornersInsideCylinder(corners, parent);
         assert.ok(
-            buriedCorners < corners.length,
+            corners.length - buriedCorners >= 2,
             `barrel band ${index} is buried ${buriedCorners}/${
                 corners.length
             } corners`
@@ -967,7 +967,7 @@ test("keeps retaining edges outside their authored terrain patches", (t) => {
             parentIndex
         );
         assert.ok(
-            buriedCorners < corners.length,
+            corners.length - buriedCorners >= 2,
             `retaining edge ${index} is buried ${buriedCorners}/${
                 corners.length
             } corners`
@@ -981,7 +981,7 @@ test("anchors canopy forks to selected high and balanced foliage", () => {
             profile: selectedProfile
         });
         try {
-            const { range } = detailFamily(
+            const { mesh, range } = detailFamily(
                 world.group,
                 "ReferenceCanopyForks"
             );
@@ -991,6 +991,7 @@ test("anchors canopy forks to selected high and balanced foliage", () => {
             const selectedParentIds = new Set(
                 crowns.userData.surfaceDetailIds
             );
+            world.group.updateMatrixWorld(true);
 
             assert.equal(range.count, 18);
             assert.equal(range.parentIds?.length, range.count);
@@ -998,6 +999,23 @@ test("anchors canopy forks to selected high and balanced foliage", () => {
                 assert.ok(
                     selectedParentIds.has(parentId),
                     `${selectedProfile.name} fork ${index} floats from ${
+                        parentId
+                    }`
+                );
+                const parentIndex = crowns.userData.surfaceDetailIds
+                    .indexOf(parentId);
+                const corners = instanceBoxCorners(
+                    mesh,
+                    range.offset + index
+                );
+                const contactCorners = countCornersInsideInstance(
+                    corners,
+                    crowns,
+                    parentIndex
+                );
+                assert.ok(
+                    contactCorners > 0,
+                    `${selectedProfile.name} fork ${index} does not touch ${
                         parentId
                     }`
                 );

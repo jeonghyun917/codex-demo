@@ -368,7 +368,43 @@ function transformedDetailPlacement(THREE, placement, familyName) {
     };
 }
 
-function createPackedMiniatureDetailPlacements(THREE) {
+function canopyCrownTransform(THREE, placement, index) {
+    const normal = new THREE.Vector3(...placement.position).normalize();
+    return {
+        position: new THREE.Vector3(...placement.position)
+            .addScaledVector(normal, .64 + (index % 3) * .07)
+            .toArray(),
+        scale: placement.scale.map((axis) => axis * .55),
+        rotation: placement.rotation
+    };
+}
+
+function connectForkToSelectedCrown(
+    THREE,
+    placement,
+    foliagePlacements
+) {
+    const parentIndex = foliagePlacements.findIndex(
+        (parent) => parent.id === placement.parentId
+    );
+    if (parentIndex < 0) {
+        throw new Error(`Missing selected canopy parent ${placement.parentId}`);
+    }
+    const parent = foliagePlacements[parentIndex];
+    const crown = canopyCrownTransform(THREE, parent, parentIndex);
+    const normal = new THREE.Vector3(...parent.position).normalize();
+    return {
+        ...placement,
+        position: new THREE.Vector3(...crown.position)
+            .addScaledVector(normal, -crown.scale[1] * .55)
+            .toArray()
+    };
+}
+
+function createPackedMiniatureDetailPlacements(
+    THREE,
+    foliagePlacements
+) {
     const placements = [];
     const detailFamilyRanges = {};
     PACKED_DETAIL_FAMILY_ORDER.forEach((familyName) => {
@@ -378,10 +414,17 @@ function createPackedMiniatureDetailPlacements(THREE) {
         const offset = placements.length;
         const colors = PACKED_DETAIL_COLORS[familyName];
         familyPlacements.forEach((placement, index) => {
+            const profilePlacement = familyName === "ReferenceCanopyForks"
+                ? connectForkToSelectedCrown(
+                    THREE,
+                    placement,
+                    foliagePlacements
+                )
+                : placement;
             placements.push({
                 ...transformedDetailPlacement(
                     THREE,
-                    placement,
+                    profilePlacement,
                     familyName
                 ),
                 family: familyName,
@@ -644,7 +687,12 @@ function selectFoliagePlacements(profile) {
     return Object.freeze(selected);
 }
 
-function buildPlanetCore(THREE, resources, palette) {
+function buildPlanetCore(
+    THREE,
+    resources,
+    palette,
+    foliagePlacements
+) {
     const group = new THREE.Group();
     group.name = "ReferencePlanetCore";
 
@@ -813,7 +861,10 @@ function buildPlanetCore(THREE, resources, palette) {
             surface: true
         });
     });
-    const packedDetails = createPackedMiniatureDetailPlacements(THREE);
+    const packedDetails = createPackedMiniatureDetailPlacements(
+        THREE,
+        foliagePlacements
+    );
     const packedOffset = reliefPlacements.length;
     reliefPlacements.push(...packedDetails.placements);
     const relief = buildColoredInstanceFamily(THREE, {
@@ -2030,15 +2081,13 @@ function buildLowerCanopy(THREE, resources, palette, placements) {
         );
         trunks.setMatrixAt(index, matrix);
 
-        const crownPosition = new THREE.Vector3(...placement.position)
-            .addScaledVector(normal, .64 + (index % 3) * .07)
-            .toArray();
+        const crown = canopyCrownTransform(THREE, placement, index);
         orientSurfaceInstance(
             THREE,
             matrix,
-            crownPosition,
-            placement.scale.map((axis) => axis * .55),
-            placement.rotation
+            crown.position,
+            crown.scale,
+            crown.rotation
         );
         crowns.setMatrixAt(index, matrix);
         crowns.setColorAt(index, canopyColors[index % canopyColors.length]);
@@ -2270,7 +2319,13 @@ export function createQuantPlanetWorld(THREE, {
         planet.name = "QuantPlanet";
         const content = new THREE.Group();
         content.name = "ReferencePlanetMiniature";
-        const core = buildPlanetCore(THREE, resources, palette);
+        const foliagePlacements = selectFoliagePlacements(profile);
+        const core = buildPlanetCore(
+            THREE,
+            resources,
+            palette,
+            foliagePlacements
+        );
         const body = core.getObjectByName("ReferencePlanetBody");
         const plainSurfaceMaterial = body.material;
         let browserTexture = null;
@@ -2305,7 +2360,6 @@ export function createQuantPlanetWorld(THREE, {
         const industrial = buildIndustrialCluster(THREE, resources, palette);
         const utility = buildUtilityCluster(THREE, resources, palette);
         const villages = buildVillageClusters(THREE, resources, palette);
-        const foliagePlacements = selectFoliagePlacements(profile);
         const canopy = buildLowerCanopy(
             THREE,
             resources,
