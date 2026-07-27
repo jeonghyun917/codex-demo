@@ -36,3 +36,24 @@ export function fitPerspectiveSphere({
         limitingFovRadians
     };
 }
+
+export function fitReferenceWorld({
+    center = { x: 0, y: 0, z: 0 },
+    radius = 1,
+    aspect = 1,
+    verticalFovDegrees = 34
+} = {}) {
+    const coverage = aspect < .75 ? .76 : .72;
+    const margin = 1 / coverage;
+    return {
+        ...fitPerspectiveSphere({
+            center,
+            radius,
+            aspect,
+            verticalFovDegrees,
+            margin
+        }),
+        coverage,
+        margin
+    };
+}

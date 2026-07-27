@@ -2,7 +2,7 @@ import {
     shouldRenderFrame
 } from "./home-quant-planet-motion.js";
 import {
-    fitPerspectiveSphere,
+    fitReferenceWorld,
     REFERENCE_HERO
 } from "./home-quant-planet-composition.js";
 import {
@@ -21,8 +21,6 @@ const BALANCED_LIMITS = Object.freeze({
     triangles: 90000
 });
 const GLYPH_LAYOUT_RADIUS_RATIO = .504;
-const framingMargin = (aspect) => aspect < .75 ? 1 : 1.1;
-const cameraHeroRadiusRatio = (aspect) => aspect < .75 ? .72 : .56;
 
 const EMPTY_POSE = Object.freeze({
     worldAngle: 0,
@@ -137,12 +135,11 @@ export async function createQuantPlanetScene({
         const glyphLayoutRadius = envelope.radius
             * GLYPH_LAYOUT_RADIUS_RATIO;
         function refitCamera(aspect) {
-            const next = fitPerspectiveSphere({
+            const next = fitReferenceWorld({
                 center: envelope.center,
-                radius: envelope.radius * cameraHeroRadiusRatio(aspect),
+                radius: envelope.radius,
                 aspect,
-                verticalFovDegrees: 34,
-                margin: framingMargin(aspect)
+                verticalFovDegrees: 34
             });
             const clipPadding = envelope.radius * 1.08;
             camera.near = Math.max(.1, next.distance - clipPadding);

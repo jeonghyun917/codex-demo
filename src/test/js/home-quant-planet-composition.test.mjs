@@ -14,7 +14,8 @@ import {
 
 const {
     REFERENCE_HERO,
-    fitPerspectiveSphere
+    fitPerspectiveSphere,
+    fitReferenceWorld
 } = composition;
 
 function createNineCellMask() {
@@ -312,10 +313,11 @@ const pose = (overrides = {}) => ({
     ...overrides
 });
 
-test("exports only the reference hero and bounds fitting contracts", () => {
+test("exports the reference hero and complete-world fitting contracts", () => {
     assert.deepEqual(Object.keys(composition).sort(), [
         "REFERENCE_HERO",
-        "fitPerspectiveSphere"
+        "fitPerspectiveSphere",
+        "fitReferenceWorld"
     ]);
 });
 
@@ -338,6 +340,28 @@ test("fits complete bounds against the stricter viewport field of view", () => {
     assert.deepEqual(landscape.target, { x: 0, y: .4, z: 0 });
     assert.ok(landscape.distance > 3.8);
     assert.ok(portrait.distance > landscape.distance);
+});
+
+test("fits the complete public radius to reference viewport coverage", () => {
+    const landscape = fitReferenceWorld({
+        center: { x: 0, y: 0, z: 0 },
+        radius: 5.4,
+        aspect: 1440 / 900,
+        verticalFovDegrees: 34
+    });
+    const portrait = fitReferenceWorld({
+        center: { x: 0, y: 0, z: 0 },
+        radius: 5.4,
+        aspect: 375 / 812,
+        verticalFovDegrees: 34
+    });
+
+    assert.ok(landscape.coverage >= .68);
+    assert.ok(landscape.coverage <= .74);
+    assert.ok(portrait.coverage >= .68);
+    assert.ok(portrait.coverage <= .82);
+    assert.equal(landscape.radius, 5.4);
+    assert.equal(portrait.radius, 5.4);
 });
 
 test("forwards the world angle without pointer or drag coupling", async (t) => {
@@ -391,38 +415,44 @@ test("refits complete world bounds after landscape and portrait resizes", async 
     assert.ok(portrait.far > Math.max(...portrait.depths));
 });
 
-test("matches the 16:9 video framing and keeps the title centered at scale",
+test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         async (t) => {
     const scene = await createTestScene(t, {
-        // The desktop CSS scene is a square 100dvh canvas inside 1280x720.
-        width: 720,
+        width: 1280,
         height: 720
     });
 
-    assert.equal(scene.controller.render(pose()), true);
-    const frame = scene.frames.at(-1);
-    const bodyYs = frame.bodyProjected.map(({ y }) => y);
-    const bodyViewportRatio = (
-        Math.max(...bodyYs) - Math.min(...bodyYs)
-    ) / 2;
-    const glyphToEnvelopeRatio = frame.glyphLayoutRadius
-        / frame.worldRadius;
+    for (const worldAngle of [
+        0,
+        Math.PI / 2,
+        Math.PI,
+        Math.PI * 3 / 2
+    ]) {
+        assert.equal(scene.controller.render(pose({ worldAngle })), true);
+    }
 
-    assert.ok(
-        bodyViewportRatio >= .75 && bodyViewportRatio <= .82,
-        `Expected body ratio 0.75-0.82, got ${bodyViewportRatio}`
-    );
-    assert.ok(Math.abs(frame.glyphCenterProjected.x) < 1e-9);
-    assert.ok(Math.abs(frame.glyphCenterProjected.y) < 1e-9);
-    assert.ok(
-        Math.abs(glyphToEnvelopeRatio - .504) < 1e-9,
-        `Expected glyph/envelope 0.504, got ${glyphToEnvelopeRatio}`
-    );
-    assert.ok(
-        Math.abs(frame.glyphDepthRadius / frame.worldRadius - .56) < 1e-9
-    );
-    assert.ok(frame.near < Math.min(...frame.depths));
-    assert.ok(frame.far > Math.max(...frame.depths));
+    scene.frames.forEach((frame) => {
+        const xs = frame.projected.map(({ x }) => x);
+        const ys = frame.projected.map(({ y }) => y);
+        assert.ok(
+            Math.min(...xs) >= -.94,
+            `World clipped left at ${Math.min(...xs)}`
+        );
+        assert.ok(
+            Math.max(...xs) <= .94,
+            `World clipped right at ${Math.max(...xs)}`
+        );
+        assert.ok(
+            Math.min(...ys) >= -.94,
+            `World clipped below at ${Math.min(...ys)}`
+        );
+        assert.ok(
+            Math.max(...ys) <= .86,
+            `World clipped above at ${Math.max(...ys)}`
+        );
+        assert.ok(frame.near < Math.min(...frame.depths));
+        assert.ok(frame.far > Math.max(...frame.depths));
+    });
 });
 
 test("pointer changes glyphs without changing planet or camera", async (t) => {

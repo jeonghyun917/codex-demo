@@ -223,6 +223,7 @@ class HomePageTemplateContractTest {
         String css = resource("static/css/home-quant-planet.css");
         String normalized = css.replaceAll("\\s+", " ");
         String experience = cssRule(css, ".planet-experience");
+        String scene = cssRule(css, ".planet-scene");
         String title = cssRule(css, ".reference-title");
         String action = cssRule(css, ".planet-primary-action");
         String lockedAction = cssRule(
@@ -230,18 +231,11 @@ class HomePageTemplateContractTest {
 
         assertTrue(normalized.contains("height: 100dvh"));
         assertTrue(normalized.contains("overflow: hidden"));
-        assertEquals(
-                "min(100dvh, 78vw)",
-                cssDeclaration(experience, "--reference-world-size"));
-        assertTrue(normalized.contains(
-                "--reference-world-size: min(100dvh, 80vw)"));
-        assertTrue(normalized.contains(
-                "--reference-world-size: min(100dvh, 82vw)"));
-        assertTrue(normalized.contains(
-                "--reference-world-size: min(100dvh, 72vw)"));
-        assertFalse(normalized.contains("--reference-world-size: min(84vh"));
-        assertFalse(normalized.contains("--reference-world-size: min(78vh"));
-        assertFalse(normalized.contains("--reference-world-size: min(72vh"));
+        assertEquals("0", cssDeclaration(scene, "inset"));
+        assertEquals("100vw", cssDeclaration(scene, "width"));
+        assertEquals("100dvh", cssDeclaration(scene, "height"));
+        assertFalse(scene.contains("var(--reference-world-size)"));
+        assertFalse(normalized.contains("--reference-world-size"));
         assertEquals(
                 "min(48vw, 64vh)",
                 cssDeclaration(experience, "--reference-title-width"));
@@ -352,18 +346,12 @@ class HomePageTemplateContractTest {
         String title = cssRule(css, ".reference-title");
         String action = cssRule(css, ".planet-primary-action");
 
-        assertEquals(
-                "var(--reference-world-size)",
-                cssDeclaration(scene, "width"));
-        assertEquals(
-                "var(--reference-world-size)",
-                cssDeclaration(scene, "height"));
+        assertEquals("0", cssDeclaration(scene, "inset"));
+        assertEquals("100vw", cssDeclaration(scene, "width"));
+        assertEquals("100dvh", cssDeclaration(scene, "height"));
         assertEquals("0", cssDeclaration(fallback, "inset"));
         assertEquals("100%", cssDeclaration(fallback, "width"));
         assertEquals("100%", cssDeclaration(fallback, "height"));
-        assertEquals(
-                "var(--reference-world-center-y)",
-                cssDeclaration(scene, "top"));
         assertEquals(
                 "var(--reference-world-center-y)",
                 cssDeclaration(title, "top"));
