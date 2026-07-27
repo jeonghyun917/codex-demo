@@ -631,6 +631,16 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
             height,
             glyphFactory: createProductionGlyphRig
         });
+        const actionBottomRatio = width <= 375
+            ? .065
+            : width <= 768
+                ? .06
+                : .052;
+        const actionHeight = width <= 599 ? 48 : 54;
+        const actionSafeTop = height
+            - height * actionBottomRatio
+            - actionHeight
+            - 16;
         for (const worldAngle of angles) {
             assert.equal(scene.controller.render(pose({ worldAngle })), true);
         }
@@ -688,6 +698,13 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
                 glyphY.min >= -.82 && glyphY.max <= .82,
                 `Nine glyphs entered the ENTER safe area at `
                     + `${width}x${height}`
+            );
+            const glyphBottomPixels = (glyphY.max + 1) * height / 2;
+            assert.ok(
+                glyphBottomPixels <= actionSafeTop,
+                `Nine glyphs crossed the measured ENTER safe area at `
+                    + `${width}x${height}: ${glyphBottomPixels} > `
+                    + `${actionSafeTop}`
             );
         }
     }

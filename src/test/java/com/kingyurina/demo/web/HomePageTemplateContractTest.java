@@ -349,6 +349,12 @@ class HomePageTemplateContractTest {
         assertEquals(0, elementsWithTag(svg, "image").size());
 
         for (String landmark : List.of(
+                "fallback-rear-rocks",
+                "fallback-rear-scraps",
+                "fallback-rear-rings",
+                "fallback-rear-atmosphere",
+                "fallback-rear-flecks",
+                "fallback-planet-artwork",
                 "fallback-planet-core",
                 "fallback-water-band",
                 "fallback-temple",
@@ -369,6 +375,23 @@ class HomePageTemplateContractTest {
                     () -> "Missing fallback landmark: " + landmark);
         }
 
+        Element planetArtwork = elementWithId(svg, "fallback-planet-artwork");
+        assertEquals(
+                "translate(-70 -112) scale(1.2)",
+                planetArtwork.getAttribute("transform"));
+        for (String rearGroup : List.of(
+                "fallback-rear-rocks",
+                "fallback-rear-scraps",
+                "fallback-rear-rings",
+                "fallback-rear-atmosphere",
+                "fallback-rear-flecks")) {
+            Element rear = elementWithId(svg, rearGroup);
+            assertTrue(
+                    (rear.compareDocumentPosition(planetArtwork)
+                            & Node.DOCUMENT_POSITION_FOLLOWING) != 0,
+                    () -> rearGroup + " must stay behind the planet artwork");
+        }
+
         String css = resource("static/css/home-quant-planet.css");
         String fallbackRule = cssRule(css, ".planet-fallback");
         assertEquals(
@@ -386,16 +409,30 @@ class HomePageTemplateContractTest {
                 css, ".planet-fallback");
         String title = cssRule(css, ".reference-title");
         String action = cssRule(css, ".planet-primary-action");
+        String pageRoots = cssRuleContainingSelector(css, "html");
+        String experience = cssRule(css, ".planet-experience");
+        String fallbackArtwork = cssRule(css, ".planet-fallback");
 
+        assertEquals("hidden", cssDeclaration(pageRoots, "overflow"));
+        assertEquals("fixed", cssDeclaration(experience, "position"));
+        assertEquals("0", cssDeclaration(experience, "inset"));
+        assertEquals("hidden", cssDeclaration(experience, "overflow"));
         assertEquals("0", cssDeclaration(scene, "inset"));
         assertEquals("100vw", cssDeclaration(scene, "width"));
         assertEquals("100dvh", cssDeclaration(scene, "height"));
+        assertEquals("hidden", cssDeclaration(scene, "overflow"));
+        assertEquals("layout paint", cssDeclaration(scene, "contain"));
         assertEquals(
                 "translateY(var(--reference-world-shift-y))",
                 cssDeclaration(scene, "transform"));
         assertEquals("0", cssDeclaration(fallback, "inset"));
         assertEquals("100%", cssDeclaration(fallback, "width"));
         assertEquals("100%", cssDeclaration(fallback, "height"));
+        assertEquals("paint", cssDeclaration(fallbackArtwork, "contain"));
+        assertEquals("hidden", cssDeclaration(fallbackArtwork, "overflow"));
+        assertEquals(
+                "contain",
+                cssDeclaration(fallbackArtwork, "background-size"));
         assertEquals(
                 "var(--reference-world-center-y)",
                 cssDeclaration(title, "top"));
@@ -405,6 +442,15 @@ class HomePageTemplateContractTest {
         assertEquals(
                 "var(--reference-action-bottom)",
                 cssDeclaration(action, "bottom"));
+        assertEquals(
+                "calc(100vw - 2rem - env(safe-area-inset-left) "
+                        + "- env(safe-area-inset-right))",
+                cssDeclaration(action, "max-width"));
+        assertTrue(css.replaceAll("\\s+", " ").contains(
+                "@media (prefers-reduced-motion: reduce)"));
+        assertTrue(css.replaceAll("\\s+", " ").contains(
+                ".planet-primary-action { animation: none; "
+                        + "transition: none;"));
 
         for (String selector : List.of(
                 ".planet-static-mode .planet-experience",

@@ -17,6 +17,72 @@
         </filter>
     </defs>
 
+    <g id="fallback-rear-atmosphere"
+       fill="#73c3c0"
+       opacity=".28">
+        <path d="M16 315C43 270 98 252 146 267C181 278 205 302 208 330C177 350 130 353 92 342C57 333 34 326 16 315Z"/>
+        <path d="M570 160C615 124 686 126 733 155C765 174 781 204 771 228C731 238 679 227 644 209C614 194 589 178 570 160Z"/>
+        <path d="M601 590C648 555 715 554 763 580C790 595 801 617 792 640C755 657 700 651 658 634C632 624 612 608 601 590Z"/>
+        <path d="M79 645C112 616 157 606 198 619C224 627 245 644 250 665C222 683 181 687 145 680C116 674 92 661 79 645Z"
+              fill="#78d7d0"
+              opacity=".72"/>
+        <path d="M246 62C284 38 335 38 371 57C392 68 406 84 406 101C372 112 330 108 298 96C273 87 256 75 246 62Z"
+              fill="#78d7d0"
+              opacity=".58"/>
+    </g>
+
+    <g id="fallback-rear-rings"
+       fill="none"
+       stroke="#338f91"
+       stroke-linecap="round"
+       opacity=".48">
+        <path d="M22 475C74 434 136 421 193 434" stroke-width="15"/>
+        <path d="M627 291C681 265 740 270 783 303" stroke-width="10"/>
+        <path d="M513 692C561 718 617 724 669 706" stroke-width="18"/>
+        <path d="M155 138C187 111 223 99 261 104" stroke="#f2e5c7" stroke-width="8" opacity=".58"/>
+    </g>
+
+    <g id="fallback-rear-rocks"
+       fill="#638f82"
+       stroke="#3d6f6b"
+       stroke-width="5"
+       stroke-linejoin="round"
+       opacity=".72">
+        <path d="M31 205l38-25 41 13 12 38-27 34-48-8-23-27z"/>
+        <path d="M701 98l22-15 27 9 9 27-18 23-32-4-15-21z"/>
+        <path d="M713 487l52-18 29 30-12 51-53 13-35-38z"/>
+        <path d="M271 724l29-16 36 13 8 32-28 26-39-12-17-23z"/>
+        <path d="M525 55l14-18 24 3 11 21-13 20-26 2-13-15z"/>
+        <path d="M96 535l18-12 22 9 4 22-19 16-24-9-7-15z"/>
+    </g>
+
+    <g id="fallback-rear-scraps"
+       fill="#5f9f98"
+       stroke="#3d6f6b"
+       stroke-width="5"
+       stroke-linejoin="round"
+       opacity=".66">
+        <path d="M119 91l88-18 10 26-84 31z"/>
+        <path d="M617 71l89 20-9 28-94-9z"/>
+        <path d="M14 373l116-12 5 24-113 31z"/>
+        <path d="M681 372l104 18-8 25-110-2z"/>
+        <path d="M572 744l105-29 12 27-99 40z"/>
+        <path d="M168 708l62 20-8 23-67-10z"/>
+    </g>
+
+    <g id="fallback-rear-flecks"
+       fill="#f2e5c7"
+       opacity=".56">
+        <path d="M61 133l13-29 16 35z"/>
+        <path d="M229 45l9-24 13 29z"/>
+        <path d="M454 43l18-25 8 34z"/>
+        <path d="M764 245l22-13-8 29z"/>
+        <path d="M740 667l24-15-5 31z"/>
+        <path d="M455 756l12-27 15 31z"/>
+        <path d="M46 615l20-17-1 29z"/>
+        <path d="M338 31l7-18 11 21z"/>
+    </g>
+
     <g id="fallback-exterior-debris" fill="#7c8580" stroke="#253238" stroke-width="7" stroke-linejoin="round">
         <path d="M98 238l25-14 19 22-13 30-31-8z"/>
         <path d="M676 213l28-9 18 24-15 25-31-12z"/>
@@ -49,11 +115,13 @@
         </g>
     </g>
 
-    <g id="fallback-backside-houses"
-       fill="#253238"
-       stroke="#253238"
-       stroke-width="6"
-       stroke-linejoin="round">
+    <g id="fallback-planet-artwork"
+       transform="translate(-70 -112) scale(1.2)">
+        <g id="fallback-backside-houses"
+           fill="#253238"
+           stroke="#253238"
+           stroke-width="6"
+           stroke-linejoin="round">
         <path d="M134 350l37-32 38 31v59h-75z"/>
         <path d="M578 346l35-31 39 33v58h-74z"/>
         <path d="M239 184l28-25 31 26v47h-59z"/>
@@ -64,7 +132,7 @@
             <path d="M255 190h11v15h-11zM275 190h11v15h-11z"/>
             <path d="M521 192h11v15h-11zM541 192h11v15h-11z"/>
         </g>
-    </g>
+        </g>
 
     <g id="fallback-planet-core" filter="url(#fallback-soft-shadow)">
         <path d="M151 382C146 274 225 170 337 139C449 108 584 154 642 255C700 356 671 493 598 585C525 677 391 713 275 668C159 623 91 503 151 382Z"
@@ -262,10 +330,10 @@
         </g>
     </g>
 
-    <g id="fallback-forest-belt"
-       stroke="#253238"
-       stroke-width="6"
-       stroke-linejoin="round">
+        <g id="fallback-forest-belt"
+           stroke="#253238"
+           stroke-width="6"
+           stroke-linejoin="round">
         <g fill="#205f43">
             <path d="M180 610l25-58 25 58z"/>
             <path d="M236 636l27-66 28 66z"/>
@@ -286,5 +354,6 @@
               stroke="#a8bf78"
               stroke-width="15"
               stroke-linecap="round"/>
+        </g>
     </g>
 </svg>
