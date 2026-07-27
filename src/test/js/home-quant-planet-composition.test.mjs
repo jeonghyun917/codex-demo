@@ -184,6 +184,35 @@ async function createReferenceGlyphRig(Three) {
     };
 }
 
+function createRearFieldProbe(Three, {
+    stats = { drawCalls: 0, shadowCalls: 0, triangles: 0 }
+} = {}) {
+    const group = new Three.Group();
+    group.name = "ReferenceRearField";
+    const updates = [];
+    let renderStats = { ...stats };
+    let disposeCalls = 0;
+    return {
+        group,
+        updates,
+        update(nextPose) {
+            updates.push({ ...nextPose });
+        },
+        getRenderStats() {
+            return { ...renderStats };
+        },
+        setRenderStats(nextStats) {
+            renderStats = { ...nextStats };
+        },
+        get disposeCalls() {
+            return disposeCalls;
+        },
+        dispose() {
+            disposeCalls += 1;
+        }
+    };
+}
+
 function createSceneHarness({ rendererDisposeError = null } = {}) {
     const frames = [];
     const pixelRatios = [];
@@ -296,7 +325,8 @@ async function createTestScene(t, {
     width,
     height,
     profile = sceneProfile(),
-    glyphFactory = createReferenceGlyphRig
+    glyphFactory = createReferenceGlyphRig,
+    rearFieldFactory
 }) {
     const { createQuantPlanetScene } = await import(
         "../../main/resources/static/js/home-quant-planet-scene.js"
@@ -307,7 +337,8 @@ async function createTestScene(t, {
         canvas,
         profile,
         three: harness.three,
-        glyphFactory
+        glyphFactory,
+        rearFieldFactory
     });
     t.after(() => controller.dispose());
     controller.resize();
@@ -392,6 +423,40 @@ test("forwards the world angle without pointer or drag coupling", async (t) => {
         new THREE.Euler(0, .45, 0)
     );
     assert.ok(actual.angleTo(expected) < 1e-7);
+});
+
+test("owns the rear field behind the planet and forwards autonomous pose only",
+        async (t) => {
+    let rearField;
+    const scene = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        rearFieldFactory(Three) {
+            rearField = createRearFieldProbe(Three);
+            return rearField;
+        }
+    });
+
+    assert.equal(scene.controller.render(pose({
+        worldAngle: Math.PI / 2,
+        dragAngle: -.75,
+        elapsedMs: 9000,
+        pointer: { x: 1, y: -1 }
+    })), true);
+
+    assert.ok(rearField, "scene should construct the supplied rear field");
+    assert.deepEqual(rearField.updates.at(-1), {
+        worldAngle: Math.PI / 2,
+        elapsedMs: 9000,
+        reduceMotion: false
+    });
+    assert.equal("pointer" in rearField.updates.at(-1), false);
+    assert.deepEqual(
+        scene.renderers[0].scene.children.slice(0, 3).map(
+            ({ name }) => name
+        ),
+        ["ReferenceRearField", "QuantPlanet", "ReferenceGlyphRig"]
+    );
 });
 
 test("refits complete world bounds after landscape and portrait resizes", async (t) => {
@@ -748,10 +813,16 @@ test("combines renderer-real rig diagnostics within the scene budget", async (t)
     scene.controller.render(pose());
     assert.deepEqual(scene.pixelRatios, [1.5]);
     const diagnostics = scene.controller.getDiagnostics();
-    assert.ok(diagnostics.drawCalls <= diagnostics.limits.drawCalls);
-    assert.ok(diagnostics.triangles <= diagnostics.limits.triangles);
-    assert.equal(diagnostics.limits.drawCalls, 75);
-    assert.equal(diagnostics.limits.triangles, 140000);
+    assert.ok(
+        diagnostics.drawCalls <= diagnostics.limits.drawCalls,
+        `High draw calls exceeded budget: ${JSON.stringify(diagnostics)}`
+    );
+    assert.ok(
+        diagnostics.triangles <= diagnostics.limits.triangles,
+        `High triangles exceeded budget: ${JSON.stringify(diagnostics)}`
+    );
+    assert.equal(diagnostics.limits.drawCalls, 80);
+    assert.equal(diagnostics.limits.triangles, 145000);
     assert.equal(diagnostics.withinBudget, true);
 });
 
@@ -764,9 +835,62 @@ test("keeps high-profile shadows inside the combined call budget", async (t) => 
 
     scene.controller.render(pose());
     const diagnostics = scene.controller.getDiagnostics();
-    assert.ok(diagnostics.drawCalls <= 75);
-    assert.ok(diagnostics.triangles <= 140000);
+    assert.ok(diagnostics.drawCalls <= 80);
+    assert.ok(diagnostics.triangles <= 145000);
     assert.equal(diagnostics.withinBudget, true);
+});
+
+test("adds rear-field render statistics to scene diagnostics", async (t) => {
+    let rearField;
+    const scene = await createTestScene(t, {
+        width: 1440,
+        height: 900,
+        rearFieldFactory(Three) {
+            rearField = createRearFieldProbe(Three);
+            return rearField;
+        }
+    });
+    const withoutRearField = scene.controller.getDiagnostics();
+
+    assert.ok(rearField, "scene should construct the supplied rear field");
+    rearField.setRenderStats({
+        drawCalls: 5,
+        shadowCalls: 2,
+        triangles: 1234
+    });
+    const withRearField = scene.controller.getDiagnostics();
+
+    assert.equal(
+        withRearField.drawCalls - withoutRearField.drawCalls,
+        7
+    );
+    assert.equal(
+        withRearField.triangles - withoutRearField.triangles,
+        1234
+    );
+});
+
+test("uses the balanced rear-field scene budget", async (t) => {
+    const balancedProfile = selectPlanetQualityProfile({
+        reduceMotion: false,
+        webgl: true,
+        mobile: true,
+        cores: 8,
+        dpr: 3
+    });
+    const scene = await createTestScene(t, {
+        width: 375,
+        height: 812,
+        profile: balancedProfile
+    });
+
+    const diagnostics = scene.controller.getDiagnostics();
+
+    assert.equal(balancedProfile.name, "balanced");
+    assert.deepEqual(diagnostics.limits, {
+        drawCalls: 70,
+        triangles: 95000
+    });
 });
 
 test("refits glyph layout only when the viewport changes", async (t) => {
@@ -797,9 +921,11 @@ test("refits glyph layout only when the viewport changes", async (t) => {
     );
 });
 
-test("disposal attempts glyphs, world, and renderer once when cleanup throws", async () => {
+test("disposal attempts every owned scene resource once when cleanup throws",
+        async () => {
     const glyphError = new Error("glyph cleanup failed");
     let glyphDisposeCalls = 0;
+    const rearField = createRearFieldProbe(THREE);
     const harness = createSceneHarness({
         rendererDisposeError: new Error("renderer cleanup failed")
     });
@@ -810,6 +936,7 @@ test("disposal attempts glyphs, world, and renderer once when cleanup throws", a
         canvas: { clientWidth: 800, clientHeight: 600 },
         profile: sceneProfile(),
         three: harness.three,
+        rearFieldFactory: () => rearField,
         glyphFactory: async () => ({
             ...baseGlyphs,
             dispose() {
@@ -825,6 +952,7 @@ test("disposal attempts glyphs, world, and renderer once when cleanup throws", a
 
     assert.throws(() => controller.dispose(), glyphError);
     assert.doesNotThrow(() => controller.dispose());
+    assert.equal(rearField.disposeCalls, 1);
     assert.equal(glyphDisposeCalls, 1);
     assert.equal(harness.renderers[0].disposeCalls, 1);
     worldDisposals.forEach((calls) => assert.equal(calls, 1));
@@ -834,6 +962,7 @@ test("construction rollback cleans every completed rig despite cleanup errors", 
     const constructionError = new Error("layout failed");
     let glyphDisposeCalls = 0;
     let worldDisposals;
+    const rearField = createRearFieldProbe(THREE);
     const harness = createSceneHarness({
         rendererDisposeError: new Error("renderer cleanup failed")
     });
@@ -845,6 +974,7 @@ test("construction rollback cleans every completed rig despite cleanup errors", 
         canvas: { clientWidth: 800, clientHeight: 600 },
         profile: sceneProfile(),
         three: harness.three,
+        rearFieldFactory: () => rearField,
         glyphFactory: async () => ({
             ...glyphs,
             setLayout() {
@@ -861,6 +991,7 @@ test("construction rollback cleans every completed rig despite cleanup errors", 
         })
     }), constructionError);
 
+    assert.equal(rearField.disposeCalls, 1);
     assert.equal(glyphDisposeCalls, 1);
     assert.equal(harness.renderers[0].disposeCalls, 1);
     worldDisposals.forEach((calls) => assert.equal(calls, 1));

@@ -439,6 +439,8 @@ class HomePageTemplateContractTest {
                 resource("static/js/home-quant-planet-composition.js"),
                 resource("static/js/home-quant-planet-input.js"),
                 resource("static/js/home-quant-planet-motion.js"),
+                resource("static/js/home-quant-planet-rear-field-layout.js"),
+                resource("static/js/home-quant-planet-rear-field.js"),
                 resource("static/js/home-quant-planet-runtime.js"),
                 resource("static/js/home-quant-planet-scene.js"),
                 resource("static/js/home-quant-planet-world.js")));
@@ -490,6 +492,7 @@ class HomePageTemplateContractTest {
         assertTrue(runtime.contains("createHeroInputController"));
         assertTrue(runtime.contains("REFERENCE_HERO"));
         assertTrue(scene.contains("world.update({"));
+        assertTrue(scene.contains("rearField.update({"));
         assertTrue(scene.contains("glyphs.update({"));
         assertTrue(scene.contains("fitReferenceWorld"));
         assertTrue(scene.contains("Math.min"));

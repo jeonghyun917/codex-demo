@@ -11,14 +11,17 @@ import {
 import {
     createQuantPlanetWorld
 } from "./home-quant-planet-world.js";
+import {
+    createQuantPlanetRearField
+} from "./home-quant-planet-rear-field.js";
 
 const HIGH_LIMITS = Object.freeze({
-    drawCalls: 75,
-    triangles: 140000
+    drawCalls: 80,
+    triangles: 145000
 });
 const BALANCED_LIMITS = Object.freeze({
-    drawCalls: 65,
-    triangles: 90000
+    drawCalls: 70,
+    triangles: 95000
 });
 const GLYPH_LAYOUT_RADIUS_RATIO = .65;
 
@@ -53,7 +56,8 @@ export async function createQuantPlanetScene({
     canvas,
     profile,
     three,
-    glyphFactory
+    glyphFactory,
+    rearFieldFactory
 } = {}) {
     if (!canvas || !profile?.webgl || profile.name === "static") {
         return createStaticSceneController();
@@ -61,9 +65,11 @@ export async function createQuantPlanetScene({
 
     let renderer = null;
     let world = null;
+    let rearField = null;
     let glyphs = null;
     const cleanupAttempted = {
         glyphs: false,
+        rearField: false,
         world: false,
         renderer: false
     };
@@ -72,6 +78,7 @@ export async function createQuantPlanetScene({
         let firstError = null;
         for (const [name, resource] of [
             ["glyphs", glyphs],
+            ["rearField", rearField],
             ["world", world],
             ["renderer", renderer]
         ]) {
@@ -111,6 +118,9 @@ export async function createQuantPlanetScene({
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(34, 1, .1, 40);
         world = createQuantPlanetWorld(THREE, { profile });
+        const makeRearField = rearFieldFactory
+            || createQuantPlanetRearField;
+        rearField = makeRearField(THREE, { profile });
         const makeGlyphs = glyphFactory || createQuantGlyphRig;
         glyphs = await makeGlyphs(THREE, {
             profile,
@@ -121,7 +131,7 @@ export async function createQuantPlanetScene({
             Number(profile.planetScale) || 1
         );
         world.group.scale.setScalar(worldScale);
-        scene.add(world.group, glyphs.group);
+        scene.add(rearField.group, world.group, glyphs.group);
 
         const localEnvelope = world.getFramingEnvelope();
         const envelope = {
@@ -235,6 +245,11 @@ export async function createQuantPlanetScene({
                     return false;
                 }
 
+                rearField.update({
+                    worldAngle: pose.worldAngle,
+                    elapsedMs: pose.elapsedMs,
+                    reduceMotion: pose.reduceMotion
+                });
                 world.update({
                     worldAngle: pose.worldAngle,
                     elapsedMs: pose.elapsedMs,
@@ -253,13 +268,17 @@ export async function createQuantPlanetScene({
                 return true;
             },
             getDiagnostics() {
+                const rearFieldStats = rearField.getRenderStats();
                 const worldStats = world.getRenderStats();
                 const glyphStats = glyphs.getRenderStats();
-                const drawCalls = worldStats.drawCalls
+                const drawCalls = rearFieldStats.drawCalls
+                    + rearFieldStats.shadowCalls
+                    + worldStats.drawCalls
                     + worldStats.shadowCalls
                     + glyphStats.drawCalls
                     + glyphStats.shadowCalls;
-                const triangles = worldStats.triangles
+                const triangles = rearFieldStats.triangles
+                    + worldStats.triangles
                     + glyphStats.triangles;
                 return {
                     drawCalls,
