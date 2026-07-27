@@ -686,6 +686,139 @@ test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     });
 });
 
+test("authors the high-profile miniature detail families by district", (t) => {
+    const world = createWorld(t);
+    const expectedDetailCounts = {
+        ReferenceIndustrialBarrelBands: 12,
+        ReferenceIndustrialCableStays: 10,
+        ReferenceVillageRoofCaps: 18,
+        ReferenceVillageChimneys: 12,
+        ReferenceTempleBeamEnds: 10,
+        ReferenceMountainStrata: 16,
+        ReferenceWaterFoamAccents: 20,
+        ReferenceTerrainRetainingEdges: 14,
+        ReferenceCanopyForks: 18,
+        ReferenceUnderCanopyStones: 16
+    };
+    const expectedDistricts = {
+        ReferenceIndustrialBarrelBands: ["industrial-yard"],
+        ReferenceIndustrialCableStays: ["industrial-yard"],
+        ReferenceVillageRoofCaps: [
+            "backside-houses",
+            "forest-hamlet",
+            "mountain-village",
+            "water-works"
+        ],
+        ReferenceVillageChimneys: [
+            "backside-houses",
+            "forest-hamlet",
+            "mountain-village",
+            "water-works"
+        ],
+        ReferenceTempleBeamEnds: ["summit-shrine"],
+        ReferenceMountainStrata: [
+            "mountain-village",
+            "summit-shrine"
+        ],
+        ReferenceWaterFoamAccents: ["water-works"],
+        ReferenceTerrainRetainingEdges: [
+            "backside-houses",
+            "forest-hamlet",
+            "industrial-yard",
+            "mountain-village",
+            "root-gardens",
+            "summit-shrine",
+            "utility-ridge",
+            "water-works"
+        ],
+        ReferenceCanopyForks: [
+            "forest-hamlet",
+            "root-gardens"
+        ],
+        ReferenceUnderCanopyStones: [
+            "forest-hamlet",
+            "root-gardens"
+        ]
+    };
+    const readablePalette = new Set([
+        0x78d7d0,
+        0x338f91,
+        0xa8bf78,
+        0x78965f,
+        0xf2e5c7,
+        0xfffae9,
+        0xd65f47,
+        0xa94737,
+        0x50656b,
+        0x39805b,
+        0x205f43,
+        0x7c8580,
+        0xe7b54f
+    ]);
+    const instanceColor = new THREE.Color();
+
+    for (const [name, minimumCount] of Object.entries(
+        expectedDetailCounts
+    )) {
+        let mesh;
+        let range;
+        world.group.traverse((object) => {
+            const candidate = object.userData?.detailFamilyRanges?.[name];
+            if (candidate) {
+                mesh = object;
+                range = candidate;
+            }
+        });
+        assert.ok(range, `Missing logical instance family ${name}`);
+        assert.equal(mesh.isInstancedMesh, true, `${name} must be instanced`);
+        assert.notEqual(mesh.visible, false, `${name} must remain visible`);
+        assert.ok(
+            range.count >= minimumCount,
+            `${name} needs ${minimumCount} instances, received ${range.count}`
+        );
+        assert.ok(range.offset >= 0);
+        assert.ok(range.offset + range.count <= mesh.count);
+        assert.ok(mesh.instanceColor, `${name} must carry authored colors`);
+
+        const colors = new Set();
+        for (
+            let index = range.offset;
+            index < range.offset + range.count;
+            index += 1
+        ) {
+            mesh.getColorAt(index, instanceColor);
+            const color = instanceColor.getHex();
+            colors.add(color);
+            assert.ok(
+                readablePalette.has(color),
+                `${name} instance ${index} uses unreadable color ${
+                    color.toString(16)
+                }`
+            );
+        }
+        assert.ok(colors.size >= 2, `${name} needs readable color variation`);
+
+        const scaleSignatures = new Set(
+            instanceTransforms(mesh)
+                .slice(range.offset, range.offset + range.count)
+                .map(({ scale }) =>
+                    [scale.x, scale.y, scale.z]
+                        .map((value) => value.toFixed(3))
+                        .join(":"))
+        );
+        assert.ok(
+            scaleSignatures.size >= 2,
+            `${name} must vary authored instance scale`
+        );
+        assert.deepEqual(
+            [...new Set(range.districtIds)].toSorted(),
+            expectedDistricts[name],
+            `${name} must stay in its semantic districts`
+        );
+        assert.equal(range.districtIds.length, range.count);
+    }
+});
+
 test("packs readable landmark details into four instanced families", (t) => {
     const world = createWorld(t);
     const industrialRings = world.group.getObjectByName(

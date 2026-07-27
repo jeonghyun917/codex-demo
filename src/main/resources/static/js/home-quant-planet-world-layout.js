@@ -632,3 +632,387 @@ export const PIPE_POLE_PLACEMENTS = Object.freeze(generatedPlacements({
         sectorIndex % 2 ? -.12 : .12
     ]
 }));
+
+function detailPlacement(id, districtId, position, scale, rotation) {
+    return frozenPlacement({
+        id,
+        districtId,
+        position,
+        scale,
+        rotation
+    });
+}
+
+function surfaceOffset(position, normalDistance, tangentDistance = 0) {
+    const length = Math.hypot(...position);
+    const normal = position.map((axis) => axis / length);
+    const tangentLength = Math.hypot(normal[0], normal[2]) || 1;
+    const tangent = [
+        -normal[2] / tangentLength,
+        0,
+        normal[0] / tangentLength
+    ];
+    return position.map((axis, index) =>
+        axis
+            + normal[index] * normalDistance
+            + tangent[index] * tangentDistance
+    );
+}
+
+function villageDetailsForDistrict(
+    districtId,
+    roofCount,
+    chimneyCount
+) {
+    const placements = VILLAGE_PLACEMENTS.filter(
+        (placement) => placement.clusterId === districtId
+    );
+    const roofCaps = placements.slice(0, roofCount).map(
+        (placement, index) => detailPlacement(
+            `roof-cap-${districtId}-${index}`,
+            districtId,
+            surfaceOffset(
+                placement.position,
+                placement.scale[1] * .94
+            ),
+            [
+                placement.scale[0] * (.2 + index % 2 * .035),
+                .075 + index % 3 * .012,
+                placement.scale[2] * (.22 + index % 2 * .035)
+            ],
+            [
+                placement.rotation[0],
+                placement.rotation[1] + index * .045,
+                placement.rotation[2] + (index % 2 ? -.08 : .08)
+            ]
+        )
+    );
+    const chimneys = placements.slice(-chimneyCount).map(
+        (placement, index) => detailPlacement(
+            `chimney-${districtId}-${index}`,
+            districtId,
+            surfaceOffset(
+                placement.position,
+                placement.scale[1] * .88,
+                (index % 2 ? -.22 : .22) * placement.scale[0]
+            ),
+            [
+                .045 + index % 2 * .012,
+                .16 + index % 3 * .025,
+                .045 + (index + 1) % 2 * .012
+            ],
+            [
+                placement.rotation[0] + (index % 2 ? -.04 : .04),
+                placement.rotation[1],
+                placement.rotation[2]
+            ]
+        )
+    );
+    return { roofCaps, chimneys };
+}
+
+function terrainEdgesForDistrict(districtId, count) {
+    return TERRAIN_PATCHES
+        .filter((placement) => placement.districtId === districtId)
+        .slice(0, count)
+        .map((placement, index) => detailPlacement(
+            `retaining-edge-${districtId}-${index}`,
+            districtId,
+            surfaceOffset(
+                placement.position,
+                .075,
+                (index % 2 ? -.12 : .12)
+            ),
+            [
+                placement.scale[0] * (.46 + index % 2 * .08),
+                .035 + index % 3 * .008,
+                placement.scale[2] * .13
+            ],
+            [
+                placement.rotation[0],
+                placement.rotation[1] + index * .07,
+                placement.rotation[2] + (index % 2 ? -.05 : .05)
+            ]
+        ));
+}
+
+function canopyDetailsForDistrict(
+    districtId,
+    forkCount,
+    stoneCount
+) {
+    const placements = FOREST_BELTS
+        .flatMap((belt) => belt.placements)
+        .filter((placement) => placement.districtId === districtId);
+    const forks = placements.slice(0, forkCount).map(
+        (placement, index) => detailPlacement(
+            `canopy-fork-${districtId}-${index}`,
+            districtId,
+            surfaceOffset(
+                placement.position,
+                .38 + index % 3 * .035,
+                (index % 2 ? -.08 : .08)
+            ),
+            [
+                .035 + index % 2 * .009,
+                .22 + index % 3 * .035,
+                .035 + (index + 1) % 2 * .009
+            ],
+            [
+                placement.rotation[0] + (index % 2 ? -.38 : .38),
+                placement.rotation[1] + index * .06,
+                placement.rotation[2] + (index % 3 - 1) * .14
+            ]
+        )
+    );
+    const stones = placements.slice(-stoneCount).map(
+        (placement, index) => detailPlacement(
+            `under-canopy-stone-${districtId}-${index}`,
+            districtId,
+            surfaceOffset(
+                placement.position,
+                .07,
+                (index % 3 - 1) * .14
+            ),
+            [
+                .12 + index % 3 * .025,
+                .065 + index % 2 * .018,
+                .1 + (index + 1) % 3 * .02
+            ],
+            [
+                placement.rotation[0] + index * .025,
+                placement.rotation[1] + index * .13,
+                placement.rotation[2]
+            ]
+        )
+    );
+    return { forks, stones };
+}
+
+function mountainStrataForDistrict(districtId, yawDegrees, latitudes) {
+    return latitudes.map((latitude, index) => detailPlacement(
+        `mountain-strata-${districtId}-${index}`,
+        districtId,
+        pointOnSurface(
+            yawDegrees + (index - 3.5) * 2.2,
+            latitude,
+            3.7 + index % 2 * .055
+        ),
+        [
+            .24 + index % 3 * .055,
+            .022 + index % 2 * .008,
+            .1 + (index + 1) % 3 * .022
+        ],
+        [
+            index % 2 ? -.06 : .06,
+            index * .075,
+            (index - 3.5) * .035
+        ]
+    ));
+}
+
+function waterFoamAccents() {
+    const waterCenters = [
+        [2.72, 1.34, -1.7],
+        [.12, .72, 3.26],
+        [-2.76, -.42, 1.8],
+        [1.92, -1.56, -2.2]
+    ];
+    return waterCenters.flatMap((position, waterIndex) =>
+        [-.42, -.21, 0, .21, .42].map((offset, index) =>
+            detailPlacement(
+                `water-foam-accent-${waterIndex}-${index}`,
+                "water-works",
+                surfaceOffset(position, .09, offset),
+                [
+                    .09 + (index + waterIndex) % 3 * .025,
+                    .012 + index % 2 * .005,
+                    .026 + (index + 1) % 2 * .008
+                ],
+                [
+                    index % 2 ? -.025 : .025,
+                    waterIndex * .11 + offset * .16,
+                    (index - 2) * .035
+                ]
+            )
+        )
+    );
+}
+
+const mountainVillageDetails = villageDetailsForDistrict(
+    "mountain-village",
+    5,
+    3
+);
+const forestHamletDetails = villageDetailsForDistrict(
+    "forest-hamlet",
+    5,
+    3
+);
+const backsideHouseDetails = villageDetailsForDistrict(
+    "backside-houses",
+    4,
+    3
+);
+const waterVillageDetails = villageDetailsForDistrict(
+    "water-works",
+    4,
+    3
+);
+const forestCanopyDetails = canopyDetailsForDistrict(
+    "forest-hamlet",
+    9,
+    8
+);
+const rootCanopyDetails = canopyDetailsForDistrict(
+    "root-gardens",
+    9,
+    8
+);
+
+function frozenDistrictDetails(details) {
+    return Object.freeze(Object.fromEntries(
+        Object.entries(details).map(([family, placements]) => [
+            family,
+            Object.freeze(placements)
+        ])
+    ));
+}
+
+export const DETAIL_PLACEMENTS_BY_DISTRICT = Object.freeze({
+    "summit-shrine": frozenDistrictDetails({
+        ReferenceTempleBeamEnds: Array.from(
+            { length: 10 },
+            (_, index) => detailPlacement(
+                `temple-beam-end-${index}`,
+                "summit-shrine",
+                [
+                    -.98 + index % 5 * .47,
+                    index < 5 ? 4.7 : 4.48,
+                    index < 5 ? 2.08 : 2.1
+                ],
+                [
+                    .055 + index % 2 * .012,
+                    .1 + index % 3 * .018,
+                    .07 + (index + 1) % 2 * .012
+                ],
+                [0, -.08, index % 2 ? -.12 : .12]
+            )
+        ),
+        ReferenceMountainStrata: mountainStrataForDistrict(
+            "summit-shrine",
+            0,
+            [.72, .76, .8, .84, .7, .75, .79, .83]
+        ),
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "summit-shrine",
+            2
+        )
+    }),
+    "mountain-village": frozenDistrictDetails({
+        ReferenceVillageRoofCaps: mountainVillageDetails.roofCaps,
+        ReferenceVillageChimneys: mountainVillageDetails.chimneys,
+        ReferenceMountainStrata: mountainStrataForDistrict(
+            "mountain-village",
+            45,
+            [.42, .48, .54, .58, .4, .46, .52, .56]
+        ),
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "mountain-village",
+            2
+        )
+    }),
+    "utility-ridge": frozenDistrictDetails({
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "utility-ridge",
+            2
+        )
+    }),
+    "forest-hamlet": frozenDistrictDetails({
+        ReferenceVillageRoofCaps: forestHamletDetails.roofCaps,
+        ReferenceVillageChimneys: forestHamletDetails.chimneys,
+        ReferenceCanopyForks: forestCanopyDetails.forks,
+        ReferenceUnderCanopyStones: forestCanopyDetails.stones,
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "forest-hamlet",
+            2
+        )
+    }),
+    "root-gardens": frozenDistrictDetails({
+        ReferenceCanopyForks: rootCanopyDetails.forks,
+        ReferenceUnderCanopyStones: rootCanopyDetails.stones,
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "root-gardens",
+            2
+        )
+    }),
+    "backside-houses": frozenDistrictDetails({
+        ReferenceVillageRoofCaps: backsideHouseDetails.roofCaps,
+        ReferenceVillageChimneys: backsideHouseDetails.chimneys,
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "backside-houses",
+            1
+        )
+    }),
+    "industrial-yard": frozenDistrictDetails({
+        ReferenceIndustrialBarrelBands: [
+            ...Array.from({ length: 6 }, (_, index) => detailPlacement(
+                `industrial-upper-band-${index}`,
+                "industrial-yard",
+                [-4.28 + index * .22, .62, 1.18],
+                [
+                    .035 + index % 2 * .008,
+                    .68 + index % 2 * .035,
+                    .045 + index % 3 * .008
+                ],
+                [index % 2 ? -.05 : .05, Math.PI / 2, index * .025]
+            )),
+            ...Array.from({ length: 6 }, (_, index) => detailPlacement(
+                `industrial-lower-band-${index}`,
+                "industrial-yard",
+                [-3.9 + index * .17, -.78, 1.22],
+                [
+                    .032 + index % 2 * .007,
+                    .56 + index % 3 * .025,
+                    .042 + (index + 1) % 3 * .007
+                ],
+                [index % 2 ? .05 : -.05, Math.PI / 2, -index * .025]
+            ))
+        ],
+        ReferenceIndustrialCableStays: Array.from(
+            { length: 10 },
+            (_, index) => detailPlacement(
+                `industrial-cable-stay-${index}`,
+                "industrial-yard",
+                [
+                    -4.68 + index % 5 * .48,
+                    index < 5 ? .16 : -.98,
+                    1.73 + index % 2 * .12
+                ],
+                [
+                    .025 + index % 2 * .006,
+                    .34 + index % 3 * .055,
+                    .025 + (index + 1) % 2 * .006
+                ],
+                [
+                    index % 2 ? -.1 : .1,
+                    index * .04,
+                    index < 5 ? -.42 : .42
+                ]
+            )
+        ),
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "industrial-yard",
+            1
+        )
+    }),
+    "water-works": frozenDistrictDetails({
+        ReferenceVillageRoofCaps: waterVillageDetails.roofCaps,
+        ReferenceVillageChimneys: waterVillageDetails.chimneys,
+        ReferenceWaterFoamAccents: waterFoamAccents(),
+        ReferenceTerrainRetainingEdges: terrainEdgesForDistrict(
+            "water-works",
+            2
+        )
+    })
+});

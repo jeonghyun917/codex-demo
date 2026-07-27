@@ -1,6 +1,7 @@
 import {
     CABLE_SEGMENT_PLACEMENTS,
     DEBRIS_PLACEMENTS,
+    DETAIL_PLACEMENTS_BY_DISTRICT,
     FOREST_BELTS,
     PATH_FRAME_PLACEMENTS,
     PIPE_POLE_PLACEMENTS,
@@ -255,6 +256,151 @@ function buildColoredInstanceFamily(
     mesh.castShadow = false;
     markInstancesDirty(mesh);
     return mesh;
+}
+
+const PACKED_DETAIL_FAMILY_ORDER = Object.freeze([
+    "ReferenceIndustrialBarrelBands",
+    "ReferenceIndustrialCableStays",
+    "ReferenceVillageRoofCaps",
+    "ReferenceVillageChimneys",
+    "ReferenceTempleBeamEnds",
+    "ReferenceMountainStrata",
+    "ReferenceWaterFoamAccents",
+    "ReferenceTerrainRetainingEdges",
+    "ReferenceCanopyForks",
+    "ReferenceUnderCanopyStones"
+]);
+
+const PACKED_DETAIL_COLORS = Object.freeze({
+    ReferenceIndustrialBarrelBands: Object.freeze([
+        COLORS.paper,
+        COLORS.gold,
+        COLORS.coral
+    ]),
+    ReferenceIndustrialCableStays: Object.freeze([
+        COLORS.ink,
+        COLORS.paper,
+        COLORS.gold
+    ]),
+    ReferenceVillageRoofCaps: Object.freeze([
+        COLORS.coral,
+        COLORS.coralShade,
+        COLORS.paper
+    ]),
+    ReferenceVillageChimneys: Object.freeze([
+        COLORS.rock,
+        COLORS.coralShade,
+        COLORS.gold
+    ]),
+    ReferenceTempleBeamEnds: Object.freeze([
+        COLORS.gold,
+        COLORS.paper,
+        COLORS.coral
+    ]),
+    ReferenceMountainStrata: Object.freeze([
+        COLORS.rock,
+        COLORS.paper,
+        COLORS.groundShade
+    ]),
+    ReferenceWaterFoamAccents: Object.freeze([
+        COLORS.paper,
+        COLORS.water,
+        COLORS.gold
+    ]),
+    ReferenceTerrainRetainingEdges: Object.freeze([
+        COLORS.rock,
+        COLORS.groundShade,
+        COLORS.paper
+    ]),
+    ReferenceCanopyForks: Object.freeze([
+        COLORS.foliage,
+        COLORS.groundShade,
+        COLORS.gold
+    ]),
+    ReferenceUnderCanopyStones: Object.freeze([
+        COLORS.rock,
+        COLORS.groundShade,
+        COLORS.paper
+    ])
+});
+
+const LOCAL_DETAIL_TRANSFORMS = Object.freeze({
+    ReferenceIndustrialBarrelBands: Object.freeze({
+        position: Object.freeze([0, 0, 0]),
+        rotation: Object.freeze([0, -1.82, 0])
+    }),
+    ReferenceIndustrialCableStays: Object.freeze({
+        position: Object.freeze([0, 0, 0]),
+        rotation: Object.freeze([0, -1.82, 0])
+    }),
+    ReferenceTempleBeamEnds: Object.freeze({
+        position: Object.freeze([1.55, 0, 0]),
+        rotation: Object.freeze([0, Math.PI / 2, 0])
+    })
+});
+
+function transformedDetailPlacement(THREE, placement, familyName) {
+    const parentTransform = LOCAL_DETAIL_TRANSFORMS[familyName];
+    if (!parentTransform) {
+        return placement;
+    }
+    const parentQuaternion = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(...parentTransform.rotation)
+    );
+    const authoredQuaternion = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(...placement.rotation)
+    );
+    const transformedQuaternion = parentQuaternion.clone()
+        .multiply(authoredQuaternion);
+    const transformedPosition = new THREE.Vector3(...placement.position)
+        .applyQuaternion(parentQuaternion)
+        .add(new THREE.Vector3(...parentTransform.position));
+    const transformedRotation = new THREE.Euler()
+        .setFromQuaternion(transformedQuaternion);
+    return {
+        ...placement,
+        position: transformedPosition.toArray(),
+        rotation: [
+            transformedRotation.x,
+            transformedRotation.y,
+            transformedRotation.z
+        ]
+    };
+}
+
+function createPackedMiniatureDetailPlacements(THREE) {
+    const placements = [];
+    const detailFamilyRanges = {};
+    PACKED_DETAIL_FAMILY_ORDER.forEach((familyName) => {
+        const familyPlacements = Object.values(
+            DETAIL_PLACEMENTS_BY_DISTRICT
+        ).flatMap((district) => district[familyName] ?? []);
+        const offset = placements.length;
+        const colors = PACKED_DETAIL_COLORS[familyName];
+        familyPlacements.forEach((placement, index) => {
+            placements.push({
+                ...transformedDetailPlacement(
+                    THREE,
+                    placement,
+                    familyName
+                ),
+                family: familyName,
+                color: colors[index % colors.length],
+                surface: !LOCAL_DETAIL_TRANSFORMS[familyName]
+            });
+        });
+        detailFamilyRanges[familyName] = Object.freeze({
+            offset,
+            count: familyPlacements.length,
+            districtIds: Object.freeze(
+                familyPlacements.map((placement) => placement.districtId)
+            )
+        });
+    });
+    return {
+        placements,
+        detailFamilyRanges
+    };
 }
 
 function tagSurfaceInstances(mesh, placements) {
@@ -664,12 +810,29 @@ function buildPlanetCore(THREE, resources, palette) {
             surface: true
         });
     });
+    const packedDetails = createPackedMiniatureDetailPlacements(THREE);
+    const packedOffset = reliefPlacements.length;
+    reliefPlacements.push(...packedDetails.placements);
     const relief = buildColoredInstanceFamily(THREE, {
         name: "ReferenceTerrainReliefDetails",
         geometry: resources.geometry.box,
         material: palette.village,
         placements: reliefPlacements
     });
+    relief.userData.detailFamilyRanges = Object.freeze(
+        Object.fromEntries(Object.entries(
+            packedDetails.detailFamilyRanges
+        ).map(([name, range]) => [
+            name,
+            Object.freeze({
+                ...range,
+                offset: range.offset + packedOffset
+            })
+        ]))
+    );
+    relief.userData.detailDistrictIds = Object.freeze(
+        reliefPlacements.map((placement) => placement.districtId)
+    );
     group.add(relief);
     return group;
 }
