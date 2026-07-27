@@ -233,7 +233,7 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                 cameraPosition: camera.position.clone(),
                 cameraMatrix: camera.matrixWorld.elements.slice(),
                 target: camera.lookAtTarget.clone(),
-                worldScale: planet.scale.x,
+                worldScale: planet.scale.clone(),
                 worldQuaternion: planet.quaternion.clone(),
                 worldMatrix: planet.matrixWorld.elements.slice(),
                 glyphPosition: glyphs.position.clone(),
@@ -425,6 +425,40 @@ test("refits complete world bounds after landscape and portrait resizes", async 
     assert.ok(portrait.far > Math.max(...portrait.depths));
 });
 
+test("keeps the planet uniformly round across wide and narrow viewports",
+        async (t) => {
+    const scene = await createTestScene(t, {
+        width: 1920,
+        height: 1080
+    });
+
+    assert.equal(scene.controller.render(pose()), true);
+    scene.canvas.clientWidth = 900;
+    scene.canvas.clientHeight = 1100;
+    scene.controller.resize();
+    assert.equal(scene.controller.render(pose()), true);
+
+    for (const [index, frame] of scene.frames.entries()) {
+        assert.ok(Math.abs(frame.worldScale.x - frame.worldScale.y) < 1e-9);
+        assert.ok(Math.abs(frame.worldScale.y - frame.worldScale.z) < 1e-9);
+        const width = index === 0 ? 1920 : 900;
+        const height = index === 0 ? 1080 : 1100;
+        const xRange = finiteRange(
+            frame.bodyProjected.map(({ x }) => x)
+        );
+        const yRange = finiteRange(
+            frame.bodyProjected.map(({ y }) => y)
+        );
+        const pixelWidth = (xRange.max - xRange.min) * width / 2;
+        const pixelHeight = (yRange.max - yRange.min) * height / 2;
+        const ratio = pixelWidth / pixelHeight;
+        assert.ok(
+            ratio >= .94 && ratio <= 1.08,
+            `Expected round planet at ${width}x${height}, got ${ratio}`
+        );
+    }
+});
+
 test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         async (t) => {
     const scene = await createTestScene(t, {
@@ -476,8 +510,8 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         `Expected world height 0.81-0.87, got ${worldViewportHeight}`
     );
     assert.ok(
-        worldViewportWidth >= .48 && worldViewportWidth <= .55,
-        `Expected world width 0.48-0.55, got ${worldViewportWidth}`
+        worldViewportWidth >= .35 && worldViewportWidth <= .4,
+        `Expected uniform world width 0.35-0.40, got ${worldViewportWidth}`
     );
 });
 

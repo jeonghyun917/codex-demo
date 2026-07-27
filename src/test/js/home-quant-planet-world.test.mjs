@@ -681,10 +681,17 @@ test("packs readable landmark details into four instanced families", (t) => {
     assert.ok(industrialBoxes.userData.detailFamilyCounts.fasteners >= 8);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.catwalk >= 3);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.accessPanel >= 1);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.panelSeams >= 6);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.ladderRungs >= 5);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.gaugeTicks >= 6);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.mastFeet >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.dishBracket >= 2);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.windowFrames >= 4);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.ladderRungs >= 5);
     assert.ok(templeBoxes.userData.detailFamilyCounts.roofTrim >= 3);
     assert.ok(templeBoxes.userData.detailFamilyCounts.rockLedges >= 3);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.eaveBrackets >= 6);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.steps >= 3);
 
     const stats = world.getRenderStats();
     assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
@@ -713,9 +720,13 @@ test("packs village water and terrain relief into three detail families",
     assert.ok(village.userData.detailFamilyCounts.windows > 0);
     assert.ok(village.userData.detailFamilyCounts.doors > 0);
     assert.ok(village.userData.detailFamilyCounts.roofTrim > 0);
+    assert.ok(village.userData.detailFamilyCounts.windowSills >= 20);
+    assert.ok(village.userData.detailFamilyCounts.doorCanopies >= 10);
     assert.ok(water.userData.detailFamilyCounts.bridgeRails >= 8);
     assert.ok(water.userData.detailFamilyCounts.bankStones >= 12);
+    assert.ok(water.userData.detailFamilyCounts.bridgeTies >= 16);
     assert.ok(terrain.userData.detailFamilyCounts.cliffLedges >= 8);
+    assert.ok(terrain.userData.detailFamilyCounts.cliffStrata >= 8);
 
     const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
     const crownScaleSignatures = new Set(

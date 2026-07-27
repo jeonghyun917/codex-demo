@@ -583,6 +583,37 @@ function buildPlanetCore(THREE, resources, palette) {
                 : COLORS.groundShade,
             surface: true
         }));
+    TERRAIN_PATCHES
+        .filter((_, index) => index % 3 === 0)
+        .forEach((placement, index) => {
+            const normal = new THREE.Vector3(...placement.position)
+                .normalize();
+            const tangent = new THREE.Vector3(
+                -normal.z,
+                0,
+                normal.x
+            ).normalize();
+            reliefPlacements.push({
+                family: "cliffStrata",
+                position: new THREE.Vector3(...placement.position)
+                    .multiplyScalar(1.046)
+                    .addScaledVector(
+                        tangent,
+                        (index % 2 === 0 ? -.12 : .12)
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .42,
+                    .026,
+                    placement.scale[2] * .34
+                ],
+                rotation: placement.rotation,
+                color: index % 2 === 0
+                    ? COLORS.paper
+                    : COLORS.rock,
+                surface: true
+            });
+        });
     const relief = buildColoredInstanceFamily(THREE, {
         name: "ReferenceTerrainReliefDetails",
         geometry: resources.geometry.box,
@@ -695,6 +726,21 @@ function buildWaterBand(THREE, resources, palette) {
                 scale: [scale[0] * 1.04, .035, .035],
                 rotation,
                 color: side === -1 ? COLORS.paper : COLORS.gold,
+                surface: true
+            });
+        }
+        for (const offset of [-.42, -.14, .14, .42]) {
+            waterEdgePlacements.push({
+                family: "bridgeTies",
+                position: new THREE.Vector3(...position)
+                    .addScaledVector(normal, .075)
+                    .addScaledVector(tangent, offset * scale[0])
+                    .toArray(),
+                scale: [.035, .025, scale[2] * .82],
+                rotation,
+                color: Math.abs(offset) > .3
+                    ? COLORS.gold
+                    : COLORS.paper,
                 surface: true
             });
         }
@@ -871,6 +917,20 @@ function buildTemplePeak(THREE, resources, palette) {
                 rotation: [0, -.08, 0],
                 color: COLORS.ink
             },
+            ...Array.from({ length: 6 }, (_, index) => ({
+                family: "eaveBrackets",
+                position: [-1.2 + index * .46, 4.73, 1.94],
+                scale: [.055, .15, .07],
+                rotation: [0, -.08, index % 2 === 0 ? -.08 : .08],
+                color: index % 2 === 0 ? COLORS.gold : COLORS.coral
+            })),
+            ...Array.from({ length: 3 }, (_, index) => ({
+                family: "steps",
+                position: [-.05, 4.05 - index * .11, 2.08 + index * .07],
+                scale: [.48 + index * .12, .045, .12],
+                rotation: [0, -.08, 0],
+                color: index === 1 ? COLORS.paper : COLORS.rock
+            })),
             ...Array.from({ length: 5 }, (_, index) => ({
                 family: "columnBases",
                 position: [-.47 + index * .23, 3.86, 2.12],
@@ -1074,6 +1134,35 @@ function buildIndustrialCluster(THREE, resources, palette) {
             color: COLORS.coral
         }
     );
+    for (let index = 0; index < 6; index += 1) {
+        industrialBoxPlacements.push({
+            family: "panelSeams",
+            position: [-4.18 + index * .19, .62, 1.955],
+            scale: [.035, .31, .022],
+            rotation: [0, 0, -.03],
+            color: index % 2 === 0 ? COLORS.rock : COLORS.ink
+        });
+        industrialBoxPlacements.push({
+            family: "gaugeTicks",
+            position: [
+                -3.9 + Math.cos(index * Math.PI / 3) * .2,
+                .62 + Math.sin(index * Math.PI / 3) * .19,
+                1.975
+            ],
+            scale: [.035, .065, .02],
+            rotation: [0, 0, index * Math.PI / 3],
+            color: COLORS.gold
+        });
+    }
+    for (let index = 0; index < 5; index += 1) {
+        industrialBoxPlacements.push({
+            family: "ladderRungs",
+            position: [-3.08, -.34 + index * .18, 1.94],
+            scale: [.22, .028, .025],
+            rotation: [0, 0, -.03],
+            color: index % 2 === 0 ? COLORS.paper : COLORS.rock
+        });
+    }
     const industrialBoxes = buildColoredInstanceFamily(THREE, {
         name: "ReferenceIndustrialBoxDetails",
         geometry: resources.geometry.box,
@@ -1267,6 +1356,41 @@ function buildUtilityCluster(THREE, resources, palette) {
                 scale: [.045, .3, .045],
                 rotation: [0, 0, index % 2 === 0 ? -.18 : .18],
                 color: COLORS.ink
+            })),
+            {
+                family: "windowFrames",
+                position: [2.73, -.74, 2.19],
+                scale: [.34, .035, .025],
+                rotation: [0, .12, -.04],
+                color: COLORS.waterDeep
+            },
+            {
+                family: "windowFrames",
+                position: [2.73, -1.06, 2.19],
+                scale: [.34, .035, .025],
+                rotation: [0, .12, -.04],
+                color: COLORS.waterDeep
+            },
+            {
+                family: "windowFrames",
+                position: [2.42, -.9, 2.19],
+                scale: [.035, .2, .025],
+                rotation: [0, .12, -.04],
+                color: COLORS.ink
+            },
+            {
+                family: "windowFrames",
+                position: [3.04, -.9, 2.19],
+                scale: [.035, .2, .025],
+                rotation: [0, .12, -.04],
+                color: COLORS.ink
+            },
+            ...Array.from({ length: 5 }, (_, index) => ({
+                family: "ladderRungs",
+                position: [4.16, -1.96 + index * .16, 1.47],
+                scale: [.22, .025, .025],
+                rotation: [0, -.2, -.08],
+                color: index % 2 === 0 ? COLORS.gold : COLORS.paper
             }))
         ]
     });
@@ -1393,6 +1517,29 @@ function buildVillageClusters(THREE, resources, palette) {
                     : COLORS.ink,
                 surface: true
             });
+            facadePlacements.push({
+                family: "windowSills",
+                position: facadeCenter.clone()
+                    .addScaledVector(
+                        normal,
+                        placement.scale[1] * .02
+                    )
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .2
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .21,
+                    .025,
+                    .045
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 2 === 0
+                    ? COLORS.paper
+                    : COLORS.gold,
+                surface: true
+            });
         }
         facadePlacements.push(
             {
@@ -1425,6 +1572,22 @@ function buildVillageClusters(THREE, resources, palette) {
                 color: placementIndex % 4 === 0
                     ? COLORS.gold
                     : COLORS.coral,
+                surface: true
+            },
+            {
+                family: "doorCanopies",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .08)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .3,
+                    .035,
+                    placement.scale[2] * .18
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 3 === 0
+                    ? COLORS.coral
+                    : COLORS.paper,
                 surface: true
             }
         );

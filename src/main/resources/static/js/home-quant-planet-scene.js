@@ -21,7 +21,6 @@ const BALANCED_LIMITS = Object.freeze({
     triangles: 90000
 });
 const GLYPH_LAYOUT_RADIUS_RATIO = .65;
-const LANDSCAPE_WORLD_WIDTH_SCALE = 1.28;
 
 const EMPTY_POSE = Object.freeze({
     worldAngle: 0,
@@ -150,14 +149,6 @@ export async function createQuantPlanetScene({
         }
         let framing;
         function layoutForAspect(aspect) {
-            const horizontalScale = aspect >= 1
-                ? LANDSCAPE_WORLD_WIDTH_SCALE
-                : 1;
-            world.group.scale.set(
-                worldScale * horizontalScale,
-                worldScale,
-                worldScale * horizontalScale
-            );
             framing = refitCamera(aspect);
             glyphs.setLayout({
                 center: envelope.center,
