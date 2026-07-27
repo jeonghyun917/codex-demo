@@ -466,11 +466,10 @@ export async function createQuantGlyphRig(THREE, {
         atlasTexture.magFilter = THREE.LinearFilter;
         atlasTexture.generateMipmaps = false;
         atlasTexture.needsUpdate = true;
-        const faceSideMaterial = ownMaterial(new THREE.MeshStandardMaterial({
+        const faceSideMaterial = ownMaterial(new THREE.MeshBasicMaterial({
             color: 0xffffff,
             vertexColors: true,
-            roughness: .78,
-            metalness: .02
+            toneMapped: false
         }));
         const inkLineMaterial = ownMaterial(new THREE.LineBasicMaterial({
             color: 0x28312d

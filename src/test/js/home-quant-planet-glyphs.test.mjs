@@ -177,7 +177,7 @@ test("builds nine independent extruded glyph pivots", async (t) => {
         );
         assert.equal(mesh?.geometry?.type, "ExtrudeGeometry");
         assert.ok(mesh.geometry.parameters.options.depth > 0);
-        assert.equal(mesh?.material?.isMeshStandardMaterial, true);
+        assert.equal(mesh?.material?.isMeshBasicMaterial, true);
         assert.equal(outline?.isLineSegments, true);
         assert.equal(outline.geometry.type, "EdgesGeometry");
         assert.equal(overlay?.geometry?.type, "ShapeGeometry");
@@ -236,11 +236,10 @@ test("uses one vertex-colored face-side material and the ink outline",
     assert.equal(mesh.geometry.parameters.options.bevelSize, .025);
     assert.equal(mesh.geometry.parameters.options.bevelThickness, .025);
     assert.equal(mesh.geometry.parameters.options.curveSegments, 1);
-    assert.equal(faceSide.isMeshStandardMaterial, true);
+    assert.equal(faceSide.isMeshBasicMaterial, true);
     assert.equal(faceSide.color.getHex(), 0xffffff);
     assert.equal(faceSide.vertexColors, true);
-    assert.equal(faceSide.roughness, .78);
-    assert.equal(faceSide.metalness, .02);
+    assert.equal(faceSide.toneMapped, false);
     assert.equal(colors.itemSize, 3);
     assert.equal(colors.count, mesh.geometry.attributes.position.count);
     assert.ok(new Set(Array.from(colors.array, (value) =>

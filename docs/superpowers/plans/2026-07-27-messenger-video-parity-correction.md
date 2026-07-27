@@ -267,8 +267,14 @@ outline/tree ring.
 
 The final video-framing gate requires a 16:9 solid-body viewport ratio of
 `0.75–0.82`, keeps the nine-glyph title centered and proportionally enlarged,
-caps repeated village backing opacity at `0.08`, and caps canopy crown scale at
-`0.55`. Verify this in the real 1280×720 browser, not from static counts alone.
+disables the duplicate village backing draw pass, and caps canopy crown scale
+at `0.55`. Verify this in the real 1280×720 browser, not from static counts
+alone.
+
+If live review still shows broad black masses, preserve the geometry but render
+repeated terrain, village, structural-ink, and glyph face/side vertex colors
+with non-tone-mapped basic materials. Keep the separate glyph edge lines and
+all independent pivot motion unchanged.
 
 - [ ] **Step 4: Check runtime diagnostics**
 

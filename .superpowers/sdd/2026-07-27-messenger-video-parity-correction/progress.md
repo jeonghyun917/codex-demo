@@ -11,6 +11,8 @@ Task 3: in progress
 Task 3: fix round 1/5 (1 addressed, 0 open; commits 6ec9d64..7469bd6)
 Task 3: complete (commits 0d563bf..7469bd6, review clean)
 Task 4: in progress
+Task 4: root live-browser acceptance correction complete — duplicate backing hidden; repeated world and glyph colors no longer depend on key-light orientation
+Task 4: root browser acceptance correction — disable stacked village backing draw pass after 0.08 opacity still accumulated into an opaque ring
 Task 4: fix round 4/5 (macro-detail v2 passes automated checks; live planet remains undersized and overlapping silhouettes form a dark ring)
 Task 4: fix round 5/5 in progress — match video framing and expose the mapped artwork
 Task 4: fix round 3/5 (unlit color and silhouette scale addressed; v1 micro-detail still collapses into brown noise at live size)

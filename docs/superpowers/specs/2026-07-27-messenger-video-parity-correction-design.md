@@ -98,9 +98,16 @@ At a 16:9 desktop viewport, the solid planet body occupies 75–82% of viewport
 height, matching the Messenger video's dominant hero scale. The nine-glyph
 title grows with the same camera move and remains centered over the world.
 Because the panorama already supplies hand-drawn ink, repeated village backing
-outlines use no more than 0.08 opacity and canopy crowns use no more than 55% of
-their authored scale; this prevents overlapping instances from forming a black
-ring around the mapped artwork.
+outlines retain their diagnostic transforms but are not rendered, while canopy
+crowns use no more than 55% of their authored scale. This prevents overlapping
+instances from forming a black ring around the mapped artwork.
+
+Repeated terrain shelves, village faces, structural ink, and the nine title
+glyph face/side colors use non-tone-mapped basic materials. Their authored
+cream, rust, green, and gray bands therefore remain readable at every yaw
+instead of turning into broad black silhouettes on faces opposite the key
+light. Geometry, depth, independent glyph pivots, and ink edge lines remain
+fully three-dimensional.
 
 ## Behavioral Contracts
 

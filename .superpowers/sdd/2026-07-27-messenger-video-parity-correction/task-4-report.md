@@ -298,3 +298,25 @@ Focused GREEN: 21 passing, 0 failing.
 Per the fix-round directive, no server was restarted and neither port 8080 nor
 8081 was touched. The root reviewer owns the final live 1280×720 comparison
 and browser acceptance against `Messenger.mp4`.
+
+## Root live-browser acceptance correction
+
+The first rebuilt 1280×720 frame proved that opacity `0.08` still accumulated
+across many transparent village instances into a nearly opaque black ring.
+Because the v2 panorama already carries its own hand-drawn ink, a new failing
+world contract required the duplicate backing instance family to remain
+available for diagnostic transforms but not enter the draw pass.
+
+RED: world 20/21; `ReferenceVillageOutlineFamily.visible` was `true`.
+
+GREEN: the backing family is hidden, world 21/21 and full Node 107/107. The
+renderer-real expectation correspondingly improves from 69 calls / 23,337
+triangles to 68 calls / 22,041 triangles.
+
+The next live yaw samples separated the remaining dark bands into three
+lighting-dependent families rather than additional backing geometry:
+structural ink, terrain/village faces, and the extruded title sides. Focused
+RED/GREEN contracts now require these repeated vertex colors to use
+non-tone-mapped basic materials. Their geometry, instance matrices, glyph
+pivots, extrusion depth, and edge lines are unchanged. The final focused
+results are world 22/22 and glyph 21/21; the full Node suite is 108/108.

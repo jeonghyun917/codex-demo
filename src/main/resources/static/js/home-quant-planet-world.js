@@ -21,7 +21,7 @@ const COLORS = Object.freeze({
     paper: 0xfffae9,
     coral: 0xd65f47,
     coralShade: 0xa94737,
-    ink: 0x233a42,
+    ink: 0x50656b,
     foliage: 0x39805b,
     foliageDark: 0x205f43,
     rock: 0x7c8580,
@@ -970,6 +970,11 @@ function buildVillageClusters(THREE, resources, palette) {
         VILLAGE_PLACEMENTS.length * 3
     );
     outlines.name = "ReferenceVillageOutlineFamily";
+    // The panorama already carries its own hand-drawn ink. Rendering every
+    // backing instance stacks transparent silhouettes into an opaque black
+    // ring at the live hero scale, so retain the authored transforms for
+    // diagnostics while keeping the duplicate backing pass out of the scene.
+    outlines.visible = false;
     const matrix = new THREE.Matrix4();
     const architectureColor = new THREE.Color(COLORS.architecture);
     const roofColor = new THREE.Color(COLORS.coralShade);
@@ -1313,22 +1318,19 @@ export function createQuantPlanetWorld(THREE, {
             ground: ownMaterial(
                 createToonMaterial(THREE, COLORS.ground, gradientMap)
             ),
-            groundShade: ownMaterial(
-                createToonMaterial(THREE, 0xffffff, gradientMap, {
-                    vertexColors: true
-                })
-            ),
+            groundShade: ownMaterial(new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                toneMapped: false
+            })),
             architecture: ownMaterial(
                 createToonMaterial(THREE, COLORS.architecture, gradientMap)
             ),
-            village: ownMaterial(
-                createToonMaterial(
-                    THREE,
-                    COLORS.architecture,
-                    gradientMap,
-                    { vertexColors: true }
-                )
-            ),
+            village: ownMaterial(new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                toneMapped: false
+            })),
             paper: ownMaterial(
                 createToonMaterial(THREE, COLORS.paper, gradientMap)
             ),
@@ -1338,9 +1340,10 @@ export function createQuantPlanetWorld(THREE, {
             coralShade: ownMaterial(
                 createToonMaterial(THREE, COLORS.coralShade, gradientMap)
             ),
-            ink: ownMaterial(
-                createToonMaterial(THREE, COLORS.ink, gradientMap)
-            ),
+            ink: ownMaterial(new THREE.MeshBasicMaterial({
+                color: COLORS.ink,
+                toneMapped: false
+            })),
             canopy: ownMaterial(
                 createToonMaterial(
                     THREE,

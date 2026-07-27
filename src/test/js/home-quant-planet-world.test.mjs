@@ -184,6 +184,18 @@ test("exposes large village bodies and terrain shelves in every sector", (t) => 
     assert.equal(buildings?.isInstancedMesh, true);
     assert.equal(outlines?.isInstancedMesh, true);
     assert.equal(terrain?.isInstancedMesh, true);
+    assert.equal(
+        buildings.material.isMeshBasicMaterial,
+        true,
+        "Village side faces must preserve their authored cel colors"
+    );
+    assert.equal(buildings.material.toneMapped, false);
+    assert.equal(
+        terrain.material.isMeshBasicMaterial,
+        true,
+        "Terrain shelves must preserve authored colors around the sphere"
+    );
+    assert.equal(terrain.material.toneMapped, false);
 
     const buildingBodies = instanceTransforms(buildings).filter(
         ({ index }) => index % 3 === 0
@@ -562,7 +574,11 @@ test("keeps panorama backing and canopy crowns below the final exposure caps", (
     );
 
     assert.equal(outlines.material.transparent, true);
-    assert.ok(outlines.material.opacity <= .08);
+    assert.equal(
+        outlines.visible,
+        false,
+        "The textured world must not render stacked village backing silhouettes"
+    );
     assert.ok(outlines.geometry.parameters.width <= 1.04);
     assert.equal(crowns.count, authoredCrownPlacements.length);
     instanceTransforms(crowns).forEach(({ scale }, index) => {
@@ -653,6 +669,15 @@ test("keeps canopy instance greens above the crushed-black floor", (t) => {
         assert.ok(shadedBase.g > shadedBase.r);
         assert.ok(shadedBase.g > shadedBase.b);
     }
+});
+
+test("keeps repeated structural ink readable instead of crushed black", (t) => {
+    const world = createWorld(t);
+    const trunks = world.group.getObjectByName("ReferenceCanopyTrunks");
+
+    assert.equal(trunks.material.isMeshBasicMaterial, true);
+    assert.equal(trunks.material.toneMapped, false);
+    assert.equal(trunks.material.color.getHex(), 0x50656b);
 });
 
 test("stays within the high-profile world render budget", (t) => {
