@@ -258,29 +258,30 @@ git commit -m "fix: match reference hero proportions"
 **Interfaces:**
 - Consumes: existing `resources.geometry`, palette, `addOutlinedMesh()`, and
   `orientInstance()`.
-- Produces named meshes:
-  `ReferenceIndustrialCollars`, `ReferenceIndustrialFasteners`,
-  `ReferenceIndustrialCatwalk`, `ReferenceUtilitySupports`,
-  `ReferenceTempleTrim`, and `ReferenceTempleRockLedges`.
+- Produces four draw-call-bounded instanced meshes:
+  `ReferenceIndustrialRingDetails`, `ReferenceIndustrialBoxDetails`,
+  `ReferenceUtilityBoxDetails`, and `ReferenceTempleBoxDetails`.
+- Each mesh exposes exact semantic counts through
+  `userData.detailFamilyCounts`.
 
 - [ ] **Step 1: Write failing landmark-detail tests**
 
-Add a test requiring each named mesh and instancing for repeated families:
+Add a test requiring each shared detail mesh, its semantic families, and
+instancing:
 
 ```js
-[
-    "ReferenceIndustrialCollars",
-    "ReferenceIndustrialFasteners",
-    "ReferenceUtilitySupports",
-    "ReferenceTempleTrim",
-    "ReferenceTempleRockLedges"
-].forEach((name) => {
-    assert.ok(world.group.getObjectByName(name), `Missing ${name}`);
-});
-assert.equal(
-    world.group.getObjectByName("ReferenceIndustrialFasteners").isInstancedMesh,
-    true
+const industrial = world.group.getObjectByName(
+    "ReferenceIndustrialBoxDetails"
 );
+assert.equal(industrial?.isInstancedMesh, true);
+assert.ok(industrial.userData.detailFamilyCounts.fasteners >= 8);
+assert.ok(industrial.userData.detailFamilyCounts.catwalk >= 3);
+assert.ok(industrial.userData.detailFamilyCounts.accessPanel >= 1);
+
+const temple = world.group.getObjectByName("ReferenceTempleBoxDetails");
+assert.equal(temple?.isInstancedMesh, true);
+assert.ok(temple.userData.detailFamilyCounts.roofTrim >= 3);
+assert.ok(temple.userData.detailFamilyCounts.rockLedges >= 3);
 ```
 
 Also assert the industrial cluster has at least three distinct non-ink
@@ -310,16 +311,18 @@ Do not allocate geometry inside per-instance loops.
 
 - [ ] **Step 4: Implement industrial and utility detail**
 
-Add instanced collar rings around both coral engines, small paper fasteners,
-two secondary pipe sections, a narrow rock/ink catwalk, and one paper access
-panel. Add utility mast feet, dish bracket, rotor ring, and deterministic cable
-supports. Use existing palette materials and shared matrices.
+Add instanced collar rings around both coral engines. Pack small fasteners,
+secondary pipe sections, catwalk pieces, and the access panel into one box
+instance family with per-instance colors. Pack utility mast feet, dish bracket,
+rotor ring blocks, and deterministic cable supports into one utility box
+family. Use existing palette colors and shared matrices.
 
 - [ ] **Step 5: Implement temple detail**
 
-Add instanced ink/paper roof ridge pieces, a recessed entrance panel, column
-bases, and a small set of rock ledges around the mountain base. Keep the
-highest point at or below the existing finial height plus `0.08` world units.
+Pack ink/paper roof ridge pieces, a recessed entrance panel, column bases, and
+small rock ledges into one temple box instance family with per-instance colors.
+Keep the highest point at or below the existing finial height plus `0.08` world
+units.
 
 - [ ] **Step 6: Run world tests and budgets**
 
@@ -350,28 +353,29 @@ git commit -m "feat: refine quant planet landmarks"
 **Interfaces:**
 - Consumes: `VILLAGE_PLACEMENTS`, water bridge placements, foliage placements,
   shared geometry/material registry, and surface orientation helpers.
-- Produces named instanced meshes:
-  `ReferenceVillageWindows`, `ReferenceVillageDoors`,
-  `ReferenceVillageRoofTrim`, `ReferenceBridgeRails`,
-  `ReferenceBankStones`, and `ReferenceCliffLedges`.
+- Produces three draw-call-bounded instanced meshes:
+  `ReferenceVillageFacadeDetails`, `ReferenceWaterEdgeDetails`, and
+  `ReferenceTerrainReliefDetails`.
+- Each mesh exposes exact semantic counts through
+  `userData.detailFamilyCounts`.
 
 - [ ] **Step 1: Write failing detail-family tests**
 
 Add:
 
 ```js
-[
-    "ReferenceVillageWindows",
-    "ReferenceVillageDoors",
-    "ReferenceVillageRoofTrim",
-    "ReferenceBridgeRails",
-    "ReferenceBankStones",
-    "ReferenceCliffLedges"
-].forEach((name) => {
-    const mesh = world.group.getObjectByName(name);
-    assert.equal(mesh?.isInstancedMesh, true, `${name} must be instanced`);
-    assert.ok(mesh.count > 0, `${name} must not be empty`);
-});
+const village = world.group.getObjectByName(
+    "ReferenceVillageFacadeDetails"
+);
+assert.equal(village?.isInstancedMesh, true);
+assert.ok(village.userData.detailFamilyCounts.windows > 0);
+assert.ok(village.userData.detailFamilyCounts.doors > 0);
+assert.ok(village.userData.detailFamilyCounts.roofTrim > 0);
+
+const water = world.group.getObjectByName("ReferenceWaterEdgeDetails");
+assert.equal(water?.isInstancedMesh, true);
+assert.ok(water.userData.detailFamilyCounts.bridgeRails > 0);
+assert.ok(water.userData.detailFamilyCounts.bankStones > 0);
 ```
 
 Add a foliage assertion proving at least three deterministic crown scale
@@ -391,16 +395,17 @@ Expected: the six detail-family names are missing.
 - [ ] **Step 3: Implement village facade details**
 
 For each village placement, calculate its surface normal and tangent once.
-Create instanced dark window panels, coral/paper door panels, and thin roof
-ridge caps offset along the surface normal enough to avoid z-fighting. Vary
-window count and chimney inclusion deterministically by placement index.
+Pack dark window panels, coral/paper door panels, and thin roof ridge caps into
+one box instance family with per-instance colors. Offset panels along the
+surface normal enough to avoid z-fighting. Vary window count and chimney
+inclusion deterministically by placement index.
 
 - [ ] **Step 4: Implement water and terrain detail**
 
-Add two low rails per bridge, instanced bank stones around the water district,
-and a limited cliff-ledge family on existing terrain patch sectors. Use
-existing water, paper, rock, and ground-shade materials; no transparent black
-backing meshes.
+Pack two low rails per bridge and faceted bank-stone blocks into one water box
+instance family with per-instance colors. Pack a limited cliff-ledge family on
+existing terrain patch sectors into one terrain box family. Use existing
+paper, rock, and ground-shade colors; no transparent black backing meshes.
 
 - [ ] **Step 5: Refine foliage variation**
 
