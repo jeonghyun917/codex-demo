@@ -430,6 +430,10 @@ class HomePageTemplateContractTest {
                     .map(HomePageTemplateContractTest::pathBounds)
                     .toList();
             assertTrue(
+                    geometry.stream().allMatch(
+                            HomePageTemplateContractTest::hasVisiblePaint),
+                    () -> id + " contains invisible geometry");
+            assertTrue(
                     bounds.stream().allMatch(bound ->
                             bound.width() > 4 && bound.height() > 4),
                     () -> id + " contains empty or degenerate geometry");
@@ -439,6 +443,12 @@ class HomePageTemplateContractTest {
                             .distinct()
                             .count() >= 2,
                     () -> id + " needs more than one visible size");
+            assertTrue(
+                    geometry.stream()
+                            .map(HomePageTemplateContractTest::silhouetteSignature)
+                            .distinct()
+                            .count() >= 2,
+                    () -> id + " needs distinct authored silhouettes");
             allGeometry.addAll(bounds);
             familyStyles.add(String.join("|",
                     group.getAttribute("fill"),
@@ -474,8 +484,8 @@ class HomePageTemplateContractTest {
                     cloud, atmosphere, "fill"));
             double effectiveOpacity = groupOpacity * opacity(cloud, 1);
             assertTrue(
-                    effectiveOpacity <= .3,
-                    "Atmospheric clouds must stay low opacity");
+                    effectiveOpacity >= .12 && effectiveOpacity <= .3,
+                    "Atmospheric clouds must stay visible but low opacity");
             assertTrue(
                     contrastRatio(fill, field) <= 1.5,
                     "Atmospheric clouds must stay near the field color");
@@ -498,12 +508,20 @@ class HomePageTemplateContractTest {
                         element.getAttribute("transform").contains("scale("))
                 .count();
         assertEquals(1, scaledGroups);
-        SvgBounds sourceArtwork = geometryBounds(artwork);
+        SvgBounds sourceArtwork = paintedGeometryBounds(artwork);
         SvgBounds fittedArtwork = transform.apply(sourceArtwork);
-        assertTrue(fittedArtwork.minX() >= 0);
-        assertTrue(fittedArtwork.minY() >= 0);
-        assertTrue(fittedArtwork.maxX() <= 800);
-        assertTrue(fittedArtwork.maxY() <= 760);
+        assertTrue(
+                fittedArtwork.minX() >= 0,
+                () -> "Painted artwork clips left: " + fittedArtwork);
+        assertTrue(
+                fittedArtwork.minY() >= 0,
+                () -> "Painted artwork clips top: " + fittedArtwork);
+        assertTrue(
+                fittedArtwork.maxX() <= 800,
+                () -> "Painted artwork clips right: " + fittedArtwork);
+        assertTrue(
+                fittedArtwork.maxY() <= 760,
+                () -> "Painted artwork enters CTA area: " + fittedArtwork);
 
         String css = resource("static/css/home-quant-planet.css");
         int sceneZ = Integer.parseInt(cssDeclaration(
@@ -939,6 +957,168 @@ class HomePageTemplateContractTest {
         return bounds.stream().reduce(SvgBounds::union).orElseThrow();
     }
 
+    private static SvgBounds paintedGeometryBounds(Element root) {
+        List<SvgBounds> bounds = new ArrayList<>();
+        NodeList geometry = root.getElementsByTagName("*");
+        for (int index = 0; index < geometry.getLength(); index++) {
+            if (!(geometry.item(index) instanceof Element element)
+                    || !hasVisiblePaint(element)) {
+                continue;
+            }
+            SvgBounds painted = switch (element.getTagName()) {
+                case "path" -> pathBounds(element);
+                case "circle" -> {
+                    double x = Double.parseDouble(
+                            element.getAttribute("cx"));
+                    double y = Double.parseDouble(
+                            element.getAttribute("cy"));
+                    double radius = Double.parseDouble(
+                            element.getAttribute("r"));
+                    yield new SvgBounds(
+                            x - radius, y - radius,
+                            x + radius, y + radius);
+                }
+                case "ellipse" -> {
+                    double x = Double.parseDouble(
+                            element.getAttribute("cx"));
+                    double y = Double.parseDouble(
+                            element.getAttribute("cy"));
+                    double radiusX = Double.parseDouble(
+                            element.getAttribute("rx"));
+                    double radiusY = Double.parseDouble(
+                            element.getAttribute("ry"));
+                    yield new SvgBounds(
+                            x - radiusX, y - radiusY,
+                            x + radiusX, y + radiusY);
+                }
+                default -> null;
+            };
+            if (painted == null) {
+                continue;
+            }
+
+            String stroke = inheritedAttribute(element, "stroke", "none");
+            if (isVisiblePaintValue(stroke)) {
+                double strokeWidth = Double.parseDouble(
+                        inheritedAttribute(element, "stroke-width", "1"));
+                painted = painted.expand(strokeWidth / 2);
+            }
+            painted = includeInheritedDropShadow(element, root, painted);
+            bounds.add(painted);
+        }
+        assertFalse(bounds.isEmpty());
+        return bounds.stream().reduce(SvgBounds::union).orElseThrow();
+    }
+
+    private static SvgBounds includeInheritedDropShadow(
+            Element element,
+            Element boundary,
+            SvgBounds painted) {
+        Node current = element;
+        SvgBounds result = painted;
+        while (current instanceof Element currentElement) {
+            String filterValue = currentElement.getAttribute("filter");
+            Matcher reference = Pattern.compile(
+                    "url\\(\\s*#([^)\\s]+)\\s*\\)")
+                    .matcher(filterValue);
+            if (reference.matches()) {
+                Element filter = elementWithId(
+                        element.getOwnerDocument().getDocumentElement(),
+                        reference.group(1));
+                if (filter != null) {
+                    List<Element> shadows = elementsWithTag(
+                            filter, "feDropShadow");
+                    for (Element shadow : shadows) {
+                        double dx = numericAttribute(shadow, "dx", 0);
+                        double dy = numericAttribute(shadow, "dy", 0);
+                        double blur = numericAttribute(
+                                shadow, "stdDeviation", 0) * 3;
+                        result = result.union(
+                                painted.expand(blur).translate(dx, dy));
+                    }
+                }
+            }
+            if (currentElement == boundary) {
+                break;
+            }
+            current = currentElement.getParentNode();
+        }
+        return result;
+    }
+
+    private static boolean hasVisiblePaint(Element element) {
+        if (!List.of("path", "circle", "ellipse")
+                .contains(element.getTagName())) {
+            return false;
+        }
+        if (effectiveOpacity(element) < .08) {
+            return false;
+        }
+        String fill = inheritedAttribute(element, "fill", "black");
+        String stroke = inheritedAttribute(element, "stroke", "none");
+        boolean visibleFill = isVisiblePaintValue(fill);
+        boolean visibleStroke = isVisiblePaintValue(stroke)
+                && Double.parseDouble(
+                        inheritedAttribute(element, "stroke-width", "1")) > 0;
+        return visibleFill || visibleStroke;
+    }
+
+    private static boolean isVisiblePaintValue(String value) {
+        String normalized = value.strip().toLowerCase();
+        return !normalized.isBlank()
+                && !"none".equals(normalized)
+                && !"transparent".equals(normalized);
+    }
+
+    private static double effectiveOpacity(Element element) {
+        double result = 1;
+        Node current = element;
+        while (current instanceof Element currentElement) {
+            result *= opacity(currentElement, 1);
+            current = currentElement.getParentNode();
+        }
+        return result;
+    }
+
+    private static String inheritedAttribute(
+            Element element,
+            String attribute,
+            String fallback) {
+        Node current = element;
+        while (current instanceof Element currentElement) {
+            String value = currentElement.getAttribute(attribute);
+            if (!value.isBlank()) {
+                return value;
+            }
+            current = currentElement.getParentNode();
+        }
+        return fallback;
+    }
+
+    private static String silhouetteSignature(Element path) {
+        SvgBounds bounds = pathBounds(path);
+        String commands = path.getAttribute("d")
+                .replaceAll("[^A-Za-z]", "")
+                .toUpperCase();
+        long numbers = Pattern.compile(
+                "[-+]?(?:\\d*\\.\\d+|\\d+\\.?\\d*)"
+                        + "(?:[eE][-+]?\\d+)?")
+                .matcher(path.getAttribute("d"))
+                .results()
+                .count();
+        long aspectTier = Math.round(
+                bounds.width() / Math.max(bounds.height(), .001) * 8);
+        return commands + "|" + numbers + "|" + aspectTier;
+    }
+
+    private static double numericAttribute(
+            Element element,
+            String attribute,
+            double fallback) {
+        String value = element.getAttribute(attribute);
+        return value.isBlank() ? fallback : Double.parseDouble(value);
+    }
+
     private static long sizeTier(SvgBounds bounds) {
         return Math.round(Math.log(bounds.area()) / Math.log(1.65));
     }
@@ -1082,6 +1262,22 @@ class HomePageTemplateContractTest {
                     Math.min(minY, other.minY),
                     Math.max(maxX, other.maxX),
                     Math.max(maxY, other.maxY));
+        }
+
+        SvgBounds expand(double amount) {
+            return new SvgBounds(
+                    minX - amount,
+                    minY - amount,
+                    maxX + amount,
+                    maxY + amount);
+        }
+
+        SvgBounds translate(double x, double y) {
+            return new SvgBounds(
+                    minX + x,
+                    minY + y,
+                    maxX + x,
+                    maxY + y);
         }
     }
 
