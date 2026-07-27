@@ -234,7 +234,10 @@ function buildColoredInstanceFamily(
     const color = new THREE.Color();
     const detailFamilyCounts = {};
     placements.forEach((placement, index) => {
-        orientInstance(
+        const orient = placement.surface
+            ? orientSurfaceInstance
+            : orientInstance;
+        orient(
             THREE,
             matrix,
             placement.position,
@@ -561,6 +564,32 @@ function buildPlanetCore(THREE, resources, palette) {
     });
     markInstancesDirty(rocks);
     group.add(rocks);
+
+    const reliefPlacements = TERRAIN_PATCHES
+        .filter((_, index) => index % 3 === 0)
+        .map((placement, index) => ({
+            family: "cliffLedges",
+            position: new THREE.Vector3(...placement.position)
+                .multiplyScalar(1.035)
+                .toArray(),
+            scale: [
+                placement.scale[0] * .58,
+                .055 + (index % 3) * .012,
+                placement.scale[2] * .48
+            ],
+            rotation: placement.rotation,
+            color: index % 2 === 0
+                ? COLORS.rock
+                : COLORS.groundShade,
+            surface: true
+        }));
+    const relief = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceTerrainReliefDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: reliefPlacements
+    });
+    group.add(relief);
     return group;
 }
 
@@ -623,18 +652,19 @@ function buildWaterBand(THREE, resources, palette) {
     markInstancesDirty(foam);
     group.add(foam);
 
-    const bridges = new THREE.InstancedMesh(
-        resources.geometry.box,
-        palette.ink,
-        4
-    );
-    bridges.name = "ReferenceWaterBridges";
-    [
+    const bridgePlacements = [
         [[2.66, 1.52, -1.72], [.58, .045, .12], [.04, .26, -.02]],
         [[.08, .9, 3.22], [.5, .04, .1], [-.03, -.22, .04]],
         [[-2.78, -.28, 1.88], [.46, .04, .1], [.05, .2, -.03]],
         [[1.92, -1.42, -2.3], [.42, .04, .09], [-.04, -.18, .03]]
-    ].forEach(([position, scale, rotation], index) => {
+    ];
+    const bridges = new THREE.InstancedMesh(
+        resources.geometry.box,
+        palette.ink,
+        bridgePlacements.length
+    );
+    bridges.name = "ReferenceWaterBridges";
+    bridgePlacements.forEach(([position, scale, rotation], index) => {
         orientSurfaceInstance(
             THREE,
             matrix,
@@ -646,6 +676,61 @@ function buildWaterBand(THREE, resources, palette) {
     });
     markInstancesDirty(bridges);
     group.add(bridges);
+
+    const waterEdgePlacements = [];
+    bridgePlacements.forEach(([position, scale, rotation]) => {
+        const normal = new THREE.Vector3(...position).normalize();
+        const tangent = new THREE.Vector3(
+            -normal.z,
+            0,
+            normal.x
+        ).normalize();
+        for (const side of [-1, 1]) {
+            waterEdgePlacements.push({
+                family: "bridgeRails",
+                position: new THREE.Vector3(...position)
+                    .addScaledVector(normal, .11)
+                    .addScaledVector(tangent, side * scale[2] * .72)
+                    .toArray(),
+                scale: [scale[0] * 1.04, .035, .035],
+                rotation,
+                color: side === -1 ? COLORS.paper : COLORS.gold,
+                surface: true
+            });
+        }
+    });
+    waterPlacements.forEach(([position], waterIndex) => {
+        const normal = new THREE.Vector3(...position).normalize();
+        const tangent = new THREE.Vector3(
+            -normal.z,
+            0,
+            normal.x
+        ).normalize();
+        for (const offset of [-.42, 0, .42]) {
+            waterEdgePlacements.push({
+                family: "bankStones",
+                position: new THREE.Vector3(...position)
+                    .multiplyScalar(1.035)
+                    .addScaledVector(tangent, offset)
+                    .toArray(),
+                scale: [
+                    .18 + (waterIndex % 2) * .035,
+                    .08,
+                    .14 + Math.abs(offset) * .06
+                ],
+                rotation: [0, offset * .5, waterIndex * .08],
+                color: offset === 0 ? COLORS.groundShade : COLORS.rock,
+                surface: true
+            });
+        }
+    });
+    const waterEdges = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceWaterEdgeDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: waterEdgePlacements
+    });
+    group.add(waterEdges);
     return { group, water };
 }
 
@@ -837,7 +922,7 @@ function buildIndustrialCluster(THREE, resources, palette) {
             name: "ReferenceMainEngine"
         }
     );
-    mainEngine.castShadow = Boolean(resources.shadows);
+    mainEngine.castShadow = false;
     addOutlinedMesh(
         THREE,
         group,
@@ -1225,6 +1310,7 @@ function buildVillageClusters(THREE, resources, palette) {
     const matrix = new THREE.Matrix4();
     const architectureColor = new THREE.Color(COLORS.architecture);
     const roofColor = new THREE.Color(COLORS.coralShade);
+    const facadePlacements = [];
     VILLAGE_PLACEMENTS.forEach((placement, placementIndex) => {
         const instanceIndex = placementIndex * 3;
         orientSurfaceInstance(
@@ -1280,11 +1366,79 @@ function buildVillageClusters(THREE, resources, palette) {
                 roofColor
             );
         }
+
+        const binormal = new THREE.Vector3()
+            .crossVectors(normal, tangent)
+            .normalize();
+        const facadeCenter = new THREE.Vector3(...placement.position)
+            .addScaledVector(tangent, placement.scale[2] * .53);
+        for (const side of [-1, 1]) {
+            facadePlacements.push({
+                family: "windows",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .12)
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .2
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .16,
+                    placement.scale[1] * .2,
+                    .025
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 3 === 0
+                    ? COLORS.waterDeep
+                    : COLORS.ink,
+                surface: true
+            });
+        }
+        facadePlacements.push(
+            {
+                family: "doors",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, -placement.scale[1] * .14)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .19,
+                    placement.scale[1] * .3,
+                    .03
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 2 === 0
+                    ? COLORS.coralShade
+                    : COLORS.rock,
+                surface: true
+            },
+            {
+                family: "roofTrim",
+                position: new THREE.Vector3(...placement.position)
+                    .addScaledVector(normal, placement.scale[1] * .78)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .82,
+                    .035,
+                    placement.scale[2] * .16
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 4 === 0
+                    ? COLORS.gold
+                    : COLORS.coral,
+                surface: true
+            }
+        );
     });
     markInstancesDirty(buildings);
     markInstancesDirty(outlines);
     tagSurfaceInstances(buildings, VILLAGE_PLACEMENTS);
-    return { clusters, buildings, outlines };
+    const facades = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceVillageFacadeDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: facadePlacements
+    });
+    return { clusters, buildings, outlines, facades };
 }
 
 function buildSurfaceUtilityFamilies(THREE, resources, palette) {
@@ -1391,8 +1545,8 @@ function buildLowerCanopy(THREE, resources, palette, placements) {
     markInstancesDirty(crowns);
     tagSurfaceInstances(trunks, placements);
     tagSurfaceInstances(crowns, placements);
-    trunks.castShadow = Boolean(resources.shadows);
-    crowns.castShadow = Boolean(resources.shadows);
+    trunks.castShadow = false;
+    crowns.castShadow = false;
     group.add(trunks, crowns);
     return group;
 }
@@ -1691,6 +1845,7 @@ export function createQuantPlanetWorld(THREE, {
             utility.group,
             villages.buildings,
             villages.outlines,
+            villages.facades,
             ...villages.clusters.values(),
             canopy,
             debris,

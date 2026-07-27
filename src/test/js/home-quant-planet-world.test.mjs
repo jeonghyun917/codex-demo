@@ -691,6 +691,46 @@ test("packs readable landmark details into four instanced families", (t) => {
     assert.ok(stats.triangles <= 140000);
 });
 
+test("packs village water and terrain relief into three detail families",
+        (t) => {
+    const world = createWorld(t);
+    const village = world.group.getObjectByName(
+        "ReferenceVillageFacadeDetails"
+    );
+    const water = world.group.getObjectByName(
+        "ReferenceWaterEdgeDetails"
+    );
+    const terrain = world.group.getObjectByName(
+        "ReferenceTerrainReliefDetails"
+    );
+
+    for (const mesh of [village, water, terrain]) {
+        assert.equal(mesh?.isInstancedMesh, true, "detail must be instanced");
+        assert.ok(mesh.count > 0, `${mesh?.name} must not be empty`);
+        assert.ok(mesh.instanceColor, `${mesh?.name} must carry authored color`);
+    }
+
+    assert.ok(village.userData.detailFamilyCounts.windows > 0);
+    assert.ok(village.userData.detailFamilyCounts.doors > 0);
+    assert.ok(village.userData.detailFamilyCounts.roofTrim > 0);
+    assert.ok(water.userData.detailFamilyCounts.bridgeRails >= 8);
+    assert.ok(water.userData.detailFamilyCounts.bankStones >= 12);
+    assert.ok(terrain.userData.detailFamilyCounts.cliffLedges >= 8);
+
+    const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
+    const crownScaleSignatures = new Set(
+        instanceTransforms(crowns).map(({ scale }) =>
+            [scale.x, scale.y, scale.z]
+                .map((value) => value.toFixed(3))
+                .join(":"))
+    );
+    assert.ok(crownScaleSignatures.size >= 3);
+
+    const stats = world.getRenderStats();
+    assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
+    assert.ok(stats.triangles <= 140000);
+});
+
 test("applies instance colors without multiplying missing vertex colors", (t) => {
     const world = createWorld(t);
     [
