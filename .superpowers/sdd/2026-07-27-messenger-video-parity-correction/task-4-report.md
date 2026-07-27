@@ -240,3 +240,61 @@ The preview was not restarted for this asset-only URL replacement. The root
 reviewer must make the final live 400–600px macro-detail comparison at several
 autonomous yaw timestamps before accepting Task 4 visually. Port 8080 was not
 modified.
+
+## Fix round 5: Video framing and panorama exposure
+
+### Composition RED/GREEN
+
+The existing square-only framing fixture was replaced with a real 1280×720
+projection contract. It requires the solid body to occupy 75–82% of viewport
+height, keeps the glyph center on the camera axis, retains the title's 0.504
+world-envelope radius, and leaves the existing 375×812 finite clip-safety
+contract active.
+
+```text
+node --test src/test/js/home-quant-planet-composition.test.mjs
+```
+
+RED result: 12 passing, 1 failing. The production 16:9 body ratio was
+`0.6218212197246673`, below the required range.
+
+A first minimal `.55` landscape camera ratio was intentionally verified before
+acceptance. It produced a body ratio of `0.8320620662755016` and clipped the
+full portrait envelope, so the final fit uses `.56` for landscape and retains
+the proven `.72` portrait fit. The glyph physical layout now derives directly
+from `0.504` of the world envelope, so it grows with the landscape camera move
+instead of shrinking with the camera-fit radius.
+
+Focused GREEN: 13 passing, 0 failing.
+
+### Surface-overlay RED/GREEN
+
+The real material/matrix test was tightened first to cap the repeated village
+backing opacity at `0.08` and each canopy crown axis at `0.55` of its authored
+placement scale.
+
+```text
+node --test src/test/js/home-quant-planet-world.test.mjs
+```
+
+RED result: 20 passing, 1 failing. The first failure exposed the production
+village backing opacity of `0.30`; the crown matrices were independently
+traced to `0.72` of authored scale. The minimal implementation changed only
+those two values. No glyph response logic, texture, topology, or instance
+count changed.
+
+Focused GREEN: 21 passing, 0 failing.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Combined world/composition | 34 passing, 0 failing |
+| Renderer budget | 69 draw calls and 23,337 triangles, within 75 / 140,000 |
+| Full Node regression | 107 passing, 0 failing |
+| Maven verification | 38 tests, 0 failures/errors/skips, `BUILD SUCCESS` |
+| Diff hygiene | `git diff --check` reported no whitespace errors |
+
+Per the fix-round directive, no server was restarted and neither port 8080 nor
+8081 was touched. The root reviewer owns the final live 1280×720 comparison
+and browser acceptance against `Messenger.mp4`.

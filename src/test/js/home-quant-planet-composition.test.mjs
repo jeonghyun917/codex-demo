@@ -226,6 +226,9 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                 worldQuaternion: planet.quaternion.clone(),
                 worldMatrix: planet.matrixWorld.elements.slice(),
                 glyphPosition: glyphs.position.clone(),
+                glyphCenterProjected: glyphs.getWorldPosition(
+                    new THREE.Vector3()
+                ).project(camera),
                 glyphScale: glyphs.scale.clone(),
                 glyphMatrix: glyphs.matrixWorld.elements.slice(),
                 glyphLayoutRadius: glyphs.userData.layoutRadius,
@@ -388,11 +391,11 @@ test("refits complete world bounds after landscape and portrait resizes", async 
     assert.ok(portrait.far > Math.max(...portrait.depths));
 });
 
-test("frames the solid core densely and sizes glyphs independently of debris",
+test("matches the 16:9 video framing and keeps the title centered at scale",
         async (t) => {
     const scene = await createTestScene(t, {
-        width: 969,
-        height: 969
+        width: 1280,
+        height: 720
     });
 
     assert.equal(scene.controller.render(pose()), true);
@@ -405,15 +408,17 @@ test("frames the solid core densely and sizes glyphs independently of debris",
         / frame.worldRadius;
 
     assert.ok(
-        bodyViewportRatio >= .6 && bodyViewportRatio <= .64,
-        `Expected body ratio 0.60-0.64, got ${bodyViewportRatio}`
+        bodyViewportRatio >= .75 && bodyViewportRatio <= .82,
+        `Expected body ratio 0.75-0.82, got ${bodyViewportRatio}`
     );
+    assert.ok(Math.abs(frame.glyphCenterProjected.x) < 1e-9);
+    assert.ok(Math.abs(frame.glyphCenterProjected.y) < 1e-9);
     assert.ok(
         Math.abs(glyphToEnvelopeRatio - .504) < 1e-9,
         `Expected glyph/envelope 0.504, got ${glyphToEnvelopeRatio}`
     );
     assert.ok(
-        Math.abs(frame.glyphDepthRadius / frame.worldRadius - .72) < 1e-9
+        Math.abs(frame.glyphDepthRadius / frame.worldRadius - .56) < 1e-9
     );
     assert.ok(frame.near < Math.min(...frame.depths));
     assert.ok(frame.far > Math.max(...frame.depths));

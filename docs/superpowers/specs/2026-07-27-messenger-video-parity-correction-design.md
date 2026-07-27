@@ -94,6 +94,14 @@ lighting. Village outlines remain transparent with opacity at or below 0.35,
 and high-profile canopy crowns use at most 75% of their authored scale so the
 surface drawing remains visible between protruding silhouettes.
 
+At a 16:9 desktop viewport, the solid planet body occupies 75–82% of viewport
+height, matching the Messenger video's dominant hero scale. The nine-glyph
+title grows with the same camera move and remains centered over the world.
+Because the panorama already supplies hand-drawn ink, repeated village backing
+outlines use no more than 0.08 opacity and canopy crowns use no more than 55% of
+their authored scale; this prevents overlapping instances from forming a black
+ring around the mapped artwork.
+
 ## Behavioral Contracts
 
 - Planet yaw is a pure function of elapsed time and never consumes pointer,

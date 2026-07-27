@@ -547,7 +547,7 @@ test("maps an injected panorama onto the core with one owned texture disposal", 
     assert.equal(disposeCalls, 1);
 });
 
-test("keeps panorama overlays thin and canopy crowns below their authored scale", () => {
+test("keeps panorama backing and canopy crowns below the final exposure caps", () => {
     const texture = new THREE.Texture();
     const world = createQuantPlanetWorld(THREE, {
         profile,
@@ -562,14 +562,14 @@ test("keeps panorama overlays thin and canopy crowns below their authored scale"
     );
 
     assert.equal(outlines.material.transparent, true);
-    assert.ok(outlines.material.opacity <= .35);
+    assert.ok(outlines.material.opacity <= .08);
     assert.ok(outlines.geometry.parameters.width <= 1.04);
     assert.equal(crowns.count, authoredCrownPlacements.length);
     instanceTransforms(crowns).forEach(({ scale }, index) => {
         const authoredScale = authoredCrownPlacements[index].scale;
         ["x", "y", "z"].forEach((axis, axisIndex) => {
             assert.ok(
-                scale[axis] <= authoredScale[axisIndex] * .75 + 1e-7,
+                scale[axis] <= authoredScale[axisIndex] * .55 + 1e-7,
                 `crown ${index} ${axis} exceeds the visible-surface cap`
             );
         });

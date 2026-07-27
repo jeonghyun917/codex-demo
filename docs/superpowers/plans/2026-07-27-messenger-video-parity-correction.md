@@ -265,6 +265,11 @@ most `0.75` of the authored crown scale. These contracts prevent a correctly
 loaded panorama from being crushed into a brown field or covered by a black
 outline/tree ring.
 
+The final video-framing gate requires a 16:9 solid-body viewport ratio of
+`0.75–0.82`, keeps the nine-glyph title centered and proportionally enlarged,
+caps repeated village backing opacity at `0.08`, and caps canopy crown scale at
+`0.55`. Verify this in the real 1280×720 browser, not from static counts alone.
+
 - [ ] **Step 4: Check runtime diagnostics**
 
 Read the page's diagnostic object and confirm draw calls plus shadows `<= 75`,

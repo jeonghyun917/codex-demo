@@ -1129,7 +1129,7 @@ function buildLowerCanopy(THREE, resources, palette, placements) {
             THREE,
             matrix,
             crownPosition,
-            placement.scale.map((axis) => axis * .72),
+            placement.scale.map((axis) => axis * .55),
             placement.rotation
         );
         crowns.setMatrixAt(index, matrix);
@@ -1245,7 +1245,7 @@ export function createQuantPlanetWorld(THREE, {
             color: COLORS.ink,
             side: THREE.BackSide,
             transparent: true,
-            opacity: .3,
+            opacity: .08,
             depthWrite: false
         }));
         const resources = {
