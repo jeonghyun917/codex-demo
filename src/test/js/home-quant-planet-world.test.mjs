@@ -651,6 +651,46 @@ test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
     });
 });
 
+test("packs readable landmark details into four instanced families", (t) => {
+    const world = createWorld(t);
+    const industrialRings = world.group.getObjectByName(
+        "ReferenceIndustrialRingDetails"
+    );
+    const industrialBoxes = world.group.getObjectByName(
+        "ReferenceIndustrialBoxDetails"
+    );
+    const utilityBoxes = world.group.getObjectByName(
+        "ReferenceUtilityBoxDetails"
+    );
+    const templeBoxes = world.group.getObjectByName(
+        "ReferenceTempleBoxDetails"
+    );
+
+    for (const mesh of [
+        industrialRings,
+        industrialBoxes,
+        utilityBoxes,
+        templeBoxes
+    ]) {
+        assert.equal(mesh?.isInstancedMesh, true, "detail must be instanced");
+        assert.ok(mesh.count > 0, `${mesh?.name} must not be empty`);
+        assert.ok(mesh.instanceColor, `${mesh?.name} must carry authored color`);
+    }
+
+    assert.ok(industrialRings.userData.detailFamilyCounts.collars >= 4);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.fasteners >= 8);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.catwalk >= 3);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.accessPanel >= 1);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.mastFeet >= 2);
+    assert.ok(utilityBoxes.userData.detailFamilyCounts.dishBracket >= 2);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.roofTrim >= 3);
+    assert.ok(templeBoxes.userData.detailFamilyCounts.rockLedges >= 3);
+
+    const stats = world.getRenderStats();
+    assert.ok(stats.drawCalls + stats.shadowCalls <= 75);
+    assert.ok(stats.triangles <= 140000);
+});
+
 test("applies instance colors without multiplying missing vertex colors", (t) => {
     const world = createWorld(t);
     [

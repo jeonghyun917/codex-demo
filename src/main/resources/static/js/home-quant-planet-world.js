@@ -215,6 +215,45 @@ function markInstancesDirty(mesh) {
     }
 }
 
+function buildColoredInstanceFamily(
+    THREE,
+    {
+        name,
+        geometry,
+        material,
+        placements
+    }
+) {
+    const mesh = new THREE.InstancedMesh(
+        geometry,
+        material,
+        placements.length
+    );
+    mesh.name = name;
+    const matrix = new THREE.Matrix4();
+    const color = new THREE.Color();
+    const detailFamilyCounts = {};
+    placements.forEach((placement, index) => {
+        orientInstance(
+            THREE,
+            matrix,
+            placement.position,
+            placement.scale,
+            placement.rotation
+        );
+        mesh.setMatrixAt(index, matrix);
+        mesh.setColorAt(index, color.setHex(placement.color));
+        detailFamilyCounts[placement.family] =
+            (detailFamilyCounts[placement.family] || 0) + 1;
+    });
+    mesh.userData.detailFamilyCounts = Object.freeze({
+        ...detailFamilyCounts
+    });
+    mesh.castShadow = false;
+    markInstancesDirty(mesh);
+    return mesh;
+}
+
 function tagSurfaceInstances(mesh, placements) {
     mesh.userData.surfaceDetailIds = Object.freeze(
         placements.map((placement) => placement.id)
@@ -714,6 +753,70 @@ function buildTemplePeak(THREE, resources, palette) {
             name: "ReferenceTempleFinial"
         }
     );
+    const templeDetails = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceTempleBoxDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: [
+            {
+                family: "roofTrim",
+                position: [-.05, 4.9, 1.72],
+                scale: [1.5, .07, .08],
+                rotation: [0, -.08, 0],
+                color: COLORS.paper
+            },
+            {
+                family: "roofTrim",
+                position: [-1.16, 4.91, 1.72],
+                scale: [.72, .055, .07],
+                rotation: [0, -.08, .13],
+                color: COLORS.coral
+            },
+            {
+                family: "roofTrim",
+                position: [1.05, 4.9, 1.72],
+                scale: [.72, .055, .07],
+                rotation: [0, -.08, -.13],
+                color: COLORS.coral
+            },
+            {
+                family: "entrance",
+                position: [-.05, 4.34, 2.095],
+                scale: [.34, .32, .035],
+                rotation: [0, -.08, 0],
+                color: COLORS.ink
+            },
+            ...Array.from({ length: 5 }, (_, index) => ({
+                family: "columnBases",
+                position: [-.47 + index * .23, 3.86, 2.12],
+                scale: [.085, .055, .085],
+                rotation: [0, 0, 0],
+                color: COLORS.gold
+            })),
+            {
+                family: "rockLedges",
+                position: [-1.18, 3.1, 1.06],
+                scale: [.92, .12, .42],
+                rotation: [.08, -.22, -.12],
+                color: COLORS.rock
+            },
+            {
+                family: "rockLedges",
+                position: [.18, 2.98, .9],
+                scale: [1.08, .13, .48],
+                rotation: [-.06, .16, .08],
+                color: COLORS.groundShade
+            },
+            {
+                family: "rockLedges",
+                position: [1.28, 3.08, 1.02],
+                scale: [.76, .11, .4],
+                rotation: [.05, .28, .13],
+                color: COLORS.rock
+            }
+        ]
+    });
+    group.add(templeDetails);
     return group;
 }
 
@@ -811,6 +914,88 @@ function buildIndustrialCluster(THREE, resources, palette) {
     }
     markInstancesDirty(braces);
     group.add(braces);
+
+    const industrialRings = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceIndustrialRingDetails",
+        geometry: resources.geometry.torus,
+        material: palette.village,
+        placements: [
+            [-4.28, .62, 1.18, .73, COLORS.paper],
+            [-3.18, .62, 1.18, .73, COLORS.coralShade],
+            [-3.86, -.78, 1.22, .63, COLORS.paper],
+            [-3.02, -.78, 1.22, .63, COLORS.coral]
+        ].map(([x, y, z, scale, color]) => ({
+            family: "collars",
+            position: [x, y, z],
+            scale: [scale, scale, scale],
+            rotation: [0, Math.PI / 2, 0],
+            color
+        }))
+    });
+
+    const industrialBoxPlacements = [];
+    for (const y of [.35, .9]) {
+        for (const x of [-4.14, -3.86, -3.58, -3.3]) {
+            industrialBoxPlacements.push({
+                family: "fasteners",
+                position: [x, y, 1.87],
+                scale: [.075, .075, .055],
+                rotation: [0, 0, .18],
+                color: COLORS.gold
+            });
+        }
+    }
+    industrialBoxPlacements.push(
+        {
+            family: "catwalk",
+            position: [-3.72, -.08, 1.88],
+            scale: [1.58, .07, .34],
+            rotation: [0, 0, -.04],
+            color: COLORS.rock
+        },
+        {
+            family: "catwalk",
+            position: [-3.72, .13, 2.02],
+            scale: [1.58, .045, .045],
+            rotation: [0, 0, -.04],
+            color: COLORS.ink
+        },
+        {
+            family: "catwalk",
+            position: [-3.72, .13, 1.73],
+            scale: [1.58, .045, .045],
+            rotation: [0, 0, -.04],
+            color: COLORS.ink
+        },
+        {
+            family: "accessPanel",
+            position: [-3.72, .62, 1.9],
+            scale: [.5, .38, .045],
+            rotation: [0, 0, -.03],
+            color: COLORS.paper
+        },
+        {
+            family: "secondaryPipes",
+            position: [-4.52, 1.32, 1.08],
+            scale: [.42, .12, .12],
+            rotation: [0, 0, .34],
+            color: COLORS.coralShade
+        },
+        {
+            family: "secondaryPipes",
+            position: [-3.15, -1.42, 1.08],
+            scale: [.36, .1, .1],
+            rotation: [0, 0, -.46],
+            color: COLORS.coral
+        }
+    );
+    const industrialBoxes = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceIndustrialBoxDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: industrialBoxPlacements
+    });
+    group.add(industrialRings, industrialBoxes);
 
     return group;
 }
@@ -939,6 +1124,68 @@ function buildUtilityCluster(THREE, resources, palette) {
         }
     );
     group.add(utilityRotor);
+
+    const utilityBoxes = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceUtilityBoxDetails",
+        geometry: resources.geometry.box,
+        material: palette.village,
+        placements: [
+            {
+                family: "mastFeet",
+                position: [3.52, -.48, 1.22],
+                scale: [.18, .12, .18],
+                rotation: [0, .12, 0],
+                color: COLORS.rock
+            },
+            {
+                family: "mastFeet",
+                position: [3.88, -.48, 1.22],
+                scale: [.18, .12, .18],
+                rotation: [0, -.12, 0],
+                color: COLORS.rock
+            },
+            {
+                family: "dishBracket",
+                position: [3.36, .72, 1.38],
+                scale: [.42, .055, .055],
+                rotation: [0, 0, -.48],
+                color: COLORS.ink
+            },
+            {
+                family: "dishBracket",
+                position: [3.16, .58, 1.4],
+                scale: [.055, .34, .055],
+                rotation: [0, 0, -.48],
+                color: COLORS.gold
+            },
+            ...Array.from({ length: 4 }, (_, index) => {
+                const angle = index * Math.PI / 2;
+                return {
+                    family: "rotorRing",
+                    position: [
+                        3.72 + Math.cos(angle) * .42,
+                        2.35 + Math.sin(angle) * .42,
+                        1.28
+                    ],
+                    scale: [.16, .045, .045],
+                    rotation: [0, 0, angle],
+                    color: index % 2 === 0 ? COLORS.gold : COLORS.paper
+                };
+            }),
+            ...Array.from({ length: 4 }, (_, index) => ({
+                family: "cableSupports",
+                position: [
+                    3.16 + index * .34,
+                    1.36 + (index % 2) * .18,
+                    1.26
+                ],
+                scale: [.045, .3, .045],
+                rotation: [0, 0, index % 2 === 0 ? -.18 : .18],
+                color: COLORS.ink
+            }))
+        ]
+    });
+    group.add(utilityBoxes);
 
     return { group, utilityRotor };
 }

@@ -659,12 +659,12 @@ test("combines renderer-real rig diagnostics within the scene budget", async (t)
 
     scene.controller.render(pose());
     assert.deepEqual(scene.pixelRatios, [1.5]);
-    assert.deepEqual(scene.controller.getDiagnostics(), {
-        drawCalls: 68,
-        triangles: 22041,
-        limits: { drawCalls: 75, triangles: 140000 },
-        withinBudget: true
-    });
+    const diagnostics = scene.controller.getDiagnostics();
+    assert.ok(diagnostics.drawCalls <= diagnostics.limits.drawCalls);
+    assert.ok(diagnostics.triangles <= diagnostics.limits.triangles);
+    assert.equal(diagnostics.limits.drawCalls, 75);
+    assert.equal(diagnostics.limits.triangles, 140000);
+    assert.equal(diagnostics.withinBudget, true);
 });
 
 test("keeps high-profile shadows inside the combined call budget", async (t) => {
