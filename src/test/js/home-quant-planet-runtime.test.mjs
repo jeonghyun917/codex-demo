@@ -819,6 +819,34 @@ test("publishes bounded loopback diagnostics without wheel or scroll listeners",
     }
 });
 
+test("coalesces a resize burst into one resize on the existing frame", async () => {
+    const harness = createRuntimeHarness();
+    const scene = createScene();
+    harness.sceneDeferred.resolve(scene);
+    await flushPromises();
+
+    assert.equal(scene.resizeCalls, 1);
+    harness.windowTarget.emit("resize");
+    harness.windowTarget.emit("resize");
+    harness.windowTarget.emit("resize");
+    assert.equal(
+        scene.resizeCalls,
+        1,
+        "resize work must wait for the already scheduled animation frame"
+    );
+    assert.equal(harness.frameQueue.frames.size, 1);
+
+    harness.frameQueue.runNext(16);
+    assert.equal(scene.resizeCalls, 2);
+    harness.windowTarget.emit("resize");
+    harness.windowTarget.emit("resize");
+    assert.equal(scene.resizeCalls, 2);
+
+    harness.frameQueue.runNext(32);
+    assert.equal(scene.resizeCalls, 3);
+    assert.equal(harness.frameQueue.frames.size, 1);
+});
+
 test("destroy cancels timer, Motion, input, scene, and RAF exactly once", async () => {
     const timers = createTimerHarness();
     const motion = createMotionHarness();

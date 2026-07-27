@@ -168,7 +168,10 @@ export async function createQuantPlanetScene({
             const verticalProjection = FULL_VIEWPORT_SAFE_FRAME
                 * Math.tan(verticalHalfFov);
             let maximum = requested;
-            world.forEachFramingPoint((point) => {
+            world.forEachFramingPoint((point, object) => {
+                if (object.userData.visualFramingRole === "decorative") {
+                    return;
+                }
                 const localX = point.x - envelope.center.x;
                 const localY = point.y - envelope.center.y;
                 const localZ = point.z - envelope.center.z;

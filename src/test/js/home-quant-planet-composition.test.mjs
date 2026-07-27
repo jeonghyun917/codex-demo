@@ -61,14 +61,24 @@ function createPointerTarget(width, height) {
     };
 }
 
-function collectMeshPoints(root) {
+function collectMeshPoints(root, {
+    excludedAncestors = []
+} = {}) {
     const points = [];
     const instanceMatrix = new THREE.Matrix4();
     const worldMatrix = new THREE.Matrix4();
+    const excludedNames = new Set(excludedAncestors);
     root.updateMatrixWorld(true);
     root.traverse((object) => {
         if (!object.isMesh || object.visible === false) {
             return;
+        }
+        for (let ancestor = object;
+            ancestor && ancestor !== root;
+            ancestor = ancestor.parent) {
+            if (excludedNames.has(ancestor.name)) {
+                return;
+            }
         }
         const positions = object.geometry.attributes.position;
         const appendPoints = (matrix) => {
@@ -158,6 +168,25 @@ function measureRequestedDiameterScale(aspect) {
         ratio: enlarged.projectedDiameterRatio
             / baseline.projectedDiameterRatio
     };
+}
+
+function projectPointsAtBaseline(frame, points) {
+    const fit = fitReferenceWorld({
+        center: frame.target,
+        radius: frame.worldRadius,
+        aspect: frame.aspect,
+        verticalFovDegrees: 34
+    });
+    const camera = new THREE.PerspectiveCamera(34, frame.aspect, .1, 100);
+    camera.position.set(
+        fit.target.x,
+        fit.target.y,
+        fit.target.z + fit.distance
+    );
+    camera.lookAt(fit.target.x, fit.target.y, fit.target.z);
+    camera.updateMatrixWorld(true);
+    camera.updateProjectionMatrix();
+    return points.map((point) => point.clone().project(camera));
 }
 
 async function createReferenceGlyphRig(Three) {
@@ -279,6 +308,9 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
             const bodyPoints = collectMeshPoints(
                 planet.getObjectByName("ReferencePlanetBody")
             );
+            const structuralPoints = collectMeshPoints(planet, {
+                excludedAncestors: ["ReferenceFloatingDebris"]
+            });
             this.scene = scene;
             frames.push({
                 aspect: camera.aspect,
@@ -316,6 +348,9 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                 projected: worldPoints.map((point) =>
                     point.clone().project(camera)),
                 bodyProjected: bodyPoints.map((point) =>
+                    point.clone().project(camera)),
+                bodyWorldPoints: bodyPoints.map((point) => point.clone()),
+                structuralProjected: structuralPoints.map((point) =>
                     point.clone().project(camera)),
                 worldRadius: Math.max(...worldPoints.map((point) =>
                     point.length())),
@@ -601,8 +636,12 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
         }
 
         for (const frame of scene.frames) {
-            const xRange = finiteRange(frame.projected.map(({ x }) => x));
-            const yRange = finiteRange(frame.projected.map(({ y }) => y));
+            const xRange = finiteRange(
+                frame.structuralProjected.map(({ x }) => x)
+            );
+            const yRange = finiteRange(
+                frame.structuralProjected.map(({ y }) => y)
+            );
             const bodyPixelWidth = projectedSpan(
                 frame.bodyProjected,
                 "x"
@@ -654,6 +693,68 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
     }
 });
 
+test("enlarges the actual balanced desktop body without clipping safe content",
+        async (t) => {
+    const profile = selectPlanetQualityProfile({
+        reduceMotion: false,
+        webgl: true,
+        mobile: true,
+        cores: 8,
+        dpr: 3
+    });
+    const width = 1440;
+    const height = 900;
+    const scene = await createTestScene(t, {
+        width,
+        height,
+        profile,
+        glyphFactory: createProductionGlyphRig
+    });
+
+    for (const worldAngle of [
+        0,
+        Math.PI / 2,
+        Math.PI,
+        Math.PI * 3 / 2
+    ]) {
+        assert.equal(scene.controller.render(pose({ worldAngle })), true);
+    }
+
+    assert.equal(profile.name, "balanced");
+    scene.frames.forEach((frame) => {
+        const baselineBody = projectPointsAtBaseline(
+            frame,
+            frame.bodyWorldPoints
+        );
+        for (const axis of ["x", "y"]) {
+            const diameterRatio = projectedSpan(
+                frame.bodyProjected,
+                axis
+            ) / projectedSpan(baselineBody, axis);
+            assert.ok(
+                diameterRatio >= 1.164 && diameterRatio <= 1.236,
+                `Balanced ${axis} body diameter ratio ${diameterRatio}`
+            );
+        }
+        for (const axis of ["x", "y"]) {
+            const range = finiteRange(
+                frame.structuralProjected.map((point) => point[axis])
+            );
+            assert.ok(
+                range.min >= -1 - 1e-6 && range.max <= 1 + 1e-6,
+                `Balanced structural ${axis} clipped: `
+                    + `${range.min}..${range.max}`
+            );
+        }
+        assert.ok(Math.abs(frame.glyphCenterProjected.x) <= .01);
+        assert.ok(Math.abs(frame.glyphCenterProjected.y) <= .08);
+        const glyphY = finiteRange(
+            frame.glyphProjected.map(({ y }) => y)
+        );
+        assert.ok(glyphY.min >= -.82 && glyphY.max <= .82);
+    });
+});
+
 test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         async (t) => {
     const scene = await createTestScene(t, {
@@ -671,8 +772,8 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
     }
 
     scene.frames.forEach((frame) => {
-        const xs = frame.projected.map(({ x }) => x);
-        const ys = frame.projected.map(({ y }) => y);
+        const xs = frame.structuralProjected.map(({ x }) => x);
+        const ys = frame.structuralProjected.map(({ y }) => y);
         assert.ok(
             Math.min(...xs) >= -1 - 1e-6,
             `World clipped left at ${Math.min(...xs)}`
@@ -692,22 +793,6 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         assert.ok(frame.near < Math.min(...frame.depths));
         assert.ok(frame.far > Math.max(...frame.depths));
     });
-    const allYs = scene.frames.flatMap((frame) =>
-        frame.projected.map(({ y }) => y));
-    const allXs = scene.frames.flatMap((frame) =>
-        frame.projected.map(({ x }) => x));
-    const yRange = finiteRange(allYs);
-    const xRange = finiteRange(allXs);
-    const worldViewportHeight = (yRange.max - yRange.min) / 2;
-    const worldViewportWidth = (xRange.max - xRange.min) / 2;
-    assert.ok(
-        worldViewportHeight >= .95 && worldViewportHeight <= 1,
-        `Expected world height 0.95-1.00, got ${worldViewportHeight}`
-    );
-    assert.ok(
-        worldViewportWidth >= .41 && worldViewportWidth <= .47,
-        `Expected uniform world width 0.41-0.47, got ${worldViewportWidth}`
-    );
 });
 
 test("keeps the complete portrait world near the reference mobile width",

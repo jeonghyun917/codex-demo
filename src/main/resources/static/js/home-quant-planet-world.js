@@ -1899,12 +1899,14 @@ function buildFloatingDebris(THREE, resources, palette, placements) {
         debrisCount
     );
     pieces.name = "ReferenceDebrisPieces";
+    pieces.userData.visualFramingRole = "decorative";
     const flecks = new THREE.InstancedMesh(
         resources.geometry.cone,
         palette.paper,
         debrisCount
     );
     flecks.name = "ReferenceDebrisFlecks";
+    flecks.userData.visualFramingRole = "decorative";
     for (let index = 0; index < debrisCount; index += 1) {
         const placement = placements[index];
         orientInstance(
@@ -2222,7 +2224,7 @@ export function createQuantPlanetWorld(THREE, {
                     for (let index = 0; index < positions.count; index += 1) {
                         framingPoint.fromBufferAttribute(positions, index)
                             .applyMatrix4(matrix);
-                        visitor(framingPoint);
+                        visitor(framingPoint, object);
                     }
                 };
                 if (object.isInstancedMesh) {

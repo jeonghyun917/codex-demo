@@ -81,6 +81,7 @@ export function createQuantPlanetRuntime({
     let runtimeFailed = false;
     let scene = null;
     let sceneReady = false;
+    let resizePending = false;
     let worldAngle = 0;
 
     root.classList.remove(
@@ -248,6 +249,7 @@ export function createQuantPlanetRuntime({
             return;
         }
         lastFrameTime = null;
+        resizePending = false;
         scene?.resize?.();
         scene?.setVisible?.(!documentTarget.hidden);
     }
@@ -330,6 +332,10 @@ export function createQuantPlanetRuntime({
     function tick(time) {
         if (destroyed || runtimeFailed) {
             return;
+        }
+        if (resizePending) {
+            resizePending = false;
+            scene?.resize?.();
         }
         const frameTime = Number.isFinite(time) ? time : now();
         const deltaTime = lastFrameTime === null
@@ -420,7 +426,7 @@ export function createQuantPlanetRuntime({
     }
 
     function handleResize() {
-        scene?.resize?.();
+        resizePending = true;
     }
 
     documentTarget.addEventListener(
@@ -479,6 +485,7 @@ export function createQuantPlanetRuntime({
         }
         scene = createdScene;
         sceneReady = true;
+        resizePending = false;
         ambientFrameTime = null;
         scene.resize?.();
         scene.setVisible?.(!documentTarget.hidden);
