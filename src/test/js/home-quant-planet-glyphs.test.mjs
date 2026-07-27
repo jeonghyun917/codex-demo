@@ -650,6 +650,52 @@ test("reports actual vertex-colored glyph draw calls and triangle counts",
     });
 });
 
+test("keeps nine independent balanced glyphs within twenty draw calls",
+        async (t) => {
+    const rig = await createRig(t, {
+        profile: { name: "balanced" }
+    });
+    const pivots = glyphPivots(rig.group);
+
+    assert.equal(pivots.length, 9);
+    pivots.forEach((pivot, index) => {
+        const mesh = pivot.getObjectByName(
+            `ReferenceGlyphMesh-${index + 1}`
+        );
+        const overlay = pivot.getObjectByName(
+            `ReferenceGlyphFaceOverlay-${index + 1}`
+        );
+        assert.equal(mesh?.geometry?.type, "ExtrudeGeometry");
+        assert.equal(overlay?.material?.map?.isTexture, true);
+    });
+    assert.ok(
+        rig.getRenderStats().drawCalls <= 20,
+        `Balanced glyph calls: ${rig.getRenderStats().drawCalls}`
+    );
+
+    const restSignatures = pivots.map((pivot) => [
+        pivot.rotation.x,
+        pivot.rotation.y,
+        pivot.rotation.z,
+        pivot.position.x,
+        pivot.position.y,
+        pivot.position.z
+    ].map((value) => value.toFixed(3)).join(","));
+    advanceRig(rig, { x: .9, y: -.7 });
+    const signatures = pivots.map((pivot) => [
+        pivot.rotation.x,
+        pivot.rotation.y,
+        pivot.rotation.z,
+        pivot.position.x,
+        pivot.position.y,
+        pivot.position.z
+    ].map((value) => value.toFixed(3)).join(","));
+    assert.equal(new Set(signatures).size, 9);
+    assert.ok(signatures.every(
+        (signature, index) => signature !== restSignatures[index]
+    ));
+});
+
 test("bounds glyph draw calls independently of disconnected contours",
         async (t) => {
     const rig = await createRig(t, {

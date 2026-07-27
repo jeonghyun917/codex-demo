@@ -184,6 +184,13 @@ async function createReferenceGlyphRig(Three) {
     };
 }
 
+function createProductionGlyphRig(Three, options) {
+    return createQuantGlyphRig(Three, {
+        ...options,
+        imageDataSource: createNineCellMask()
+    });
+}
+
 function createRearFieldProbe(Three, {
     stats = { drawCalls: 0, shadowCalls: 0, triangles: 0 }
 } = {}) {
@@ -803,14 +810,23 @@ test("balanced mobile touch settles all glyphs 1.45s after release",
     });
 });
 
-test("combines renderer-real rig diagnostics within the scene budget", async (t) => {
+test("keeps the production high scene inside its complete budget", async (t) => {
+    const profile = selectPlanetQualityProfile({
+        reduceMotion: false,
+        webgl: true,
+        mobile: false,
+        cores: 8,
+        dpr: 3
+    });
     const scene = await createTestScene(t, {
         width: 1440,
         height: 900,
-        profile: sceneProfile({ pixelRatio: 3 })
+        profile,
+        glyphFactory: createProductionGlyphRig
     });
 
-    scene.controller.render(pose());
+    assert.equal(profile.name, "high");
+    assert.equal(scene.controller.render(pose()), true);
     assert.deepEqual(scene.pixelRatios, [1.5]);
     const diagnostics = scene.controller.getDiagnostics();
     assert.ok(
@@ -881,9 +897,11 @@ test("uses the balanced rear-field scene budget", async (t) => {
     const scene = await createTestScene(t, {
         width: 375,
         height: 812,
-        profile: balancedProfile
+        profile: balancedProfile,
+        glyphFactory: createProductionGlyphRig
     });
 
+    assert.equal(scene.controller.render(pose()), true);
     const diagnostics = scene.controller.getDiagnostics();
 
     assert.equal(balancedProfile.name, "balanced");
@@ -891,6 +909,15 @@ test("uses the balanced rear-field scene budget", async (t) => {
         drawCalls: 70,
         triangles: 95000
     });
+    assert.ok(
+        diagnostics.drawCalls <= diagnostics.limits.drawCalls,
+        `Balanced draw calls exceeded budget: ${JSON.stringify(diagnostics)}`
+    );
+    assert.ok(
+        diagnostics.triangles <= diagnostics.limits.triangles,
+        `Balanced triangles exceeded budget: ${JSON.stringify(diagnostics)}`
+    );
+    assert.equal(diagnostics.withinBudget, true);
 });
 
 test("refits glyph layout only when the viewport changes", async (t) => {

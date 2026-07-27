@@ -370,7 +370,8 @@ function applyFaceSideColors(THREE, geometry) {
 export async function createQuantGlyphRig(THREE, {
     assetUrl = REFERENCE_HERO.titleAssetUrl,
     documentTarget = globalThis.document,
-    imageDataSource
+    imageDataSource,
+    profile = {}
 } = {}) {
     const group = new THREE.Group();
     group.name = "ReferenceGlyphRig";
@@ -471,9 +472,12 @@ export async function createQuantGlyphRig(THREE, {
             vertexColors: true,
             toneMapped: false
         }));
-        const inkLineMaterial = ownMaterial(new THREE.LineBasicMaterial({
-            color: 0x28312d
-        }));
+        const outlineEnabled = profile.name !== "balanced";
+        const inkLineMaterial = outlineEnabled
+            ? ownMaterial(new THREE.LineBasicMaterial({
+                color: 0x28312d
+            }))
+            : null;
         const overlayMaterial = ownMaterial(new THREE.MeshBasicMaterial({
             map: atlasTexture,
             transparent: true,
@@ -532,15 +536,6 @@ export async function createQuantGlyphRig(THREE, {
             mesh.castShadow = false;
             mesh.receiveShadow = false;
 
-            const outlineGeometry = ownGeometry(
-                new THREE.EdgesGeometry(geometry, 28)
-            );
-            const outline = new THREE.LineSegments(
-                outlineGeometry,
-                inkLineMaterial
-            );
-            outline.name = `ReferenceGlyphOutline-${index + 1}`;
-
             const overlayGeometry = ownGeometry(
                 new THREE.ShapeGeometry(shapes, 1)
             );
@@ -561,7 +556,19 @@ export async function createQuantGlyphRig(THREE, {
             overlay.position.z = geometry.boundingBox.max.z + .004;
             overlay.renderOrder = 1;
 
-            pivot.add(mesh, outline, overlay);
+            pivot.add(mesh);
+            if (outlineEnabled) {
+                const outlineGeometry = ownGeometry(
+                    new THREE.EdgesGeometry(geometry, 28)
+                );
+                const outline = new THREE.LineSegments(
+                    outlineGeometry,
+                    inkLineMaterial
+                );
+                outline.name = `ReferenceGlyphOutline-${index + 1}`;
+                pivot.add(outline);
+            }
+            pivot.add(overlay);
             group.add(pivot);
             pivots.push(pivot);
             motionStates.push({
