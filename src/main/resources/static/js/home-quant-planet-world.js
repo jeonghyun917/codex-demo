@@ -1,6 +1,5 @@
 import {
     CABLE_SEGMENT_PLACEMENTS,
-    DEBRIS_PLACEMENTS,
     DETAIL_PLACEMENTS_BY_DISTRICT,
     FOREST_BELTS,
     PATH_FRAME_PLACEMENTS,
@@ -1981,6 +1980,113 @@ function buildVillageClusters(THREE, resources, palette) {
                 surface: true
             }
         );
+        for (const side of [-1, 1]) {
+            facadePlacements.push({
+                family: "wallPosts",
+                position: facadeCenter.clone()
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .42
+                    )
+                    .toArray(),
+                scale: [
+                    .035,
+                    placement.scale[1] * .47,
+                    .045
+                ],
+                rotation: placement.rotation,
+                color: side === -1 ? COLORS.ink : COLORS.rock,
+                surface: true
+            });
+            facadePlacements.push({
+                family: "doorFrames",
+                position: facadeCenter.clone()
+                    .addScaledVector(
+                        binormal,
+                        side * placement.scale[0] * .21
+                    )
+                    .addScaledVector(
+                        normal,
+                        -placement.scale[1] * .13
+                    )
+                    .toArray(),
+                scale: [
+                    .028,
+                    placement.scale[1] * .32,
+                    .04
+                ],
+                rotation: placement.rotation,
+                color: COLORS.paper,
+                surface: true
+            });
+        }
+        facadePlacements.push(
+            {
+                family: "doorFrames",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .16)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .24,
+                    .028,
+                    .04
+                ],
+                rotation: placement.rotation,
+                color: COLORS.paper,
+                surface: true
+            },
+            {
+                family: "eaveBands",
+                position: facadeCenter.clone()
+                    .addScaledVector(normal, placement.scale[1] * .43)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .5,
+                    .035,
+                    placement.scale[2] * .11
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 2 === 0
+                    ? COLORS.coral
+                    : COLORS.gold,
+                surface: true
+            },
+            {
+                family: "roofRidges",
+                position: new THREE.Vector3(...placement.position)
+                    .addScaledVector(normal, placement.scale[1] * .88)
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .46,
+                    .045,
+                    placement.scale[2] * .13
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 3 === 0
+                    ? COLORS.gold
+                    : COLORS.ink,
+                surface: true
+            },
+            {
+                family: "entrySteps",
+                position: facadeCenter.clone()
+                    .addScaledVector(
+                        normal,
+                        -placement.scale[1] * .48
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .28,
+                    .04,
+                    placement.scale[2] * .18
+                ],
+                rotation: placement.rotation,
+                color: placementIndex % 2 === 0
+                    ? COLORS.rock
+                    : COLORS.groundShade,
+                surface: true
+            }
+        );
     });
     markInstancesDirty(buildings);
     markInstancesDirty(outlines);
@@ -2099,65 +2205,6 @@ function buildLowerCanopy(THREE, resources, palette, placements) {
     trunks.castShadow = false;
     crowns.castShadow = false;
     group.add(trunks, crowns);
-    return group;
-}
-
-function buildFloatingDebris(THREE, resources, palette, placements) {
-    const group = new THREE.Group();
-    group.name = "ReferenceFloatingDebris";
-    const debrisCount = placements.length;
-    const matrix = new THREE.Matrix4();
-
-    const pieces = new THREE.InstancedMesh(
-        resources.geometry.box,
-        palette.rock,
-        debrisCount
-    );
-    pieces.name = "ReferenceDebrisPieces";
-    pieces.userData.visualFramingRole = "decorative";
-    const flecks = new THREE.InstancedMesh(
-        resources.geometry.cone,
-        palette.paper,
-        debrisCount
-    );
-    flecks.name = "ReferenceDebrisFlecks";
-    flecks.userData.visualFramingRole = "decorative";
-    for (let index = 0; index < debrisCount; index += 1) {
-        const placement = placements[index];
-        orientInstance(
-            THREE,
-            matrix,
-            placement.position,
-            placement.scale,
-            placement.rotation
-        );
-        pieces.setMatrixAt(index, matrix);
-        orientInstance(
-            THREE,
-            matrix,
-            [
-                placement.position[0] + .16,
-                placement.position[1] + .14,
-                placement.position[2]
-            ],
-            [
-                placement.scale[0] * .42,
-                placement.scale[1] * .72,
-                placement.scale[2] * .42
-            ],
-            [
-                placement.rotation[0],
-                placement.rotation[1],
-                placement.rotation[2] + .8
-            ]
-        );
-        flecks.setMatrixAt(index, matrix);
-    }
-    markInstancesDirty(pieces);
-    markInstancesDirty(flecks);
-    tagSurfaceInstances(pieces, placements);
-    tagSurfaceInstances(flecks, placements);
-    group.add(pieces, flecks);
     return group;
 }
 
@@ -2366,16 +2413,6 @@ export function createQuantPlanetWorld(THREE, {
             palette,
             foliagePlacements
         );
-        const debrisCount = profile.name === "high"
-            ? DEBRIS_PLACEMENTS.length
-            : Math.max(0, Math.floor(profile.cloudCount ?? 8));
-        const debrisPlacements = DEBRIS_PLACEMENTS.slice(0, debrisCount);
-        const debris = buildFloatingDebris(
-            THREE,
-            resources,
-            palette,
-            debrisPlacements
-        );
         const surfaceUtilities = buildSurfaceUtilityFamilies(
             THREE,
             resources,
@@ -2387,8 +2424,7 @@ export function createQuantPlanetWorld(THREE, {
             ...foliagePlacements,
             ...CABLE_SEGMENT_PLACEMENTS,
             ...PATH_FRAME_PLACEMENTS,
-            ...PIPE_POLE_PLACEMENTS,
-            ...debrisPlacements
+            ...PIPE_POLE_PLACEMENTS
         ]);
         const districts = buildDistrictAnchors(THREE);
         temple.rotation.y = Math.PI / 2;
@@ -2406,7 +2442,6 @@ export function createQuantPlanetWorld(THREE, {
             villages.facades,
             ...villages.clusters.values(),
             canopy,
-            debris,
             surfaceUtilities,
             districts.group
         );
@@ -2475,7 +2510,13 @@ export function createQuantPlanetWorld(THREE, {
                 point.distanceToSquared(framingCenter)
             );
         });
-        const framingRadius = Math.sqrt(framingRadiusSquared);
+        // Keep the camera composition stable after removing the old detached
+        // debris ring. The reference framing radius is an art-direction
+        // boundary, while min/max continue to report measured structure.
+        const framingRadius = Math.max(
+            6.7,
+            Math.sqrt(framingRadiusSquared)
+        );
 
         function getFramingEnvelope() {
             return {

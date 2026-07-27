@@ -31,12 +31,9 @@ const SIZE_SCALES = Object.freeze([
 ].map(frozenVector));
 
 const FAMILIES = Object.freeze([
-    "shard",
-    "satellite",
-    "beacon",
-    "panel",
-    "ring",
-    "signal"
+    "cloud",
+    "mist",
+    "haze"
 ]);
 
 const AUTHORED_FAMILY_SEQUENCE = Object.freeze([
@@ -105,7 +102,9 @@ function placementFromSeed(seed, index) {
     return frozenPlacement({
         id: `rear-field-${String(index + 1).padStart(2, "0")}`,
         band,
-        family: FAMILIES[AUTHORED_FAMILY_SEQUENCE[index]],
+        family: FAMILIES[
+            AUTHORED_FAMILY_SEQUENCE[index] % FAMILIES.length
+        ],
         phase,
         radius,
         verticalOffset,
@@ -119,7 +118,7 @@ function placementFromSeed(seed, index) {
             radiusOffset * 1.4,
             phase * .35
         ],
-        spinPeriodMs: AUTHORED_SPIN_PERIODS_MS[index],
+        spinPeriodMs: null,
         colorIndex: index % 7
     });
 }
@@ -175,7 +174,6 @@ export function sampleRearFieldTransform(placement, pose = {}) {
             placement.rotation[0],
             placement.rotation[1],
             placement.rotation[2]
-                + elapsedMs / placement.spinPeriodMs * Math.PI * 2
         ],
         opacity: Math.min(1, Math.max(0, seamDistance * 3.2))
             * enterQuietZoneOpacity(x, y)

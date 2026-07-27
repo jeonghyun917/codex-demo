@@ -23,7 +23,7 @@ const BALANCED_LIMITS = Object.freeze({
     drawCalls: 70,
     triangles: 95000
 });
-const GLYPH_LAYOUT_RADIUS_RATIO = .65;
+const GLYPH_LAYOUT_RADIUS_RATIO = .43;
 const FULL_VIEWPORT_SAFE_FRAME = 1;
 const QUARTER_TURN_ANGLES = Object.freeze([
     0,

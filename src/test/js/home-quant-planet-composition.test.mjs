@@ -739,7 +739,7 @@ test("keeps the enlarged structural planet and foreground safe at target viewpor
     }
 });
 
-test("enlarges the actual balanced desktop body without clipping safe content",
+test("keeps the balanced desktop body at the approved reference coverage",
         async (t) => {
     const profile = selectPlanetQualityProfile({
         reduceMotion: false,
@@ -778,8 +778,14 @@ test("enlarges the actual balanced desktop body without clipping safe content",
                 axis
             ) / projectedSpan(baselineBody, axis);
             assert.ok(
-                diameterRatio >= 1.164 && diameterRatio <= 1.236,
-                `Balanced ${axis} body diameter ratio ${diameterRatio}`
+                diameterRatio >= 1 && diameterRatio <= 1.08,
+                `Balanced ${axis} body diameter ratio ${diameterRatio}; `
+                    + `cameraZ=${frame.cameraPosition.z}; `
+                    + `worldRadius=${frame.worldRadius}; `
+                    + `actualSpan=${projectedSpan(
+                        frame.bodyProjected,
+                        axis
+                    )}; baselineSpan=${projectedSpan(baselineBody, axis)}`
             );
         }
         for (const axis of ["x", "y"]) {
@@ -882,11 +888,11 @@ test("sizes the nine glyphs independently to the reference foreground ratio",
         / frame.glyphDepthRadius;
 
     assert.ok(
-        glyphToFramingRatio >= .62,
+        glyphToFramingRatio >= .41,
         `Glyph ratio ${glyphToFramingRatio} is too small`
     );
     assert.ok(
-        glyphToFramingRatio <= .68,
+        glyphToFramingRatio <= .45,
         `Glyph ratio ${glyphToFramingRatio} is too large`
     );
     assert.ok(Math.abs(frame.glyphCenterProjected.x) < 1e-9);

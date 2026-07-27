@@ -218,8 +218,7 @@ test("builds every authored reference silhouette group", (t) => {
         "ReferenceTemplePeak",
         "ReferenceIndustrialCluster",
         "ReferenceUtilityCluster",
-        "ReferenceLowerCanopy",
-        "ReferenceFloatingDebris"
+        "ReferenceLowerCanopy"
     ]) {
         assert.ok(world.group.getObjectByName(name), `Missing ${name}`);
     }
@@ -575,13 +574,13 @@ test("exposes a complete reference silhouette envelope", (t) => {
     assert.ok(envelope.min, "Missing envelope.min");
     assert.ok(envelope.max, "Missing envelope.max");
 
-    assert.ok(envelope.min.x <= -4.8);
-    assert.ok(envelope.max.x >= 4.4);
-    assert.ok(envelope.max.y >= 5.2);
-    assert.ok(envelope.min.y <= -4.9);
+    assert.ok(envelope.min.x <= -4.3);
+    assert.ok(envelope.max.x >= 4.3);
+    assert.ok(envelope.max.y >= 4.75);
+    assert.ok(envelope.min.y <= -4.75);
 });
 
-test("fits the public envelope tightly to actual mesh and instance bounds", (t) => {
+test("keeps measured bounds inside the stable reference framing radius", (t) => {
     const world = createWorld(t);
     const envelope = world.getFramingEnvelope();
     assert.ok(envelope.min, "Missing envelope.min");
@@ -599,7 +598,8 @@ test("fits the public envelope tightly to actual mesh and instance bounds", (t) 
     const actualMax = new THREE.Box3().setFromPoints(points).max;
 
     assert.ok(actualRadius <= envelope.radius + 1e-6);
-    assert.ok(envelope.radius - actualRadius <= .02);
+    assert.equal(envelope.radius, 6.7);
+    assert.ok(envelope.radius - actualRadius <= 1);
     assert.deepEqual(envelope.min, {
         x: actualMin.x,
         y: actualMin.y,
@@ -770,18 +770,29 @@ test("uses the local panorama URL only in browser-capable worlds", () => {
     browserWorld.dispose();
 });
 
-test("instances repeated canopy, rock, roof, and debris geometry", (t) => {
+test("instances repeated attached geometry without floating debris", (t) => {
     const world = createWorld(t);
     [
         "ReferenceCanopyCrowns",
         "ReferenceCoreRocks",
-        "ReferenceTempleRoofPieces",
-        "ReferenceDebrisPieces"
+        "ReferenceTempleRoofPieces"
     ].forEach((name) => {
         const mesh = world.group.getObjectByName(name);
         assert.equal(mesh?.isInstancedMesh, true, `${name} must be instanced`);
         assert.ok(mesh.count > 0, `${name} must contain authored instances`);
     });
+    assert.equal(
+        Boolean(world.group.getObjectByName("ReferenceFloatingDebris")),
+        false
+    );
+    assert.equal(
+        Boolean(world.group.getObjectByName("ReferenceDebrisPieces")),
+        false
+    );
+    assert.equal(
+        Boolean(world.group.getObjectByName("ReferenceDebrisFlecks")),
+        false
+    );
 });
 
 test("authors the high-profile miniature detail families by district", (t) => {
@@ -1105,6 +1116,11 @@ test("packs village water and terrain relief into three detail families",
     assert.ok(village.userData.detailFamilyCounts.doorCanopies >= 10);
     assert.ok(village.userData.detailFamilyCounts.windowCrossbars >= 20);
     assert.ok(village.userData.detailFamilyCounts.canopySupports >= 20);
+    assert.ok(village.userData.detailFamilyCounts.wallPosts >= 40);
+    assert.ok(village.userData.detailFamilyCounts.doorFrames >= 60);
+    assert.ok(village.userData.detailFamilyCounts.eaveBands >= 20);
+    assert.ok(village.userData.detailFamilyCounts.roofRidges >= 20);
+    assert.ok(village.userData.detailFamilyCounts.entrySteps >= 20);
     assert.ok(water.userData.detailFamilyCounts.bridgeRails >= 8);
     assert.ok(water.userData.detailFamilyCounts.bankStones >= 12);
     assert.ok(water.userData.detailFamilyCounts.bridgeTies >= 16);

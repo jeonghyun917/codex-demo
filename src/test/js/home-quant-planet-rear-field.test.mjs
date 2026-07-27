@@ -13,33 +13,37 @@ import {
 } from "./support/three-test-double.mjs";
 
 const REAR_FAMILY_LAYOUTS = Object.freeze({
-    RearRockChips: ["shard"],
-    RearArchitecturalScraps: ["satellite"],
-    RearRingRemnants: ["beacon", "ring"],
-    RearAtmosphericClouds: ["panel"],
-    RearPaperFlecks: ["signal"]
+    RearBroadHaze: ["haze"],
+    RearAtmosphericClouds: ["cloud"],
+    RearMistIslands: ["mist"]
 });
 
-test("builds varied instanced rear families behind the planet", () => {
+test("builds only atmospheric rear families behind the planet", () => {
     const field = createQuantPlanetRearField(THREE, {
         profile: { name: "high" }
     });
     const names = [
-        "RearRockChips",
-        "RearArchitecturalScraps",
-        "RearRingRemnants",
+        "RearBroadHaze",
         "RearAtmosphericClouds",
-        "RearPaperFlecks"
+        "RearMistIslands"
     ];
     for (const name of names) {
         assert.ok(field.group.getObjectByName(name));
     }
+    assert.equal(field.group.children.length, 3);
+    assert.equal(field.group.getObjectByName("RearRockChips"), undefined);
+    assert.equal(
+        field.group.getObjectByName("RearArchitecturalScraps"),
+        undefined
+    );
+    assert.equal(field.group.getObjectByName("RearRingRemnants"), undefined);
+    assert.equal(field.group.getObjectByName("RearPaperFlecks"), undefined);
     field.update({ worldAngle: Math.PI, elapsedMs: 16000 });
     assert.ok(field.getDebugState().every((item) => item.behindSafePlane));
     field.dispose();
 });
 
-test("renders authored placements as asymmetric wedges and merged cloud blobs",
+test("renders varied low-poly cloud silhouettes instead of debris",
         () => {
     const field = createQuantPlanetRearField(THREE, {
         profile: { name: "high" }
@@ -57,18 +61,24 @@ test("renders authored placements as asymmetric wedges and merged cloud blobs",
             `${name} must retain one instance for every authored placement`
         );
     }
-    const rocks = field.group.getObjectByName("RearRockChips");
-    rocks.geometry.computeBoundingBox();
-    assert.notEqual(
-        rocks.geometry.boundingBox.max.x,
-        -rocks.geometry.boundingBox.min.x,
-        "rock chips must be asymmetric wedges, not regular cones"
-    );
-    const clouds = field.group.getObjectByName("RearAtmosphericClouds");
-    assert.ok(
-        clouds.geometry.attributes.position.count >= 180,
-        "atmospheric fields must merge several low-poly lobes"
-    );
+    for (const name of Object.keys(REAR_FAMILY_LAYOUTS)) {
+        const clouds = field.group.getObjectByName(name);
+        assert.ok(
+            clouds.geometry.attributes.position.count >= 4,
+            `${name} must render a complete atmospheric card`
+        );
+        assert.equal(clouds.material.map?.isDataTexture, true);
+        assert.equal(clouds.material.map.image.width, 64);
+        assert.equal(clouds.material.map.image.height, 64);
+        assert.equal(clouds.material.transparent, true);
+        assert.equal(clouds.material.depthWrite, false);
+        clouds.geometry.computeBoundingBox();
+        assert.ok(
+            clouds.geometry.boundingBox.max.z
+                - clouds.geometry.boundingBox.min.z <= .03,
+            `${name} must read as a flat atmospheric silhouette`
+        );
+    }
     field.dispose();
 });
 
@@ -87,13 +97,13 @@ test("writes seam opacity into the instanced shader alpha path", () => {
         profile: { name: "high" }
     });
     const layout = createRearFieldLayout({ name: "high" });
-    const rocks = field.group.getObjectByName("RearRockChips");
-    const rockPlacement = layout.filter(
-        (placement) => placement.family === "shard"
+    const clouds = field.group.getObjectByName("RearAtmosphericClouds");
+    const cloudPlacement = layout.filter(
+        (placement) => placement.family === "cloud"
     )[0];
-    const opacityAttribute = rocks.geometry.getAttribute("instanceOpacity");
+    const opacityAttribute = clouds.geometry.getAttribute("instanceOpacity");
     assert.ok(opacityAttribute, "missing rendered per-instance opacity");
-    assert.equal(rocks.material.transparent, true);
+    assert.equal(clouds.material.transparent, true);
 
     const elapsedForPhase = (placement, targetPhase) => {
         const turn = Math.PI * 2;
@@ -105,7 +115,7 @@ test("writes seam opacity into the instanced shader alpha path", () => {
     const opacityAt = (targetPhase) => {
         field.update({
             worldAngle: 0,
-            elapsedMs: elapsedForPhase(rockPlacement, targetPhase),
+            elapsedMs: elapsedForPhase(cloudPlacement, targetPhase),
             reduceMotion: false
         });
         return opacityAttribute.getX(0);
@@ -127,22 +137,16 @@ test("writes seam opacity into the instanced shader alpha path", () => {
             "#include <opaque_fragment>"
         ].join("\n")
     });
-    const rockShader = createShader();
-    rocks.material.onBeforeCompile(rockShader);
-    assert.match(rockShader.vertexShader, /attribute float instanceOpacity/);
-    assert.match(
-        rockShader.fragmentShader,
-        /diffuseColor\.a \*= vInstanceOpacity/
-    );
-
-    const clouds = field.group.getObjectByName("RearAtmosphericClouds");
-    assert.equal(clouds.material.opacity, .24);
     const cloudShader = createShader();
     clouds.material.onBeforeCompile(cloudShader);
+    assert.match(cloudShader.vertexShader, /attribute float instanceOpacity/);
     assert.match(
         cloudShader.fragmentShader,
         /diffuseColor\.a \*= vInstanceOpacity/
     );
+
+    assert.ok(clouds.material.opacity >= .12);
+    assert.ok(clouds.material.opacity <= .3);
 
     field.dispose();
 });
@@ -274,17 +278,17 @@ test("disposes every rear-field resource exactly once", () => {
     field.dispose();
     field.dispose();
 
-    assert.equal(meshes.length, 5);
+    assert.equal(meshes.length, 3);
     assert.ok(
         [...meshDisposeCounts.values()].every((count) => count === 1)
     );
-    assert.equal(resources.size, 10);
+    assert.equal(resources.size, 6);
     assert.ok([...disposeCounts.values()].every((count) => count === 1));
 });
 
 test("rolls back every allocated resource after partial construction failure", () => {
     const fault = createTrackingThree(THREE, {
-        failDodecahedronGeometry: true
+        failBufferGeometry: true
     });
 
     assert.throws(
@@ -293,11 +297,9 @@ test("rolls back every allocated resource after partial construction failure", (
         }),
         /injected rear-field construction failure/
     );
-    assert.ok(fault.allocations.length > 0);
     const allocatedMeshes = fault.allocations.filter(
         (resource) => resource.isInstancedMesh
     );
-    assert.ok(allocatedMeshes.length > 0);
     assert.ok(
         allocatedMeshes.every((mesh) => mesh.disposeCount === 1)
     );

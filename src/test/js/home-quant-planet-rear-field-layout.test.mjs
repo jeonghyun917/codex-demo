@@ -13,7 +13,10 @@ test("authors diverse rear-field profiles", () => {
     assert.ok(high.length >= 36 && high.length <= 48);
     assert.ok(balanced.length >= 24 && balanced.length <= 34);
     assert.ok(low.length >= 14 && low.length <= 22);
-    assert.ok(new Set(high.map((item) => item.family)).size >= 4);
+    assert.deepEqual(
+        [...new Set(high.map((item) => item.family))].toSorted(),
+        ["cloud", "haze", "mist"]
+    );
     assert.ok(new Set(high.map((item) => item.sizeTier)).size >= 5);
     const visibleAreas = high.map((item) => item.scale[0] * item.scale[1]);
     assert.ok(Math.max(...visibleAreas) / Math.min(...visibleAreas) >= 6);
@@ -57,14 +60,12 @@ test("reduced motion returns an invariant authored pose", () => {
     assert.deepEqual(later, first);
 });
 
-test("authors deterministic nonrepeating families bands sizes and self-spins",
+test("authors deterministic nonrepeating atmospheric families and bands",
         () => {
     const first = createRearFieldLayout({ name: "high" });
     const second = createRearFieldLayout({ name: "high" });
     assert.deepEqual(second, first);
-    assert.ok(first.every((placement) =>
-        placement.spinPeriodMs >= 8000
-        && placement.spinPeriodMs <= 18000));
+    assert.ok(first.every((placement) => placement.spinPeriodMs === null));
 
     const hasShortPeriod = (values) => {
         for (let period = 1; period <= 8; period += 1) {
@@ -85,14 +86,12 @@ test("authors deterministic nonrepeating families bands sizes and self-spins",
         elapsedMs: 0,
         reduceMotion: false
     });
-    const oneSpin = sampleRearFieldTransform(placement, {
+    const later = sampleRearFieldTransform(placement, {
         worldAngle: 0,
-        elapsedMs: placement.spinPeriodMs,
+        elapsedMs: 12000,
         reduceMotion: false
     });
-    assert.ok(Math.abs(
-        oneSpin.rotation[2] - start.rotation[2] - Math.PI * 2
-    ) <= 1e-9);
+    assert.deepEqual(later.rotation, start.rotation);
 });
 
 test("keeps the reduced-motion authored field outside the ENTER quiet zone",

@@ -3,143 +3,126 @@ import {
     sampleRearFieldTransform
 } from "./home-quant-planet-rear-field-layout.js";
 
-function createIrregularWedgeGeometry(THREE) {
+function createCloudCardGeometry(THREE) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute([
-        -.45, -.28, -.16,
-        .48, -.18, -.1,
-        -.22, .36, -.06,
-        -.32, -.2, .22,
-        .37, -.14, .18,
-        -.08, .27, .29
-    ], 3));
-    geometry.setIndex([
-        0, 1, 2,
-        3, 5, 4,
-        0, 3, 4, 0, 4, 1,
-        1, 4, 5, 1, 5, 2,
-        2, 5, 3, 2, 3, 0
-    ]);
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute([
+            -1, -1, 0,
+            1, -1, 0,
+            1, 1, 0,
+            -1, 1, 0
+        ], 3)
+    );
+    geometry.setAttribute(
+        "uv",
+        new THREE.Float32BufferAttribute([
+            0, 0,
+            1, 0,
+            1, 1,
+            0, 1
+        ], 2)
+    );
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
     geometry.computeVertexNormals();
     return geometry;
 }
 
-function createMergedCloudGeometry(THREE) {
-    const positions = [];
-    const lobes = [
-        { offset: [-.31, 0, 0], scale: [.7, .42, .62] },
-        { offset: [.06, .05, .02], scale: [.82, .5, .68] },
-        { offset: [.38, -.03, -.01], scale: [.55, .34, .52] }
-    ];
-    lobes.forEach(({ offset, scale }) => {
-        const source = new THREE.DodecahedronGeometry(.58, 0);
-        const nonIndexed = source.index ? source.toNonIndexed() : source;
-        try {
-            const attribute = nonIndexed.attributes.position;
-            for (let index = 0; index < attribute.count; index += 1) {
-                positions.push(
-                    attribute.getX(index) * scale[0] + offset[0],
-                    attribute.getY(index) * scale[1] + offset[1],
-                    attribute.getZ(index) * scale[2] + offset[2]
-                );
-            }
-        } finally {
-            if (nonIndexed !== source) {
-                nonIndexed.dispose();
-            }
-            source.dispose();
+function createCloudAlphaTexture(THREE, variant = 0) {
+    const size = 64;
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+            const unitX = x / (size - 1) * 2 - 1;
+            const unitY = y / (size - 1) * 2 - 1;
+            const angle = Math.atan2(unitY, unitX);
+            const phase = variant * 1.41;
+            const boundary = .76
+                + Math.sin(angle * (3 + variant) + phase) * .12
+                + Math.cos(angle * (5 + variant) - phase) * .07;
+            const radius = Math.hypot(
+                unitX,
+                unitY / (.74 + variant * .05)
+            );
+            const alpha = Math.round(
+                Math.min(1, Math.max(0, (boundary - radius) * 16)) * 255
+            );
+            const offset = (y * size + x) * 4;
+            data[offset] = 255;
+            data[offset + 1] = 255;
+            data[offset + 2] = 255;
+            data[offset + 3] = alpha;
         }
-    });
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(positions, 3)
+    }
+    const texture = new THREE.DataTexture(
+        data,
+        size,
+        size,
+        THREE.RGBAFormat
     );
-    geometry.computeVertexNormals();
-    return geometry;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
 }
 
 const FAMILY_DEFINITIONS = Object.freeze([
     Object.freeze({
-        name: "RearRockChips",
-        layoutFamilies: Object.freeze(["shard"]),
-        color: 0xc96b56,
-        geometry: createIrregularWedgeGeometry,
-        material: (THREE, color) => new THREE.MeshToonMaterial({
+        name: "RearBroadHaze",
+        layoutFamilies: Object.freeze(["haze"]),
+        color: 0x72c9c5,
+        textureVariant: 0,
+        geometry: createCloudCardGeometry,
+        material: (THREE, color, map) => new THREE.MeshBasicMaterial({
             color,
-            vertexColors: true,
-            toneMapped: false
-        })
-    }),
-    Object.freeze({
-        name: "RearArchitecturalScraps",
-        layoutFamilies: Object.freeze(["satellite"]),
-        color: 0x47635d,
-        geometry: (THREE) => {
-            const shape = new THREE.Shape();
-            shape.moveTo(-.38, -.12);
-            shape.lineTo(.38, -.12);
-            shape.lineTo(.38, .12);
-            shape.lineTo(-.38, .12);
-            shape.closePath();
-            const geometry = new THREE.ExtrudeGeometry(shape, {
-                depth: .16,
-                bevelEnabled: true,
-                bevelSegments: 1,
-                bevelSize: .035,
-                bevelThickness: .035,
-                curveSegments: 1
-            });
-            geometry.center();
-            return geometry;
-        },
-        material: (THREE, color) => new THREE.MeshToonMaterial({
-            color,
-            vertexColors: true,
-            toneMapped: false
-        })
-    }),
-    Object.freeze({
-        name: "RearRingRemnants",
-        layoutFamilies: Object.freeze(["beacon", "ring"]),
-        color: 0xd9b45a,
-        geometry: (THREE) => {
-            const geometry = new THREE.TorusGeometry(.48, .055, 4, 12);
-            geometry.setDrawRange(0, Math.floor(geometry.index.count * .7));
-            return geometry;
-        },
-        material: (THREE, color) => new THREE.MeshToonMaterial({
-            color,
-            vertexColors: true,
-            toneMapped: false
-        })
-    }),
-    Object.freeze({
-        name: "RearAtmosphericClouds",
-        layoutFamilies: Object.freeze(["panel"]),
-        color: 0x61bdb5,
-        geometry: createMergedCloudGeometry,
-        material: (THREE, color) => new THREE.MeshToonMaterial({
-            color,
+            map,
             transparent: true,
-            opacity: .24,
+            opacity: .08,
             depthTest: true,
             depthWrite: false,
             vertexColors: true,
+            side: THREE.DoubleSide,
             toneMapped: false
         }),
-        scale: Object.freeze([1.5, .32, .72])
+        scale: Object.freeze([3.6, 2.8, .02])
     }),
     Object.freeze({
-        name: "RearPaperFlecks",
-        layoutFamilies: Object.freeze(["signal"]),
-        color: 0xe8d4a7,
-        geometry: (THREE) => new THREE.ConeGeometry(.22, .7, 3, 1),
-        material: (THREE, color) => new THREE.MeshToonMaterial({
+        name: "RearAtmosphericClouds",
+        layoutFamilies: Object.freeze(["cloud"]),
+        color: 0xb8e7e2,
+        textureVariant: 1,
+        geometry: createCloudCardGeometry,
+        material: (THREE, color, map) => new THREE.MeshBasicMaterial({
             color,
+            map,
+            transparent: true,
+            opacity: .12,
+            depthTest: true,
+            depthWrite: false,
             vertexColors: true,
+            side: THREE.DoubleSide,
             toneMapped: false
-        })
+        }),
+        scale: Object.freeze([2.2, 1.7, .02])
+    }),
+    Object.freeze({
+        name: "RearMistIslands",
+        layoutFamilies: Object.freeze(["mist"]),
+        color: 0x4eb5b2,
+        textureVariant: 2,
+        geometry: createCloudCardGeometry,
+        material: (THREE, color, map) => new THREE.MeshBasicMaterial({
+            color,
+            map,
+            transparent: true,
+            opacity: .08,
+            depthTest: true,
+            depthWrite: false,
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            toneMapped: false
+        }),
+        scale: Object.freeze([1.1, 1, .02])
     })
 ]);
 
@@ -212,6 +195,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
     const maximumPlacements = createRearFieldLayout({ name: "high" });
     const geometries = new Set();
     const materials = new Set();
+    const textures = new Set();
     const meshes = new Set();
     const families = [];
     const matrix = new THREE.Matrix4();
@@ -235,6 +219,11 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
         return material;
     }
 
+    function ownTexture(texture) {
+        textures.add(texture);
+        return texture;
+    }
+
     function ownMesh(mesh) {
         meshes.add(mesh);
         return mesh;
@@ -253,7 +242,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             }
         });
         meshes.clear();
-        for (const resources of [geometries, materials]) {
+        for (const resources of [geometries, materials, textures]) {
             resources.forEach((resource) => {
                 try {
                     resource.dispose();
@@ -276,6 +265,10 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
                     definition.layoutFamilies.includes(placement.family)
             );
             const geometry = ownGeometry(definition.geometry(THREE));
+            const texture = ownTexture(createCloudAlphaTexture(
+                THREE,
+                definition.textureVariant
+            ));
             const opacityAttribute = new THREE.InstancedBufferAttribute(
                 new Float32Array(maximumFamilyPlacements.length).fill(1),
                 1
@@ -284,7 +277,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             const mesh = ownMesh(new THREE.InstancedMesh(
                 geometry,
                 ownMaterial(enableInstanceOpacity(
-                    definition.material(THREE, definition.color)
+                    definition.material(THREE, definition.color, texture)
                 )),
                 maximumFamilyPlacements.length
             ));
@@ -322,7 +315,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
                     matrix.compose(position, quaternion, scale);
                     family.mesh.setMatrixAt(index, matrix);
                     color.setHex(definitionColor(placement, family.definition));
-                    color.multiplyScalar(.78);
+                    color.multiplyScalar(.98);
                     family.mesh.setColorAt(index, color);
                     family.opacityAttribute.setX(index, transform.opacity);
                     nextDebugState.push(copyTransform(placement, transform));

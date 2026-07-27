@@ -756,10 +756,11 @@ class HomePageTemplateContractTest {
                 "ReferenceTemplePeak",
                 "ReferenceIndustrialCluster",
                 "ReferenceUtilityCluster",
-                "ReferenceLowerCanopy",
-                "ReferenceFloatingDebris")) {
+                "ReferenceLowerCanopy")) {
             assertTrue(world.contains(group), () -> "Missing " + group);
         }
+        assertFalse(world.contains("ReferenceFloatingDebris"));
+        assertFalse(world.contains("ReferenceDebrisPieces"));
         assertFalse(world.contains("ObserveStation"));
         assertFalse(world.contains("ResolveWorks"));
         assertFalse(world.contains("DecisionGate"));
