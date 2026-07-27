@@ -231,7 +231,7 @@ class HomePageTemplateContractTest {
         assertTrue(normalized.contains("height: 100dvh"));
         assertTrue(normalized.contains("overflow: hidden"));
         assertEquals(
-                "min(82vh, 78vw)",
+                "min(100dvh, 78vw)",
                 cssDeclaration(experience, "--reference-world-size"));
         assertEquals(
                 "min(48vw, 64vh)",

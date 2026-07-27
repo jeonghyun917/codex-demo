@@ -320,3 +320,13 @@ RED/GREEN contracts now require these repeated vertex colors to use
 non-tone-mapped basic materials. Their geometry, instance matrices, glyph
 pivots, extrusion depth, and edge lines are unchanged. The final focused
 results are world 22/22 and glyph 21/21; the full Node suite is 108/108.
+
+## Final review finding: outer-viewport framing
+
+The independent reviewer found that the prior 0.7859 body ratio was measured
+inside the canvas while production CSS limited that canvas to `82vh`, yielding
+only `0.6444` of outer viewport height at 1280×720. The Java contract was first
+tightened and failed 10/11 against the old CSS. Production now uses a square
+`min(100dvh, 78vw)` scene, and the composition fixture uses the resulting
+720×720 client size. This makes the measured 75–82% contract describe the
+actual desktop viewport.

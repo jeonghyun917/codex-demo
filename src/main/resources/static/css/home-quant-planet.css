@@ -29,7 +29,7 @@ body {
 }
 
 .planet-experience {
-    --reference-world-size: min(82vh, 78vw);
+    --reference-world-size: min(100dvh, 78vw);
     --reference-title-width: min(48vw, 64vh);
     --reference-action-bottom: max(4.8vh, env(safe-area-inset-bottom));
     --intro-world-progress: 0;

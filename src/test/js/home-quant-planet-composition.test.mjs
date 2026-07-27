@@ -394,7 +394,8 @@ test("refits complete world bounds after landscape and portrait resizes", async 
 test("matches the 16:9 video framing and keeps the title centered at scale",
         async (t) => {
     const scene = await createTestScene(t, {
-        width: 1280,
+        // The desktop CSS scene is a square 100dvh canvas inside 1280x720.
+        width: 720,
         height: 720
     });
 

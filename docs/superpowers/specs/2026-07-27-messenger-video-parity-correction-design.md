@@ -97,6 +97,8 @@ surface drawing remains visible between protruding silhouettes.
 At a 16:9 desktop viewport, the solid planet body occupies 75–82% of viewport
 height, matching the Messenger video's dominant hero scale. The nine-glyph
 title grows with the same camera move and remains centered over the world.
+The desktop square scene therefore uses `min(100dvh, 78vw)`; the ratio is
+measured against the outer viewport, not merely against the internal canvas.
 Because the panorama already supplies hand-drawn ink, repeated village backing
 outlines retain their diagnostic transforms but are not rendered, while canopy
 crowns use no more than 55% of their authored scale. This prevents overlapping

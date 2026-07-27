@@ -271,6 +271,10 @@ disables the duplicate village backing draw pass, and caps canopy crown scale
 at `0.55`. Verify this in the real 1280×720 browser, not from static counts
 alone.
 
+The production desktop scene must be a square `min(100dvh, 78vw)` canvas.
+Composition fixtures use the resulting 720×720 client size for a 1280×720
+viewport so internal-canvas ratios cannot mask an undersized CSS container.
+
 If live review still shows broad black masses, preserve the geometry but render
 repeated terrain, village, structural-ink, and glyph face/side vertex colors
 with non-tone-mapped basic materials. Keep the separate glyph edge lines and
