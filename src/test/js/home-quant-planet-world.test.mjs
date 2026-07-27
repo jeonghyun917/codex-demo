@@ -519,6 +519,41 @@ test("fits the public envelope tightly to actual mesh and instance bounds", (t) 
     assert.notEqual(world.getFramingEnvelope().min.x, 999);
 });
 
+test("samples only structural framing geometry when rear scenery is present",
+        (t) => {
+    const world = createWorld(t);
+    const originalEnvelope = world.getFramingEnvelope();
+    const rearGeometry = new THREE.BoxGeometry(100, 100, 100);
+    const rearMaterial = new THREE.MeshBasicMaterial();
+    const rearScenery = new THREE.Mesh(rearGeometry, rearMaterial);
+    rearScenery.name = "ReferenceRearFieldIntrusionProbe";
+    world.group.add(rearScenery);
+    t.after(() => {
+        rearGeometry.dispose();
+        rearMaterial.dispose();
+    });
+
+    const samples = [];
+    world.forEachFramingPoint((point) => {
+        samples.push(point.clone());
+    });
+    const sampledBox = new THREE.Box3().setFromPoints(samples);
+    const envelopeAfterRearScenery = world.getFramingEnvelope();
+
+    assert.ok(samples.length > 0);
+    assert.deepEqual(envelopeAfterRearScenery, originalEnvelope);
+    assert.deepEqual(sampledBox.min, new THREE.Vector3(
+        originalEnvelope.min.x,
+        originalEnvelope.min.y,
+        originalEnvelope.min.z
+    ));
+    assert.deepEqual(sampledBox.max, new THREE.Vector3(
+        originalEnvelope.max.x,
+        originalEnvelope.max.y,
+        originalEnvelope.max.z
+    ));
+});
+
 test("builds an irregular rounded reference core", (t) => {
     const world = createWorld(t);
     const land = world.group.getObjectByName("ReferencePlanetBody");

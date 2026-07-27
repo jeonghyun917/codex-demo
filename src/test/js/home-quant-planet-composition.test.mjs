@@ -135,6 +135,31 @@ function finiteRange(values) {
     );
 }
 
+function projectedSpan(points, axis) {
+    const range = finiteRange(points.map((point) => point[axis]));
+    return range.max - range.min;
+}
+
+function measureRequestedDiameterScale(aspect) {
+    const options = {
+        center: { x: 0, y: 0, z: 0 },
+        radius: 5.4,
+        aspect,
+        verticalFovDegrees: 34
+    };
+    const baseline = fitReferenceWorld(options);
+    const enlarged = fitReferenceWorld({
+        ...options,
+        visualScale: REFERENCE_HERO.planetDiameterScale
+    });
+    return {
+        baseline,
+        enlarged,
+        ratio: enlarged.projectedDiameterRatio
+            / baseline.projectedDiameterRatio
+    };
+}
+
 async function createReferenceGlyphRig(Three) {
     const group = new Three.Group();
     group.name = "ReferenceGlyphRig";
@@ -284,6 +309,8 @@ function createSceneHarness({ rendererDisposeError = null } = {}) {
                     pivot.quaternion.toArray()),
                 glyphMatrices: glyphs.children.map((pivot) =>
                     pivot.matrixWorld.elements.slice()),
+                glyphProjected: collectMeshPoints(glyphs).map((point) =>
+                    point.clone().project(camera)),
                 siblingRigs: planet.parent === glyphs.parent
                     && planet.parent === scene,
                 projected: worldPoints.map((point) =>
@@ -412,6 +439,22 @@ test("fits the complete public radius to reference viewport coverage", () => {
     assert.equal(portrait.radius, 5.4);
 });
 
+test("requests a measured 1.2x visible planet diameter", () => {
+    assert.equal(REFERENCE_HERO.planetDiameterScale, 1.2);
+    for (const aspect of [16 / 9, 1440 / 900, 375 / 812]) {
+        const { baseline, enlarged, ratio } =
+            measureRequestedDiameterScale(aspect);
+        assert.equal(baseline.visualScale, 1);
+        assert.equal(enlarged.visualScale, 1.2);
+        assert.ok(Number.isFinite(baseline.projectedDiameterRatio));
+        assert.ok(Number.isFinite(enlarged.projectedDiameterRatio));
+        assert.ok(
+            Math.abs(ratio - 1.2) <= .03,
+            `Expected 1.2x diameter at aspect ${aspect}, got ${ratio}`
+        );
+    }
+});
+
 test("forwards the world angle without pointer or drag coupling", async (t) => {
     const scene = await createTestScene(t, {
         width: 1440,
@@ -531,6 +574,86 @@ test("keeps the planet uniformly round across wide and narrow viewports",
     }
 });
 
+test("keeps the enlarged structural planet and foreground safe at target viewports",
+        async (t) => {
+    const viewports = [
+        [1280, 720],
+        [1440, 900],
+        [1920, 1080],
+        [768, 1024],
+        [375, 812]
+    ];
+    const angles = [
+        0,
+        Math.PI / 2,
+        Math.PI,
+        Math.PI * 3 / 2
+    ];
+
+    for (const [width, height] of viewports) {
+        const scene = await createTestScene(t, {
+            width,
+            height,
+            glyphFactory: createProductionGlyphRig
+        });
+        for (const worldAngle of angles) {
+            assert.equal(scene.controller.render(pose({ worldAngle })), true);
+        }
+
+        for (const frame of scene.frames) {
+            const xRange = finiteRange(frame.projected.map(({ x }) => x));
+            const yRange = finiteRange(frame.projected.map(({ y }) => y));
+            const bodyPixelWidth = projectedSpan(
+                frame.bodyProjected,
+                "x"
+            ) * width / 2;
+            const bodyPixelHeight = projectedSpan(
+                frame.bodyProjected,
+                "y"
+            ) * height / 2;
+            const roundness = bodyPixelWidth / bodyPixelHeight;
+
+            assert.ok(
+                roundness >= .9 && roundness <= 1.1,
+                `Planet roundness ${roundness} failed at ${width}x${height}`
+            );
+            assert.ok(
+                xRange.min >= -1 - 1e-6 && xRange.max <= 1 + 1e-6,
+                `Horizontal overflow at ${width}x${height}: `
+                    + `${xRange.min}..${xRange.max}`
+            );
+            assert.ok(
+                yRange.min >= -1 - 1e-6 && yRange.max <= 1 + 1e-6,
+                `Structural clipping at ${width}x${height}: `
+                    + `${yRange.min}..${yRange.max}`
+            );
+            assert.ok(frame.near < Math.min(...frame.depths));
+            assert.ok(frame.far > Math.max(...frame.depths));
+            assert.ok(Math.abs(frame.glyphCenterProjected.x) <= .01);
+            assert.ok(
+                Math.abs(frame.glyphCenterProjected.y) <= .08,
+                `Nine-glyph center left its safe area at ${width}x${height}`
+            );
+            const glyphX = finiteRange(
+                frame.glyphProjected.map(({ x }) => x)
+            );
+            const glyphY = finiteRange(
+                frame.glyphProjected.map(({ y }) => y)
+            );
+            assert.ok(
+                glyphX.min >= -.94 && glyphX.max <= .94,
+                `Nine glyphs crossed the horizontal safe area at `
+                    + `${width}x${height}`
+            );
+            assert.ok(
+                glyphY.min >= -.82 && glyphY.max <= .82,
+                `Nine glyphs entered the ENTER safe area at `
+                    + `${width}x${height}`
+            );
+        }
+    }
+});
+
 test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         async (t) => {
     const scene = await createTestScene(t, {
@@ -551,19 +674,19 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
         const xs = frame.projected.map(({ x }) => x);
         const ys = frame.projected.map(({ y }) => y);
         assert.ok(
-            Math.min(...xs) >= -.98,
+            Math.min(...xs) >= -1 - 1e-6,
             `World clipped left at ${Math.min(...xs)}`
         );
         assert.ok(
-            Math.max(...xs) <= .98,
+            Math.max(...xs) <= 1 + 1e-6,
             `World clipped right at ${Math.max(...xs)}`
         );
         assert.ok(
-            Math.min(...ys) >= -.98,
+            Math.min(...ys) >= -1 - 1e-6,
             `World clipped below at ${Math.min(...ys)}`
         );
         assert.ok(
-            Math.max(...ys) <= .98,
+            Math.max(...ys) <= 1 + 1e-6,
             `World clipped above at ${Math.max(...ys)}`
         );
         assert.ok(frame.near < Math.min(...frame.depths));
@@ -578,12 +701,12 @@ test("keeps every quarter-turn inside the full 16:9 viewport safe frame",
     const worldViewportHeight = (yRange.max - yRange.min) / 2;
     const worldViewportWidth = (xRange.max - xRange.min) / 2;
     assert.ok(
-        worldViewportHeight >= .81 && worldViewportHeight <= .87,
-        `Expected world height 0.81-0.87, got ${worldViewportHeight}`
+        worldViewportHeight >= .95 && worldViewportHeight <= 1,
+        `Expected world height 0.95-1.00, got ${worldViewportHeight}`
     );
     assert.ok(
-        worldViewportWidth >= .35 && worldViewportWidth <= .4,
-        `Expected uniform world width 0.35-0.40, got ${worldViewportWidth}`
+        worldViewportWidth >= .41 && worldViewportWidth <= .47,
+        `Expected uniform world width 0.41-0.47, got ${worldViewportWidth}`
     );
 });
 
@@ -608,8 +731,8 @@ test("keeps the complete portrait world near the reference mobile width",
     const xRange = finiteRange(allXs);
     const worldViewportWidth = (xRange.max - xRange.min) / 2;
     assert.ok(
-        worldViewportWidth >= .64 && worldViewportWidth <= .72,
-        `Expected world width 0.64-0.72, got ${worldViewportWidth}`
+        worldViewportWidth >= .79 && worldViewportWidth <= .85,
+        `Expected world width 0.79-0.85, got ${worldViewportWidth}`
     );
     assert.ok(xRange.min >= -.9);
     assert.ok(xRange.max <= .9);

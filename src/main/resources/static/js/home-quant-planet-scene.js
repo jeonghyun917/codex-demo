@@ -24,6 +24,13 @@ const BALANCED_LIMITS = Object.freeze({
     triangles: 95000
 });
 const GLYPH_LAYOUT_RADIUS_RATIO = .65;
+const FULL_VIEWPORT_SAFE_FRAME = 1;
+const QUARTER_TURN_ANGLES = Object.freeze([
+    0,
+    Math.PI / 2,
+    Math.PI,
+    Math.PI * 3 / 2
+]);
 
 const EMPTY_POSE = Object.freeze({
     worldAngle: 0,
@@ -144,12 +151,59 @@ export async function createQuantPlanetScene({
         };
         const glyphLayoutRadius = envelope.radius
             * GLYPH_LAYOUT_RADIUS_RATIO;
+        function safeVisualScale(aspect) {
+            const requested = REFERENCE_HERO.planetDiameterScale;
+            const baseline = fitReferenceWorld({
+                center: envelope.center,
+                radius: envelope.radius,
+                aspect,
+                verticalFovDegrees: 34
+            });
+            const verticalHalfFov = 34 * Math.PI / 360;
+            const horizontalHalfFov = Math.atan(
+                Math.tan(verticalHalfFov) * aspect
+            );
+            const horizontalProjection = FULL_VIEWPORT_SAFE_FRAME
+                * Math.tan(horizontalHalfFov);
+            const verticalProjection = FULL_VIEWPORT_SAFE_FRAME
+                * Math.tan(verticalHalfFov);
+            let maximum = requested;
+            world.forEachFramingPoint((point) => {
+                const localX = point.x - envelope.center.x;
+                const localY = point.y - envelope.center.y;
+                const localZ = point.z - envelope.center.z;
+                QUARTER_TURN_ANGLES.forEach((angle) => {
+                    const cosine = Math.cos(angle);
+                    const sine = Math.sin(angle);
+                    const x = localX * cosine + localZ * sine;
+                    const z = -localX * sine + localZ * cosine;
+                    const horizontalDepth = z
+                        + Math.abs(x) / horizontalProjection;
+                    const verticalDepth = z
+                        + Math.abs(localY) / verticalProjection;
+                    if (horizontalDepth > 0) {
+                        maximum = Math.min(
+                            maximum,
+                            baseline.distance / horizontalDepth
+                        );
+                    }
+                    if (verticalDepth > 0) {
+                        maximum = Math.min(
+                            maximum,
+                            baseline.distance / verticalDepth
+                        );
+                    }
+                });
+            });
+            return Math.max(1, maximum);
+        }
         function refitCamera(aspect) {
             const next = fitReferenceWorld({
                 center: envelope.center,
                 radius: envelope.radius,
                 aspect,
-                verticalFovDegrees: 34
+                verticalFovDegrees: 34,
+                visualScale: safeVisualScale(aspect)
             });
             const clipPadding = envelope.radius * 1.4;
             camera.near = Math.max(.1, next.distance - clipPadding);

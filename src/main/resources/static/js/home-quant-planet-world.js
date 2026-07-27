@@ -2213,7 +2213,7 @@ export function createQuantPlanetWorld(THREE, {
         const framingWorldMatrix = new THREE.Matrix4();
         function forEachFramingPoint(visitor) {
             planet.updateMatrixWorld(true);
-            planet.traverse((object) => {
+            content.traverse((object) => {
                 if (!object.isMesh || object.visible === false) {
                     return;
                 }
@@ -2326,6 +2326,7 @@ export function createQuantPlanetWorld(THREE, {
             group: planet,
             update,
             getFramingEnvelope,
+            forEachFramingPoint,
             getRenderStats,
             getSurfaceDensity: () => surfaceDensity,
             dispose
