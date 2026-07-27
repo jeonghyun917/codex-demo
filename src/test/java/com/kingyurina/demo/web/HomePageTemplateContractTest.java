@@ -597,7 +597,10 @@ class HomePageTemplateContractTest {
 
         assertEquals(4, versions.size());
         assertEquals(1, new HashSet<>(versions).size());
-        assertTrue(versions.getFirst().length() >= 10);
+        assertEquals("2026072801", versions.getFirst());
+        assertTrue(resource("static/js/home-quant-planet.js").contains(
+                "./home-quant-planet-scene.js?v="
+                        + versions.getFirst()));
     }
 
     @Test
@@ -733,6 +736,9 @@ class HomePageTemplateContractTest {
         assertTrue(template.contains("/js/home-quant-planet.js"));
         assertTrue(entry.contains("./home-quant-planet-runtime.js"));
         assertTrue(entry.contains("./home-quant-planet-scene.js"));
+        assertTrue(entry.contains("viewportWidth: window.innerWidth"));
+        assertTrue(entry.contains("viewportHeight: window.innerHeight"));
+        assertTrue(entry.contains("rearProfile: capabilities.rearProfile"));
         assertTrue(runtime.contains("createHeroIntroState"));
         assertTrue(runtime.contains("createHeroPose"));
         assertTrue(runtime.contains("createHeroInputController"));

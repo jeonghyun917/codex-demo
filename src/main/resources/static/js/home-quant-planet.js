@@ -7,7 +7,7 @@ import {
 } from "./home-quant-planet-runtime.js";
 import {
     createQuantPlanetScene
-} from "./home-quant-planet-scene.js?v=2026072715";
+} from "./home-quant-planet-scene.js?v=2026072801";
 
 const LOOPBACK_HOSTS = new Set([
     "localhost",
@@ -44,7 +44,9 @@ const capabilities = resolveQuantPlanetCapabilities({
     motionAvailable: Boolean(window.Motion?.animate),
     mobile: window.matchMedia("(max-width: 767px)").matches,
     cores: navigator.hardwareConcurrency || 4,
-    dpr: window.devicePixelRatio || 1
+    dpr: window.devicePixelRatio || 1,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight
 });
 
 function detectWebglSupport() {
@@ -91,6 +93,7 @@ if (selectorsAreValid) {
         title,
         action,
         profile: capabilities.profile,
+        rearProfile: capabilities.rearProfile,
         motionDisabled: capabilities.motionDisabled,
         isLoopback: LOOPBACK_HOSTS.has(window.location.hostname),
         createScene: createQuantPlanetScene,

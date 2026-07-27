@@ -7,6 +7,9 @@ import {
 import {
     REFERENCE_HERO
 } from "../../main/resources/static/js/home-quant-planet-composition.js";
+import {
+    createRearFieldLayout
+} from "../../main/resources/static/js/home-quant-planet-rear-field-layout.js";
 
 const HIGH_PROFILE = {
     name: "high",
@@ -266,10 +269,15 @@ function createMotionHarness() {
 
 function createRuntimeHarness({
     profile = HIGH_PROFILE,
+    rearProfile = profile.name === "high"
+        ? { name: "high" }
+        : { name: "balanced" },
     motionDisabled = profile.name === "static",
     rootClasses = [],
     timers = createTimerHarness(),
-    motion = createMotionHarness()
+    motion = createMotionHarness(),
+    viewportWidth = 1440,
+    viewportHeight = 900
 } = {}) {
     const root = createEventTarget();
     root.classList.add(...rootClasses);
@@ -288,8 +296,8 @@ function createRuntimeHarness({
     const documentTarget = createEventTarget({ hidden: false });
     const windowTarget = createEventTarget({
         clearTimeout: timers.clearTimeout,
-        innerHeight: 900,
-        innerWidth: 1440,
+        innerHeight: viewportHeight,
+        innerWidth: viewportWidth,
         Motion: motion.Motion,
         setTimeout: timers.setTimeout
     });
@@ -298,6 +306,7 @@ function createRuntimeHarness({
     const sceneDeferred = createDeferred();
     let now = 0;
     let sceneConstructionCalls = 0;
+    const sceneConstructionOptions = [];
     const runtime = createQuantPlanetRuntime({
         root,
         experience,
@@ -308,10 +317,18 @@ function createRuntimeHarness({
         title,
         action,
         profile,
+        rearProfile,
         motionDisabled,
         isLoopback: true,
-        createScene() {
+        createScene(options) {
             sceneConstructionCalls += 1;
+            sceneConstructionOptions.push({
+                canvas: options.canvas,
+                profile: structuredClone(options.profile),
+                rearProfile: options.rearProfile
+                    ? structuredClone(options.rearProfile)
+                    : undefined
+            });
             return sceneDeferred.promise;
         },
         createInput: input.createInput.bind(input),
@@ -334,6 +351,7 @@ function createRuntimeHarness({
         root,
         runtime,
         sceneConstructionCalls: () => sceneConstructionCalls,
+        sceneConstructionOptions,
         sceneDeferred,
         sceneElement,
         setNow(value) {
@@ -762,6 +780,74 @@ test("caps capable high-quality profiles at DPR 1.5", () => {
     assert.equal(capabilities.profile.name, "high");
     assert.equal(capabilities.profile.pixelRatio, 1.5);
     assert.equal(capabilities.staticMode, false);
+});
+
+test("selects and forwards rear density from viewport independently of quality",
+        () => {
+    const fixtures = [
+        {
+            width: 375,
+            height: 812,
+            mobile: true,
+            expectedQuality: "balanced",
+            expectedRear: "low",
+            expectedCount: 18
+        },
+        {
+            width: 768,
+            height: 1024,
+            mobile: false,
+            expectedQuality: "high",
+            expectedRear: "balanced",
+            expectedCount: 30
+        },
+        {
+            width: 1920,
+            height: 1080,
+            mobile: false,
+            expectedQuality: "high",
+            expectedRear: "high",
+            expectedCount: 42
+        }
+    ];
+
+    fixtures.forEach((fixture) => {
+        const capabilities = resolveQuantPlanetCapabilities({
+            detectedWebgl: true,
+            motionAvailable: true,
+            mobile: fixture.mobile,
+            cores: 16,
+            dpr: 2,
+            viewportWidth: fixture.width,
+            viewportHeight: fixture.height
+        });
+        assert.equal(capabilities.profile.name, fixture.expectedQuality);
+        assert.equal(capabilities.rearProfile.name, fixture.expectedRear);
+        assert.equal(
+            createRearFieldLayout(capabilities.rearProfile).length,
+            fixture.expectedCount
+        );
+
+        const harness = createRuntimeHarness({
+            profile: capabilities.profile,
+            rearProfile: capabilities.rearProfile,
+            viewportWidth: fixture.width,
+            viewportHeight: fixture.height
+        });
+        assert.equal(
+            harness.sceneConstructionOptions[0].profile.name,
+            fixture.expectedQuality
+        );
+        assert.equal(
+            harness.sceneConstructionOptions[0].rearProfile.name,
+            fixture.expectedRear
+        );
+        assert.equal(
+            harness.sceneConstructionOptions[0].canvas,
+            harness.canvas
+        );
+        harness.runtime.destroy();
+    });
 });
 
 test("shows the complete fallback when WebGL construction fails", async () => {

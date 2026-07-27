@@ -11,6 +11,41 @@ import {
     REFERENCE_HERO
 } from "./home-quant-planet-composition.js";
 
+const REAR_DENSITY_PROFILES = Object.freeze({
+    high: Object.freeze({ name: "high" }),
+    balanced: Object.freeze({ name: "balanced" }),
+    low: Object.freeze({ name: "low" })
+});
+
+export function selectRearFieldProfile({
+    qualityProfile = {},
+    viewportWidth,
+    viewportHeight
+} = {}) {
+    const width = Number.isFinite(viewportWidth)
+        ? Math.max(1, viewportWidth)
+        : Number.POSITIVE_INFINITY;
+    const height = Number.isFinite(viewportHeight)
+        ? Math.max(1, viewportHeight)
+        : 0;
+    const viewportProfile = width <= 480
+        ? REAR_DENSITY_PROFILES.low
+        : height > width
+            ? REAR_DENSITY_PROFILES.balanced
+            : REAR_DENSITY_PROFILES.high;
+
+    if (qualityProfile.name === "static") {
+        return REAR_DENSITY_PROFILES.low;
+    }
+    if (
+        qualityProfile.name !== "high"
+        && viewportProfile.name === "high"
+    ) {
+        return REAR_DENSITY_PROFILES.balanced;
+    }
+    return viewportProfile;
+}
+
 export function resolveQuantPlanetCapabilities({
     forceReduced = false,
     forceStatic = false,
@@ -19,7 +54,9 @@ export function resolveQuantPlanetCapabilities({
     motionAvailable = false,
     mobile = false,
     cores = 4,
-    dpr = 1
+    dpr = 1,
+    viewportWidth,
+    viewportHeight
 } = {}) {
     const environment = {
         reduceMotion: forceReduced || detectedReducedMotion,
@@ -29,9 +66,15 @@ export function resolveQuantPlanetCapabilities({
         webgl: detectedWebgl && !forceStatic && motionAvailable
     };
     const profile = selectPlanetQualityProfile(environment);
+    const rearProfile = selectRearFieldProfile({
+        qualityProfile: profile,
+        viewportWidth,
+        viewportHeight
+    });
     return {
         environment,
         profile,
+        rearProfile,
         staticMode: profile.name === "static",
         motionDisabled: environment.reduceMotion
             || profile.name === "static"
@@ -48,6 +91,7 @@ export function createQuantPlanetRuntime({
     title,
     action,
     profile,
+    rearProfile,
     motionDisabled = profile?.name === "static",
     isLoopback = false,
     createScene,
@@ -58,6 +102,11 @@ export function createQuantPlanetRuntime({
     documentTarget,
     windowTarget
 } = {}) {
+    const resolvedRearProfile = rearProfile || selectRearFieldProfile({
+        qualityProfile: profile,
+        viewportWidth: windowTarget?.innerWidth,
+        viewportHeight: windowTarget?.innerHeight
+    });
     const staticMode = motionDisabled
         || profile?.name === "static"
         || !profile?.webgl;
@@ -467,7 +516,8 @@ export function createQuantPlanetRuntime({
         try {
             scenePromise = Promise.resolve(createScene({
                 canvas,
-                profile
+                profile,
+                rearProfile: resolvedRearProfile
             }));
         } catch (error) {
             scenePromise = Promise.reject(error);

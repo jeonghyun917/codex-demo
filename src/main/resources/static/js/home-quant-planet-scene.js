@@ -62,6 +62,7 @@ function createStaticSceneController() {
 export async function createQuantPlanetScene({
     canvas,
     profile,
+    rearProfile,
     three,
     glyphFactory,
     rearFieldFactory
@@ -127,7 +128,9 @@ export async function createQuantPlanetScene({
         world = createQuantPlanetWorld(THREE, { profile });
         const makeRearField = rearFieldFactory
             || createQuantPlanetRearField;
-        rearField = makeRearField(THREE, { profile });
+        rearField = makeRearField(THREE, {
+            profile: rearProfile || { name: profile.name }
+        });
         const makeGlyphs = glyphFactory || createQuantGlyphRig;
         glyphs = await makeGlyphs(THREE, {
             profile,

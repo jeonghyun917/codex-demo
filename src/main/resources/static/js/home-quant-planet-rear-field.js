@@ -164,6 +164,47 @@ function copyTransform(placement, transform) {
     });
 }
 
+function enableInstanceOpacity(material) {
+    material.transparent = true;
+    material.depthWrite = false;
+    material.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader
+            .replace(
+                "#include <common>",
+                [
+                    "#include <common>",
+                    "attribute float instanceOpacity;",
+                    "varying float vInstanceOpacity;"
+                ].join("\n")
+            )
+            .replace(
+                "#include <begin_vertex>",
+                [
+                    "#include <begin_vertex>",
+                    "vInstanceOpacity = instanceOpacity;"
+                ].join("\n")
+            );
+        shader.fragmentShader = shader.fragmentShader
+            .replace(
+                "#include <common>",
+                [
+                    "#include <common>",
+                    "varying float vInstanceOpacity;"
+                ].join("\n")
+            )
+            .replace(
+                "#include <opaque_fragment>",
+                [
+                    "diffuseColor.a *= vInstanceOpacity;",
+                    "#include <opaque_fragment>"
+                ].join("\n")
+            );
+    };
+    material.customProgramCacheKey = () =>
+        "quant-planet-rear-instance-opacity-v1";
+    return material;
+}
+
 export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
     const group = new THREE.Group();
     group.name = "QuantPlanetRearField";
@@ -214,9 +255,17 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             const authoredPlacements = placements.filter((placement) =>
                 definition.layoutFamilies.includes(placement.family)
             );
+            const geometry = ownGeometry(definition.geometry(THREE));
+            const opacityAttribute = new THREE.InstancedBufferAttribute(
+                new Float32Array(authoredPlacements.length).fill(1),
+                1
+            );
+            geometry.setAttribute("instanceOpacity", opacityAttribute);
             const mesh = new THREE.InstancedMesh(
-                ownGeometry(definition.geometry(THREE)),
-                ownMaterial(definition.material(THREE, definition.color)),
+                geometry,
+                ownMaterial(enableInstanceOpacity(
+                    definition.material(THREE, definition.color)
+                )),
                 authoredPlacements.length
             );
             mesh.name = definition.name;
@@ -227,7 +276,8 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
             families.push({
                 placements: authoredPlacements,
                 mesh,
-                definition
+                definition,
+                opacityAttribute
             });
         }
 
@@ -250,11 +300,13 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
                     matrix.compose(position, quaternion, scale);
                     family.mesh.setMatrixAt(index, matrix);
                     color.setHex(definitionColor(placement, family.definition));
-                    color.multiplyScalar(.45 + transform.opacity * .55);
+                    color.multiplyScalar(.78);
                     family.mesh.setColorAt(index, color);
+                    family.opacityAttribute.setX(index, transform.opacity);
                     nextDebugState.push(copyTransform(placement, transform));
                 });
                 family.mesh.instanceMatrix.needsUpdate = true;
+                family.opacityAttribute.needsUpdate = true;
                 if (family.mesh.instanceColor) {
                     family.mesh.instanceColor.needsUpdate = true;
                 }

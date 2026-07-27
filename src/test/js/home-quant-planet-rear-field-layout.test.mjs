@@ -56,3 +56,60 @@ test("reduced motion returns an invariant authored pose", () => {
     });
     assert.deepEqual(later, first);
 });
+
+test("authors deterministic nonrepeating families bands sizes and self-spins",
+        () => {
+    const first = createRearFieldLayout({ name: "high" });
+    const second = createRearFieldLayout({ name: "high" });
+    assert.deepEqual(second, first);
+    assert.ok(first.every((placement) =>
+        placement.spinPeriodMs >= 8000
+        && placement.spinPeriodMs <= 18000));
+
+    const hasShortPeriod = (values) => {
+        for (let period = 1; period <= 8; period += 1) {
+            if (values.every((value, index) =>
+                index < period || value === values[index % period])) {
+                return true;
+            }
+        }
+        return false;
+    };
+    assert.equal(hasShortPeriod(first.map((item) => item.family)), false);
+    assert.equal(hasShortPeriod(first.map((item) => item.band)), false);
+    assert.equal(hasShortPeriod(first.map((item) => item.sizeTier)), false);
+
+    const placement = first[0];
+    const start = sampleRearFieldTransform(placement, {
+        worldAngle: 0,
+        elapsedMs: 0,
+        reduceMotion: false
+    });
+    const oneSpin = sampleRearFieldTransform(placement, {
+        worldAngle: 0,
+        elapsedMs: placement.spinPeriodMs,
+        reduceMotion: false
+    });
+    assert.ok(Math.abs(
+        oneSpin.rotation[2] - start.rotation[2] - Math.PI * 2
+    ) <= 1e-9);
+});
+
+test("keeps the reduced-motion authored field outside the ENTER quiet zone",
+        () => {
+    const placements = createRearFieldLayout({ name: "high" });
+    const quietZoneOccupants = placements.filter((placement) => {
+        const transform = sampleRearFieldTransform(placement, {
+            worldAngle: Math.PI,
+            elapsedMs: 32000,
+            reduceMotion: true
+        });
+        return Math.abs(transform.position[0]) < 1.6
+            && transform.position[1] < -1.2;
+    });
+
+    assert.deepEqual(
+        quietZoneOccupants.map((placement) => placement.id),
+        []
+    );
+});

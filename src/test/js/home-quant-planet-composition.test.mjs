@@ -394,6 +394,7 @@ async function createTestScene(t, {
     width,
     height,
     profile = sceneProfile(),
+    rearProfile,
     glyphFactory = createReferenceGlyphRig,
     rearFieldFactory
 }) {
@@ -405,6 +406,7 @@ async function createTestScene(t, {
     const controller = await createQuantPlanetScene({
         canvas,
         profile,
+        rearProfile,
         three: harness.three,
         glyphFactory,
         rearFieldFactory
@@ -542,6 +544,23 @@ test("owns the rear field behind the planet and forwards autonomous pose only",
         ),
         ["ReferenceRearField", "QuantPlanet", "ReferenceGlyphRig"]
     );
+});
+
+test("constructs rear density from the responsive profile, not world quality",
+        async (t) => {
+    let receivedProfile = null;
+    await createTestScene(t, {
+        width: 375,
+        height: 812,
+        profile: sceneProfile({ name: "high" }),
+        rearProfile: { name: "low" },
+        rearFieldFactory(Three, options) {
+            receivedProfile = options.profile;
+            return createRearFieldProbe(Three);
+        }
+    });
+
+    assert.deepEqual(receivedProfile, { name: "low" });
 });
 
 test("refits complete world bounds after landscape and portrait resizes", async (t) => {

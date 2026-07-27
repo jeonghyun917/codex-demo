@@ -5,7 +5,8 @@ import {
     createQuantPlanetRearField
 } from "../../main/resources/static/js/home-quant-planet-rear-field.js";
 import {
-    createRearFieldLayout
+    createRearFieldLayout,
+    REAR_FIELD_PERIODS_MS
 } from "../../main/resources/static/js/home-quant-planet-rear-field-layout.js";
 import {
     createTrackingThree
@@ -78,6 +79,71 @@ test("reports bounded rear-field render work", () => {
     const stats = field.getRenderStats();
     assert.ok(stats.drawCalls <= 5);
     assert.ok(stats.triangles <= 5000);
+    field.dispose();
+});
+
+test("writes seam opacity into the instanced shader alpha path", () => {
+    const field = createQuantPlanetRearField(THREE, {
+        profile: { name: "high" }
+    });
+    const layout = createRearFieldLayout({ name: "high" });
+    const rocks = field.group.getObjectByName("RearRockChips");
+    const rockPlacement = layout.filter(
+        (placement) => placement.family === "shard"
+    )[0];
+    const opacityAttribute = rocks.geometry.getAttribute("instanceOpacity");
+    assert.ok(opacityAttribute, "missing rendered per-instance opacity");
+    assert.equal(rocks.material.transparent, true);
+
+    const elapsedForPhase = (placement, targetPhase) => {
+        const turn = Math.PI * 2;
+        const phaseDelta = (
+            (targetPhase - placement.phase) % turn + turn
+        ) % turn;
+        return phaseDelta / turn * REAR_FIELD_PERIODS_MS[placement.band];
+    };
+    const opacityAt = (targetPhase) => {
+        field.update({
+            worldAngle: 0,
+            elapsedMs: elapsedForPhase(rockPlacement, targetPhase),
+            reduceMotion: false
+        });
+        return opacityAttribute.getX(0);
+    };
+
+    assert.ok(opacityAt(Math.PI / 2) <= 1e-6);
+    const nearSeam = opacityAt(Math.PI / 2 - .08);
+    assert.ok(nearSeam > 0 && nearSeam < .5);
+    assert.ok(opacityAt(0) >= .999);
+    assert.ok(opacityAt(Math.PI * 3 / 2) <= 1e-6);
+
+    const createShader = () => ({
+        vertexShader: [
+            "#include <common>",
+            "#include <begin_vertex>"
+        ].join("\n"),
+        fragmentShader: [
+            "#include <common>",
+            "#include <opaque_fragment>"
+        ].join("\n")
+    });
+    const rockShader = createShader();
+    rocks.material.onBeforeCompile(rockShader);
+    assert.match(rockShader.vertexShader, /attribute float instanceOpacity/);
+    assert.match(
+        rockShader.fragmentShader,
+        /diffuseColor\.a \*= vInstanceOpacity/
+    );
+
+    const clouds = field.group.getObjectByName("RearAtmosphericClouds");
+    assert.equal(clouds.material.opacity, .24);
+    const cloudShader = createShader();
+    clouds.material.onBeforeCompile(cloudShader);
+    assert.match(
+        cloudShader.fragmentShader,
+        /diffuseColor\.a \*= vInstanceOpacity/
+    );
+
     field.dispose();
 });
 

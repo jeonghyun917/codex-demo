@@ -39,6 +39,36 @@ const FAMILIES = Object.freeze([
     "signal"
 ]);
 
+const AUTHORED_FAMILY_SEQUENCE = Object.freeze([
+    5, 0, 4, 3, 4, 2, 3, 3, 3, 1, 0, 0, 5, 5,
+    1, 3, 1, 1, 2, 0, 3, 0, 5, 1, 1, 0, 4, 1,
+    3, 5, 4, 0, 1, 5, 0, 2, 2, 5, 5, 1, 4, 1
+]);
+
+const AUTHORED_BAND_SEQUENCE = Object.freeze([
+    "far", "mid", "mid", "mid", "mid", "mid", "mid",
+    "mid", "far", "far", "mid", "mid", "far", "mid",
+    "mid", "far", "mid", "mid", "mid", "far", "mid",
+    "mid", "mid", "mid", "mid", "far", "mid", "mid",
+    "mid", "mid", "far", "far", "mid", "far", "mid",
+    "mid", "far", "mid", "mid", "mid", "far", "mid"
+]);
+
+const AUTHORED_SIZE_SEQUENCE = Object.freeze([
+    0, 2, 4, 5, 1, 3, 4, 1, 1, 0, 0, 5, 1, 5,
+    1, 4, 4, 3, 2, 4, 3, 0, 0, 0, 1, 3, 4, 1,
+    1, 5, 2, 5, 5, 4, 2, 3, 2, 0, 1, 4, 1, 4
+]);
+
+const AUTHORED_SPIN_PERIODS_MS = Object.freeze([
+    8966, 14978, 15588, 14810, 15905, 9967, 15366,
+    9588, 14031, 12061, 9223, 16241, 13662, 15881,
+    11341, 15969, 8146, 13932, 15372, 9074, 14415,
+    16527, 12787, 14090, 12963, 17094, 16768, 11878,
+    12160, 13843, 16699, 13517, 16986, 14389, 8450,
+    9692, 16461, 17381, 9746, 10365, 15828, 16221
+]);
+
 const REAR_FIELD_SEEDS = Object.freeze([
     [0.12, .03, -.82], [.41, -.08, .47], [.76, .11, -.31],
     [1.04, -.13, .68], [1.39, .07, -.54], [1.78, -.04, .16],
@@ -58,17 +88,28 @@ const REAR_FIELD_SEEDS = Object.freeze([
 
 function placementFromSeed(seed, index) {
     const [phase, radiusOffset, verticalOffsetSeed] = seed;
-    const band = index % 3 === 0 ? "far" : "mid";
+    const band = AUTHORED_BAND_SEQUENCE[index];
     const thickness = band === "far" ? 2 : 1.4;
-    const sizeTier = index % SIZE_SCALES.length;
+    const radius = (band === "far" ? 6.7 : 5.05) + radiusOffset;
+    const verticalRatio = band === "far" ? .46 : .38;
+    const rawVerticalOffset = verticalOffsetSeed
+        * (band === "far" ? 2.5 : 2);
+    const authoredX = Math.sin(phase) * radius;
+    const authoredY = rawVerticalOffset
+        + Math.cos(phase) * radius * verticalRatio;
+    const verticalOffset = Math.abs(authoredX) < 1.6
+        && authoredY < -1.2
+        ? rawVerticalOffset + (-.95 - authoredY)
+        : rawVerticalOffset;
+    const sizeTier = AUTHORED_SIZE_SEQUENCE[index];
     return frozenPlacement({
         id: `rear-field-${String(index + 1).padStart(2, "0")}`,
         band,
-        family: FAMILIES[index % FAMILIES.length],
+        family: FAMILIES[AUTHORED_FAMILY_SEQUENCE[index]],
         phase,
-        radius: (band === "far" ? 6.7 : 5.05) + radiusOffset,
-        verticalOffset: verticalOffsetSeed * (band === "far" ? 2.5 : 2),
-        verticalRatio: band === "far" ? .46 : .38,
+        radius,
+        verticalOffset,
+        verticalRatio,
         rearDepth: band === "far" ? -7.1 : -5.15,
         depthBreath: thickness * .07,
         sizeTier,
@@ -78,7 +119,7 @@ function placementFromSeed(seed, index) {
             radiusOffset * 1.4,
             phase * .35
         ],
-        spinPeriodMs: 28000 + index % 5 * 6000,
+        spinPeriodMs: AUTHORED_SPIN_PERIODS_MS[index],
         colorIndex: index % 7
     });
 }
@@ -98,11 +139,11 @@ export function createRearFieldLayout(profile = {}) {
 
 export function sampleRearFieldTransform(placement, pose = {}) {
     const reduceMotion = Boolean(pose.reduceMotion);
-    const worldAngle = reduceMotion
+    const elapsedMs = reduceMotion
         ? 0
-        : (Number.isFinite(pose.worldAngle) ? pose.worldAngle : 0);
+        : Math.max(0, Number.isFinite(pose.elapsedMs) ? pose.elapsedMs : 0);
     const period = REAR_FIELD_PERIODS_MS[placement.band];
-    const phase = placement.phase + worldAngle * 36000 / period;
+    const phase = placement.phase + elapsedMs / period * Math.PI * 2;
     const seamDistance = Math.abs(Math.cos(phase));
     const depthBreath = reduceMotion
         ? 0
@@ -118,7 +159,7 @@ export function sampleRearFieldTransform(placement, pose = {}) {
             placement.rotation[0],
             placement.rotation[1],
             placement.rotation[2]
-                + worldAngle * 36000 / placement.spinPeriodMs
+                + elapsedMs / placement.spinPeriodMs * Math.PI * 2
         ],
         opacity: Math.min(1, Math.max(0, seamDistance * 3.2))
     };
