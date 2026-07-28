@@ -15,11 +15,25 @@ test("authors diverse rear-field profiles", () => {
     assert.ok(low.length >= 14 && low.length <= 22);
     assert.deepEqual(
         [...new Set(high.map((item) => item.family))].toSorted(),
-        ["cloud", "haze", "mist"]
+        ["cloud", "dust", "halo", "haze", "mist"]
+    );
+    assert.deepEqual(
+        [...new Set(high.map((item) => item.band))].toSorted(),
+        ["far", "mid", "near"]
     );
     assert.ok(new Set(high.map((item) => item.sizeTier)).size >= 5);
     const visibleAreas = high.map((item) => item.scale[0] * item.scale[1]);
     assert.ok(Math.max(...visibleAreas) / Math.min(...visibleAreas) >= 6);
+    const depthByBand = Object.fromEntries(
+        ["near", "mid", "far"].map((band) => [
+            band,
+            high.find((item) => item.band === band).rearDepth
+        ])
+    );
+    assert.ok(depthByBand.near > depthByBand.mid);
+    assert.ok(depthByBand.mid > depthByBand.far);
+    assert.ok(high.some((item) => item.depthScale > 1));
+    assert.ok(high.some((item) => item.depthScale < 1));
 });
 
 test("keeps every sampled object behind its safe plane", () => {
@@ -40,8 +54,9 @@ test("keeps every sampled object behind its safe plane", () => {
 
 test("uses independent mid and far circulation periods", () => {
     assert.deepEqual(REAR_FIELD_PERIODS_MS, {
-        mid: 48000,
-        far: 64000
+        near: 42000,
+        mid: 56000,
+        far: 78000
     });
 });
 

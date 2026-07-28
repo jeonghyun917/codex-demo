@@ -28,6 +28,10 @@ function createCloudCardGeometry(THREE) {
     return geometry;
 }
 
+function createOutlineBubbleGeometry(THREE) {
+    return new THREE.RingGeometry(.62, 1, 12, 1);
+}
+
 function createCloudAlphaTexture(THREE, variant = 0) {
     const size = 64;
     const data = new Uint8Array(size * size * 4);
@@ -70,33 +74,33 @@ const FAMILY_DEFINITIONS = Object.freeze([
     Object.freeze({
         name: "RearBroadHaze",
         layoutFamilies: Object.freeze(["haze"]),
-        color: 0x72c9c5,
+        color: 0x76cec6,
         textureVariant: 0,
         geometry: createCloudCardGeometry,
         material: (THREE, color, map) => new THREE.MeshBasicMaterial({
             color,
             map,
             transparent: true,
-            opacity: .08,
+            opacity: .18,
             depthTest: true,
             depthWrite: false,
             vertexColors: true,
             side: THREE.DoubleSide,
             toneMapped: false
         }),
-        scale: Object.freeze([3.6, 2.8, .02])
+        scale: Object.freeze([4.4, 3.3, .02])
     }),
     Object.freeze({
         name: "RearAtmosphericClouds",
         layoutFamilies: Object.freeze(["cloud"]),
-        color: 0xb8e7e2,
+        color: 0x95d9d1,
         textureVariant: 1,
         geometry: createCloudCardGeometry,
         material: (THREE, color, map) => new THREE.MeshBasicMaterial({
             color,
             map,
             transparent: true,
-            opacity: .12,
+            opacity: .21,
             depthTest: true,
             depthWrite: false,
             vertexColors: true,
@@ -108,14 +112,14 @@ const FAMILY_DEFINITIONS = Object.freeze([
     Object.freeze({
         name: "RearMistIslands",
         layoutFamilies: Object.freeze(["mist"]),
-        color: 0x4eb5b2,
+        color: 0x55aaa7,
         textureVariant: 2,
         geometry: createCloudCardGeometry,
         material: (THREE, color, map) => new THREE.MeshBasicMaterial({
             color,
             map,
             transparent: true,
-            opacity: .08,
+            opacity: .1,
             depthTest: true,
             depthWrite: false,
             vertexColors: true,
@@ -123,6 +127,44 @@ const FAMILY_DEFINITIONS = Object.freeze([
             toneMapped: false
         }),
         scale: Object.freeze([1.1, 1, .02])
+    }),
+    Object.freeze({
+        name: "RearOutlineBubbles",
+        layoutFamilies: Object.freeze(["halo"]),
+        color: 0x438f8e,
+        textureVariant: 3,
+        geometry: createOutlineBubbleGeometry,
+        material: (THREE, color, map) => new THREE.MeshBasicMaterial({
+            color,
+            map,
+            transparent: true,
+            opacity: .28,
+            depthTest: true,
+            depthWrite: false,
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            toneMapped: false
+        }),
+        scale: Object.freeze([.48, .48, .02])
+    }),
+    Object.freeze({
+        name: "RearDustMotes",
+        layoutFamilies: Object.freeze(["dust"]),
+        color: 0xd8eee8,
+        textureVariant: 4,
+        geometry: createCloudCardGeometry,
+        material: (THREE, color, map) => new THREE.MeshBasicMaterial({
+            color,
+            map,
+            transparent: true,
+            opacity: .38,
+            depthTest: true,
+            depthWrite: false,
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            toneMapped: false
+        }),
+        scale: Object.freeze([.36, .28, .02])
     })
 ]);
 
@@ -311,6 +353,7 @@ export function createQuantPlanetRearField(THREE, { profile = {} } = {}) {
                         familyScale.fromArray(family.definition.scale);
                         scale.multiply(familyScale);
                     }
+                    scale.multiplyScalar(placement.depthScale || 1);
                     quaternion.setFromEuler(rotation);
                     matrix.compose(position, quaternion, scale);
                     family.mesh.setMatrixAt(index, matrix);

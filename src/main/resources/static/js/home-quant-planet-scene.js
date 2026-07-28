@@ -242,10 +242,10 @@ export async function createQuantPlanetScene({
         const hemisphere = new THREE.HemisphereLight(
             0xfff9ea,
             0x71847e,
-            1.7
+            1.45
         );
         hemisphere.name = "SkyHemisphereFill";
-        const key = new THREE.DirectionalLight(0xfff1cc, 3.1);
+        const key = new THREE.DirectionalLight(0xfff1cc, 2.65);
         key.name = "DaylightKey";
         key.position.set(-5.5, 8, 6);
         key.castShadow = Boolean(profile.shadows);
@@ -259,7 +259,7 @@ export async function createQuantPlanetScene({
         key.shadow.camera.right = 5;
         key.shadow.camera.top = 5;
         key.shadow.camera.bottom = -5;
-        const rim = new THREE.DirectionalLight(0xe8755d, .85);
+        const rim = new THREE.DirectionalLight(0xe8755d, .6);
         rim.name = "WarmRimLight";
         rim.position.set(5, 2, -6);
         scene.add(hemisphere, key, rim);

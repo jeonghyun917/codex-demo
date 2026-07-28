@@ -15,7 +15,9 @@ import {
 const REAR_FAMILY_LAYOUTS = Object.freeze({
     RearBroadHaze: ["haze"],
     RearAtmosphericClouds: ["cloud"],
-    RearMistIslands: ["mist"]
+    RearMistIslands: ["mist"],
+    RearOutlineBubbles: ["halo"],
+    RearDustMotes: ["dust"]
 });
 
 test("builds only atmospheric rear families behind the planet", () => {
@@ -25,12 +27,14 @@ test("builds only atmospheric rear families behind the planet", () => {
     const names = [
         "RearBroadHaze",
         "RearAtmosphericClouds",
-        "RearMistIslands"
+        "RearMistIslands",
+        "RearOutlineBubbles",
+        "RearDustMotes"
     ];
     for (const name of names) {
         assert.ok(field.group.getObjectByName(name));
     }
-    assert.equal(field.group.children.length, 3);
+    assert.equal(field.group.children.length, 5);
     assert.equal(field.group.getObjectByName("RearRockChips"), undefined);
     assert.equal(
         field.group.getObjectByName("RearArchitecturalScraps"),
@@ -278,11 +282,11 @@ test("disposes every rear-field resource exactly once", () => {
     field.dispose();
     field.dispose();
 
-    assert.equal(meshes.length, 3);
+    assert.equal(meshes.length, 5);
     assert.ok(
         [...meshDisposeCounts.values()].every((count) => count === 1)
     );
-    assert.equal(resources.size, 6);
+    assert.equal(resources.size, 10);
     assert.ok([...disposeCounts.values()].every((count) => count === 1));
 });
 

@@ -1,6 +1,6 @@
 :root {
-    --reference-field: #9ed9d5;
-    --reference-field-deep: #73c3c0;
+    --reference-field: #65c1bc;
+    --reference-field-deep: #4aa8a5;
     --reference-ink: #253238;
     --reference-paper: #f8f2db;
     --reference-action-yellow: #ffd83d;
@@ -44,7 +44,7 @@ body {
     overflow: hidden;
     isolation: isolate;
     background:
-        radial-gradient(circle at 50% 46%, rgba(255, 255, 255, .08), transparent 43%),
+        radial-gradient(circle at 50% 46%, rgba(255, 255, 255, .025), transparent 43%),
         var(--reference-field);
 }
 

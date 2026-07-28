@@ -297,9 +297,8 @@ test("exposes large village bodies and terrain shelves in every sector", (t) => 
     const buildingBodies = instanceTransforms(buildings).filter(
         ({ index }) => index % 3 === 0
     );
-    const outlineBodies = instanceTransforms(outlines).filter(
-        ({ index }) => index % 3 === 0
-    );
+    const outlineBodies = instanceTransforms(outlines);
+    assert.equal(outlineBodies.length, buildingBodies.length);
     assert.deepEqual(
         outlineBodies.map(({ matrix }) => matrix.elements),
         buildingBodies.map(({ matrix }) => matrix.elements),
@@ -576,8 +575,8 @@ test("exposes a complete reference silhouette envelope", (t) => {
 
     assert.ok(envelope.min.x <= -4.3);
     assert.ok(envelope.max.x >= 4.3);
-    assert.ok(envelope.max.y >= 4.75);
-    assert.ok(envelope.min.y <= -4.75);
+    assert.ok(envelope.max.y >= 4.4);
+    assert.ok(envelope.min.y <= -4.4);
 });
 
 test("keeps measured bounds inside the stable reference framing radius", (t) => {
@@ -709,10 +708,16 @@ test("keeps panorama backing and canopy crowns below the final exposure caps", (
     assert.equal(outlines.material.transparent, true);
     assert.equal(
         outlines.visible,
-        false,
-        "The textured world must not render stacked village backing silhouettes"
+        true,
+        "The textured world needs one restrained contour per village body"
     );
-    assert.ok(outlines.geometry.parameters.width <= 1.04);
+    assert.equal(
+        outlines.count,
+        world.group.getObjectByName("ReferenceVillageBuildingFamily").count / 3
+    );
+    assert.ok(outlines.material.opacity >= .18);
+    assert.ok(outlines.material.opacity <= .25);
+    assert.ok(outlines.geometry.parameters.width <= 1.015);
     assert.equal(crowns.count, authoredCrownPlacements.length);
     instanceTransforms(crowns).forEach(({ scale }, index) => {
         const authoredScale = authoredCrownPlacements[index].scale;
@@ -764,7 +769,7 @@ test("uses the local panorama URL only in browser-capable worlds", () => {
     for (const world of [fallbackWorld, failedWorld]) {
         const body = world.group.getObjectByName("ReferencePlanetBody");
         assert.equal(body.material.map, null);
-        assert.equal(body.material.color.getHex(), 0xa8bf78);
+        assert.equal(body.material.color.getHex(), 0x91a873);
         world.dispose();
     }
     browserWorld.dispose();
@@ -850,19 +855,19 @@ test("authors the high-profile miniature detail families by district", (t) => {
         ]
     };
     const readablePalette = new Set([
-        0x78d7d0,
-        0x338f91,
-        0xa8bf78,
-        0x78965f,
-        0xf2e5c7,
-        0xfffae9,
-        0xd65f47,
-        0xa94737,
-        0x50656b,
-        0x39805b,
-        0x205f43,
-        0x7c8580,
-        0xe7b54f
+        0x58aaa4,
+        0x356f70,
+        0x91a873,
+        0x697f59,
+        0xd8dac9,
+        0xf0f4e4,
+        0xcb6047,
+        0x943f35,
+        0x2c3d41,
+        0x39774f,
+        0x265b43,
+        0x8e978b,
+        0xe8b73d
     ]);
     const instanceColor = new THREE.Color();
 
@@ -1037,10 +1042,13 @@ test("anchors canopy forks to selected high and balanced foliage", () => {
     }
 });
 
-test("packs readable landmark details into four instanced families", (t) => {
+test("packs readable landmark details into bounded instanced families", (t) => {
     const world = createWorld(t);
     const industrialRings = world.group.getObjectByName(
         "ReferenceIndustrialRingDetails"
+    );
+    const industrialCylinders = world.group.getObjectByName(
+        "ReferenceIndustrialCylinderDetails"
     );
     const industrialBoxes = world.group.getObjectByName(
         "ReferenceIndustrialBoxDetails"
@@ -1053,6 +1061,7 @@ test("packs readable landmark details into four instanced families", (t) => {
     );
 
     for (const mesh of [
+        industrialCylinders,
         industrialRings,
         industrialBoxes,
         utilityBoxes,
@@ -1063,8 +1072,26 @@ test("packs readable landmark details into four instanced families", (t) => {
         assert.ok(mesh.instanceColor, `${mesh?.name} must carry authored color`);
     }
 
-    assert.ok(industrialRings.userData.detailFamilyCounts.collars >= 4);
+    assert.ok(industrialRings.userData.detailFamilyCounts.collars >= 6);
+    assert.ok(industrialRings.userData.detailFamilyCounts.pressureGauge >= 1);
+    assert.ok(
+        industrialCylinders.userData.detailFamilyCounts.serviceTank >= 1
+    );
+    assert.ok(
+        industrialCylinders.userData.detailFamilyCounts.exhaustStack >= 1
+    );
+    assert.ok(
+        industrialCylinders.userData.detailFamilyCounts.nozzleShaft >= 1
+    );
+    assert.ok(
+        industrialCylinders.userData.detailFamilyCounts.nozzleMuzzle >= 1
+    );
+    assert.ok(
+        industrialCylinders.userData.detailFamilyCounts.pressureVessel >= 1
+    );
     assert.ok(industrialBoxes.userData.detailFamilyCounts.fasteners >= 8);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.engineSpokes >= 8);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.pipeNetwork >= 6);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.catwalk >= 3);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.accessPanel >= 1);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.panelSeams >= 6);
@@ -1072,6 +1099,14 @@ test("packs readable landmark details into four instanced families", (t) => {
     assert.ok(industrialBoxes.userData.detailFamilyCounts.gaugeTicks >= 6);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.pipeClamps >= 8);
     assert.ok(industrialBoxes.userData.detailFamilyCounts.ladderRails >= 2);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.cabinetInset >= 1);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.cabinetHandle >= 1);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.cabinetLouvers >= 4);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.serviceTankBand >= 2);
+    assert.ok(industrialBoxes.userData.detailFamilyCounts.stackCap >= 1);
+    assert.ok(
+        industrialBoxes.userData.detailFamilyCounts.controlCabinetBody >= 1
+    );
     assert.ok(utilityBoxes.userData.detailFamilyCounts.mastFeet >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.dishBracket >= 2);
     assert.ok(utilityBoxes.userData.detailFamilyCounts.windowFrames >= 4);
@@ -1121,6 +1156,10 @@ test("packs village water and terrain relief into three detail families",
     assert.ok(village.userData.detailFamilyCounts.eaveBands >= 20);
     assert.ok(village.userData.detailFamilyCounts.roofRidges >= 20);
     assert.ok(village.userData.detailFamilyCounts.entrySteps >= 20);
+    assert.ok(village.userData.detailFamilyCounts.wallCourses >= 40);
+    assert.ok(village.userData.detailFamilyCounts.balconySlabs >= 10);
+    assert.ok(village.userData.detailFamilyCounts.balconyRails >= 10);
+    assert.ok(village.userData.detailFamilyCounts.balconyPosts >= 30);
     assert.ok(water.userData.detailFamilyCounts.bridgeRails >= 8);
     assert.ok(water.userData.detailFamilyCounts.bankStones >= 12);
     assert.ok(water.userData.detailFamilyCounts.bridgeTies >= 16);
@@ -1130,6 +1169,7 @@ test("packs village water and terrain relief into three detail families",
     assert.ok(terrain.userData.detailFamilyCounts.cliffStrata >= 8);
     assert.ok(terrain.userData.detailFamilyCounts.secondaryStrata >= 8);
     assert.ok(terrain.userData.detailFamilyCounts.pathChips >= 12);
+    assert.ok(terrain.userData.detailFamilyCounts.rockFaultLines >= 30);
 
     const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
     const crownScaleSignatures = new Set(
@@ -1167,7 +1207,7 @@ test("keeps canopy instance greens above the crushed-black floor", (t) => {
     const crowns = world.group.getObjectByName("ReferenceCanopyCrowns");
     const instanceColor = new THREE.Color();
 
-    assert.equal(crowns.material.emissive.getHex(), 0x205f43);
+    assert.equal(crowns.material.emissive.getHex(), 0x265b43);
     assert.equal(crowns.material.emissiveIntensity, .8);
     for (let index = 0; index < crowns.count; index += 1) {
         crowns.getColorAt(index, instanceColor);
@@ -1188,7 +1228,7 @@ test("keeps repeated structural ink readable instead of crushed black", (t) => {
 
     assert.equal(trunks.material.isMeshBasicMaterial, true);
     assert.equal(trunks.material.toneMapped, false);
-    assert.equal(trunks.material.color.getHex(), 0x50656b);
+    assert.equal(trunks.material.color.getHex(), 0x2c3d41);
 });
 
 test("stays within the high-profile world render budget", (t) => {

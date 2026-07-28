@@ -476,6 +476,7 @@ class HomePageTemplateContractTest {
         String css = resource("static/css/home-quant-planet.css");
         int field = parseHexColor(cssDeclaration(
                 cssRule(css, ":root"), "--reference-field"));
+        assertEquals(0x65c1bc, field);
         Element atmosphere = elementWithId(
                 svg, "fallback-rear-atmosphere");
         double groupOpacity = opacity(atmosphere, 1);

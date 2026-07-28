@@ -13,19 +13,19 @@ export const QUANT_PLANET_PANORAMA_URL =
     "/images/quant-planet-panorama-v2.png";
 
 const COLORS = Object.freeze({
-    water: 0x78d7d0,
-    waterDeep: 0x338f91,
-    ground: 0xa8bf78,
-    groundShade: 0x78965f,
-    architecture: 0xf2e5c7,
-    paper: 0xfffae9,
-    coral: 0xd65f47,
-    coralShade: 0xa94737,
-    ink: 0x50656b,
-    foliage: 0x39805b,
-    foliageDark: 0x205f43,
-    rock: 0x7c8580,
-    gold: 0xe7b54f
+    water: 0x58aaa4,
+    waterDeep: 0x356f70,
+    ground: 0x91a873,
+    groundShade: 0x697f59,
+    architecture: 0xd8dac9,
+    paper: 0xf0f4e4,
+    coral: 0xcb6047,
+    coralShade: 0x943f35,
+    ink: 0x2c3d41,
+    foliage: 0x39774f,
+    foliageDark: 0x265b43,
+    rock: 0x8e978b,
+    gold: 0xe8b73d
 });
 
 function createGradientMap(THREE) {
@@ -830,6 +830,38 @@ function buildPlanetCore(
                 surface: true
             });
         });
+    TERRAIN_PATCHES
+        .filter((_, index) => index % 4 === 1)
+        .forEach((placement, index) => {
+            const normal = new THREE.Vector3(...placement.position)
+                .normalize();
+            const tangent = new THREE.Vector3(
+                -normal.z,
+                0,
+                normal.x
+            ).normalize();
+            for (const level of [-.1, .08]) {
+                reliefPlacements.push({
+                    family: "rockFaultLines",
+                    position: new THREE.Vector3(...placement.position)
+                        .multiplyScalar(1.058)
+                        .addScaledVector(tangent, level)
+                        .toArray(),
+                    scale: [
+                        placement.scale[0] * (.28 + index % 2 * .08),
+                        .014,
+                        .018
+                    ],
+                    rotation: [
+                        placement.rotation[0],
+                        placement.rotation[1] + index * .08,
+                        placement.rotation[2] + level
+                    ],
+                    color: index % 3 === 0 ? COLORS.ink : COLORS.rock,
+                    surface: true
+                });
+            }
+        });
     TERRAIN_PATCHES.slice(0, 12).forEach((placement, index) => {
         const normal = new THREE.Vector3(...placement.position).normalize();
         const tangent = new THREE.Vector3(
@@ -1081,13 +1113,13 @@ function buildTemplePeak(THREE, resources, palette) {
     group.name = "ReferenceTemplePeak";
 
     const mountainPlacements = [
-        [-1.35, 3.63, .78, [1.1, 2.55, 1.02], -.06],
-        [.1, 3.72, .58, [1.38, 2.88, 1.2], .02],
-        [1.48, 3.5, .7, [1.02, 2.35, .94], .08]
+        [-1.35, 3.3, .78, [1.1, .9, 1.02], -.06],
+        [.1, 3.38, .58, [1.38, 1.15, 1.2], .02],
+        [1.48, 3.2, .7, [1.02, .8, .94], .08]
     ];
     const mountains = new THREE.InstancedMesh(
-        resources.geometry.cone,
-        palette.paper,
+        resources.geometry.detailedSphere,
+        palette.architecture,
         mountainPlacements.length
     );
     mountains.name = "ReferencePaleMountains";
@@ -1288,7 +1320,7 @@ function buildIndustrialCluster(THREE, resources, palette) {
         {
             position: [-3.72, .62, 1.18],
             rotation: [0, 0, Math.PI / 2],
-            scale: [.68, 1.34, .68],
+            scale: [.46, 1.34, .46],
             name: "ReferenceMainEngine"
         }
     );
@@ -1302,7 +1334,7 @@ function buildIndustrialCluster(THREE, resources, palette) {
         {
             position: [-3.42, -.78, 1.22],
             rotation: [0, 0, Math.PI / 2],
-            scale: [.58, 1.04, .58],
+            scale: [.38, 1.04, .38],
             name: "ReferenceLowerEngine"
         }
     );
@@ -1315,7 +1347,7 @@ function buildIndustrialCluster(THREE, resources, palette) {
         {
             position: [-4.15, 1.82, .94],
             rotation: [0, 0, Math.PI / 2],
-            scale: [.31, .78, .31],
+            scale: [.27, .78, .27],
             outlined: false,
             name: "ReferenceUpperPipe"
         }
@@ -1329,7 +1361,7 @@ function buildIndustrialCluster(THREE, resources, palette) {
         {
             position: [-4.02, -1.62, 1.05],
             rotation: [Math.PI / 2, .1, 0],
-            scale: [.58, .58, .58],
+            scale: [.47, .47, .47],
             outlined: false,
             name: "ReferencePipeElbow"
         }
@@ -1343,12 +1375,11 @@ function buildIndustrialCluster(THREE, resources, palette) {
         {
             position: [-3.2, .02, .88],
             rotation: [0, -.18, -.12],
-            scale: [.65, 2.35, .62],
+            scale: [.48, 2.08, .46],
             outlined: false,
             name: "ReferenceEngineMount"
         }
     );
-
     const braces = new THREE.InstancedMesh(
         resources.geometry.box,
         palette.ink,
@@ -1370,22 +1401,73 @@ function buildIndustrialCluster(THREE, resources, palette) {
     markInstancesDirty(braces);
     group.add(braces);
 
+    const industrialCylinders = buildColoredInstanceFamily(THREE, {
+        name: "ReferenceIndustrialCylinderDetails",
+        geometry: resources.geometry.cylinder,
+        material: palette.village,
+        placements: [
+            {
+                family: "serviceTank",
+                position: [-4.28, -.24, .78],
+                rotation: [0, 0, Math.PI / 2],
+                scale: [.2, .34, .2],
+                color: COLORS.coralShade
+            },
+            {
+                family: "exhaustStack",
+                position: [-2.66, 1.05, .82],
+                rotation: [0, 0, 0],
+                scale: [.17, .62, .17],
+                color: COLORS.rock
+            },
+            {
+                family: "nozzleShaft",
+                position: [-4.78, 1.82, .94],
+                rotation: [0, 0, Math.PI / 2],
+                scale: [.18, .22, .18],
+                color: COLORS.coral
+            },
+            {
+                family: "nozzleMuzzle",
+                position: [-4.98, 1.82, .94],
+                rotation: [0, 0, Math.PI / 2],
+                scale: [.25, .08, .25],
+                color: COLORS.paper
+            },
+            {
+                family: "pressureVessel",
+                position: [-2.76, 1.52, .7],
+                rotation: [0, 0, 0],
+                scale: [.24, .58, .24],
+                color: COLORS.coralShade
+            }
+        ]
+    });
+
     const industrialRings = buildColoredInstanceFamily(THREE, {
         name: "ReferenceIndustrialRingDetails",
         geometry: resources.geometry.torus,
         material: palette.village,
         placements: [
-            [-4.28, .62, 1.18, .73, COLORS.paper],
-            [-3.18, .62, 1.18, .73, COLORS.coralShade],
-            [-3.86, -.78, 1.22, .63, COLORS.paper],
-            [-3.02, -.78, 1.22, .63, COLORS.coral]
+            [-4.31, .62, 1.18, .42, COLORS.ink],
+            [-3.72, .62, 1.18, .42, COLORS.paper],
+            [-3.13, .62, 1.18, .42, COLORS.coralShade],
+            [-3.82, -.78, 1.22, .34, COLORS.rock],
+            [-3.4, -.78, 1.22, .34, COLORS.paper],
+            [-2.98, -.78, 1.22, .34, COLORS.coral]
         ].map(([x, y, z, scale, color]) => ({
             family: "collars",
             position: [x, y, z],
             scale: [scale, scale, scale],
             rotation: [0, Math.PI / 2, 0],
             color
-        }))
+        })).concat({
+            family: "pressureGauge",
+            position: [-2.72, .18, 1.37],
+            scale: [.17, .17, .17],
+            rotation: [0, 0, 0],
+            color: COLORS.gold
+        })
     });
 
     const industrialBoxPlacements = [];
@@ -1442,8 +1524,59 @@ function buildIndustrialCluster(THREE, resources, palette) {
             scale: [.36, .1, .1],
             rotation: [0, 0, -.46],
             color: COLORS.coral
+        },
+        {
+            family: "controlCabinetBody",
+            position: [-2.72, .08, 1.02],
+            scale: [.42, .62, .32],
+            rotation: [0, -.12, -.08],
+            color: COLORS.paper
+        },
+        {
+            family: "cabinetInset",
+            position: [-2.72, .18, 1.39],
+            scale: [.22, .22, .035],
+            rotation: [0, 0, -.08],
+            color: COLORS.waterDeep
+        },
+        {
+            family: "cabinetHandle",
+            position: [-2.48, -.08, 1.39],
+            scale: [.025, .18, .03],
+            rotation: [0, 0, -.08],
+            color: COLORS.ink
+        },
+        {
+            family: "serviceTankBand",
+            position: [-4.28, -.24, .98],
+            scale: [.27, .04, .04],
+            rotation: [0, 0, .04],
+            color: COLORS.paper
+        },
+        {
+            family: "serviceTankBand",
+            position: [-4.28, -.24, .58],
+            scale: [.27, .04, .04],
+            rotation: [0, 0, .04],
+            color: COLORS.ink
+        },
+        {
+            family: "stackCap",
+            position: [-2.66, 1.7, .82],
+            scale: [.27, .06, .27],
+            rotation: [0, 0, -.05],
+            color: COLORS.coralShade
         }
     );
+    for (let index = 0; index < 4; index += 1) {
+        industrialBoxPlacements.push({
+            family: "cabinetLouvers",
+            position: [-2.72, -.16 + index * .12, 1.405],
+            scale: [.17, .018, .025],
+            rotation: [0, 0, -.08],
+            color: index % 2 === 0 ? COLORS.ink : COLORS.rock
+        });
+    }
     for (let index = 0; index < 6; index += 1) {
         industrialBoxPlacements.push({
             family: "panelSeams",
@@ -1496,13 +1629,79 @@ function buildIndustrialCluster(THREE, resources, palette) {
             color: COLORS.ink
         });
     }
+    for (let index = 0; index < 12; index += 1) {
+        const angle = index / 12 * Math.PI * 2;
+        industrialBoxPlacements.push({
+            family: "engineRivets",
+            position: [
+                -3.72 + Math.cos(angle) * .49,
+                .62 + Math.sin(angle) * .49,
+                1.98
+            ],
+            scale: [.045, .045, .035],
+            rotation: [0, 0, angle],
+            color: index % 3 === 0 ? COLORS.gold : COLORS.ink
+        });
+    }
+    for (let index = 0; index < 8; index += 1) {
+        const angle = index / 8 * Math.PI * 2;
+        industrialBoxPlacements.push({
+            family: "engineSpokes",
+            position: [
+                -3.72 + Math.cos(angle) * .31,
+                .62 + Math.sin(angle) * .31,
+                1.97
+            ],
+            scale: [.025, .19, .022],
+            rotation: [0, 0, angle],
+            color: index % 2 === 0 ? COLORS.ink : COLORS.paper
+        });
+    }
+    [
+        [-4.62, 1.36, 1.08, .34, .08, .08, .32],
+        [-4.28, 1.12, 1.16, .36, .07, .07, -.28],
+        [-3.86, -1.24, 1.12, .44, .075, .075, -.38],
+        [-3.36, -1.46, 1.02, .34, .065, .065, .46],
+        [-2.92, -.96, .98, .38, .07, .07, 1.02],
+        [-2.62, -.44, .9, .32, .065, .065, .18]
+    ].forEach(([x, y, z, sx, sy, sz, rz], index) => {
+        industrialBoxPlacements.push({
+            family: "pipeNetwork",
+            position: [x, y, z],
+            scale: [sx, sy, sz],
+            rotation: [0, 0, rz],
+            color: index % 3 === 0 ? COLORS.coralShade : COLORS.coral
+        });
+    });
+    for (let index = 0; index < 5; index += 1) {
+        industrialBoxPlacements.push(
+            {
+                family: "catwalkPosts",
+                position: [-4.55 + index * .52, -.02, 1.88],
+                scale: [.035, .23, .035],
+                rotation: [0, 0, -.04],
+                color: COLORS.ink
+            },
+            {
+                family: "pipeSeams",
+                position: [-4.42 + index * .35, 1.02, 1.6],
+                scale: [.035, .2, .04],
+                rotation: [0, 0, -.12],
+                color: index % 2 === 0 ? COLORS.paper : COLORS.gold
+            }
+        );
+    }
     const industrialBoxes = buildColoredInstanceFamily(THREE, {
         name: "ReferenceIndustrialBoxDetails",
         geometry: resources.geometry.box,
         material: palette.village,
         placements: industrialBoxPlacements
     });
-    group.add(industrialRings, industrialBoxes);
+    group.add(
+        industrialCylinders,
+        industrialRings,
+        industrialBoxes
+    );
 
     return group;
 }
@@ -1778,17 +1977,25 @@ function buildVillageClusters(THREE, resources, palette) {
     const outlines = new THREE.InstancedMesh(
         resources.geometry.villageOutlineBox,
         resources.villageOutline,
-        VILLAGE_PLACEMENTS.length * 3
+        VILLAGE_PLACEMENTS.length
     );
     outlines.name = "ReferenceVillageOutlineFamily";
-    // The panorama already carries its own hand-drawn ink. Rendering every
-    // backing instance stacks transparent silhouettes into an opaque black
-    // ring at the live hero scale, so retain the authored transforms for
-    // diagnostics while keeping the duplicate backing pass out of the scene.
-    outlines.visible = false;
+    // One restrained contour per building body keeps the miniature readable
+    // without stacking three dark shells around every roof and facade.
+    outlines.visible = true;
     const matrix = new THREE.Matrix4();
-    const architectureColor = new THREE.Color(COLORS.architecture);
-    const roofColor = new THREE.Color(COLORS.coralShade);
+    const architectureColors = [
+        new THREE.Color(COLORS.paper),
+        new THREE.Color(COLORS.architecture),
+        new THREE.Color(0xc6c2b4),
+        new THREE.Color(COLORS.rock)
+    ];
+    const roofColors = [
+        new THREE.Color(COLORS.ink),
+        new THREE.Color(COLORS.coralShade),
+        new THREE.Color(0x786f6d),
+        new THREE.Color(0xb67f72)
+    ];
     const facadePlacements = [];
     VILLAGE_PLACEMENTS.forEach((placement, placementIndex) => {
         const instanceIndex = placementIndex * 3;
@@ -1800,8 +2007,11 @@ function buildVillageClusters(THREE, resources, palette) {
             placement.rotation
         );
         buildings.setMatrixAt(instanceIndex, matrix);
-        outlines.setMatrixAt(instanceIndex, matrix);
-        buildings.setColorAt(instanceIndex, architectureColor);
+        outlines.setMatrixAt(placementIndex, matrix);
+        buildings.setColorAt(
+            instanceIndex,
+            architectureColors[placementIndex % architectureColors.length]
+        );
 
         const normal = new THREE.Vector3(...placement.position).normalize();
         const tangent = new THREE.Vector3(
@@ -1836,13 +2046,12 @@ function buildVillageClusters(THREE, resources, palette) {
                 instanceIndex + (side === -1 ? 1 : 2),
                 matrix
             );
-            outlines.setMatrixAt(
-                instanceIndex + (side === -1 ? 1 : 2),
-                matrix
-            );
             buildings.setColorAt(
                 instanceIndex + (side === -1 ? 1 : 2),
-                roofColor
+                roofColors[
+                    (placementIndex + (side === -1 ? 0 : 1))
+                    % roofColors.length
+                ]
             );
         }
 
@@ -1980,6 +2189,82 @@ function buildVillageClusters(THREE, resources, palette) {
                 surface: true
             }
         );
+        for (const level of [-.04, .18]) {
+            facadePlacements.push({
+                family: "wallCourses",
+                position: facadeCenter.clone()
+                    .addScaledVector(
+                        normal,
+                        placement.scale[1] * level
+                    )
+                    .toArray(),
+                scale: [
+                    placement.scale[0] * .42,
+                    .018,
+                    .035
+                ],
+                rotation: placement.rotation,
+                color: level < 0 ? COLORS.rock : COLORS.ink,
+                surface: true
+            });
+        }
+        if (placementIndex % 2 === 0) {
+            facadePlacements.push(
+                {
+                    family: "balconySlabs",
+                    position: facadeCenter.clone()
+                        .addScaledVector(
+                            normal,
+                            placement.scale[1] * .2
+                        )
+                        .toArray(),
+                    scale: [
+                        placement.scale[0] * .34,
+                        .035,
+                        placement.scale[2] * .24
+                    ],
+                    rotation: placement.rotation,
+                    color: COLORS.rock,
+                    surface: true
+                },
+                {
+                    family: "balconyRails",
+                    position: facadeCenter.clone()
+                        .addScaledVector(
+                            normal,
+                            placement.scale[1] * .31
+                        )
+                        .toArray(),
+                    scale: [
+                        placement.scale[0] * .34,
+                        .025,
+                        .03
+                    ],
+                    rotation: placement.rotation,
+                    color: COLORS.ink,
+                    surface: true
+                }
+            );
+            for (const side of [-1, 0, 1]) {
+                facadePlacements.push({
+                    family: "balconyPosts",
+                    position: facadeCenter.clone()
+                        .addScaledVector(
+                            normal,
+                            placement.scale[1] * .255
+                        )
+                        .addScaledVector(
+                            binormal,
+                            side * placement.scale[0] * .28
+                        )
+                        .toArray(),
+                    scale: [.022, placement.scale[1] * .12, .022],
+                    rotation: placement.rotation,
+                    color: side === 0 ? COLORS.gold : COLORS.ink,
+                    surface: true
+                });
+            }
+        }
         for (const side of [-1, 1]) {
             facadePlacements.push({
                 family: "wallPosts",
@@ -2251,7 +2536,7 @@ export function createQuantPlanetWorld(THREE, {
             color: COLORS.ink,
             side: THREE.BackSide,
             transparent: true,
-            opacity: .08,
+            opacity: .22,
             depthWrite: false
         }));
         const resources = {
@@ -2263,7 +2548,7 @@ export function createQuantPlanetWorld(THREE, {
             geometry: {
                 box: ownGeometry(new THREE.BoxGeometry(1, 1, 1, 1, 1, 1)),
                 villageOutlineBox: ownGeometry(
-                    new THREE.BoxGeometry(1.035, 1.035, 1.035, 1, 1, 1)
+                    new THREE.BoxGeometry(1.012, 1.012, 1.012, 1, 1, 1)
                 ),
                 cylinder: ownGeometry(
                     new THREE.CylinderGeometry(1, 1, 1, 8, 1)
@@ -2396,7 +2681,7 @@ export function createQuantPlanetWorld(THREE, {
                 body,
                 resolvedSurfaceTexture,
                 ownMaterial(new THREE.MeshBasicMaterial({
-                    color: 0xffffff,
+                    color: 0xd5ded3,
                     map: resolvedSurfaceTexture,
                     toneMapped: false
                 }))
@@ -2428,9 +2713,12 @@ export function createQuantPlanetWorld(THREE, {
         ]);
         const districts = buildDistrictAnchors(THREE);
         temple.rotation.y = Math.PI / 2;
-        temple.position.x = 1.55;
-        industrial.rotation.y = -1.82;
+        temple.position.set(1.2, .42, 0);
+        temple.scale.set(.78, .78, .78);
+        industrial.rotation.y = 2.2;
+        industrial.scale.set(1.08, 1.08, 1.08);
         utility.group.rotation.y = -1.22;
+        utility.group.scale.set(.88, .88, .88);
         content.add(
             core,
             waterBand.group,

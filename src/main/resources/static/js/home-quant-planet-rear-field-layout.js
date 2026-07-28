@@ -11,8 +11,9 @@ function frozenPlacement(placement) {
 }
 
 export const REAR_FIELD_PERIODS_MS = Object.freeze({
-    mid: 48000,
-    far: 64000
+    near: 42000,
+    mid: 56000,
+    far: 78000
 });
 
 export const REAR_FIELD_PROFILES = Object.freeze({
@@ -33,7 +34,9 @@ const SIZE_SCALES = Object.freeze([
 const FAMILIES = Object.freeze([
     "cloud",
     "mist",
-    "haze"
+    "haze",
+    "halo",
+    "dust"
 ]);
 
 const AUTHORED_FAMILY_SEQUENCE = Object.freeze([
@@ -43,12 +46,12 @@ const AUTHORED_FAMILY_SEQUENCE = Object.freeze([
 ]);
 
 const AUTHORED_BAND_SEQUENCE = Object.freeze([
-    "far", "mid", "mid", "mid", "mid", "mid", "mid",
-    "mid", "far", "far", "mid", "mid", "far", "mid",
-    "mid", "far", "mid", "mid", "mid", "far", "mid",
-    "mid", "mid", "mid", "mid", "far", "mid", "mid",
-    "mid", "mid", "far", "far", "mid", "far", "mid",
-    "mid", "far", "mid", "mid", "mid", "far", "mid"
+    "far", "near", "mid", "mid", "near", "mid", "far",
+    "near", "far", "far", "mid", "near", "far", "mid",
+    "near", "far", "mid", "near", "mid", "far", "near",
+    "mid", "mid", "near", "mid", "far", "mid", "near",
+    "mid", "near", "far", "far", "near", "far", "mid",
+    "near", "far", "mid", "near", "mid", "far", "near"
 ]);
 
 const AUTHORED_SIZE_SEQUENCE = Object.freeze([
@@ -86,11 +89,33 @@ const REAR_FIELD_SEEDS = Object.freeze([
 function placementFromSeed(seed, index) {
     const [phase, radiusOffset, verticalOffsetSeed] = seed;
     const band = AUTHORED_BAND_SEQUENCE[index];
-    const thickness = band === "far" ? 2 : 1.4;
-    const radius = (band === "far" ? 6.7 : 5.05) + radiusOffset;
-    const verticalRatio = band === "far" ? .46 : .38;
+    const bandDefinition = {
+        near: {
+            radius: 6.7,
+            verticalRatio: .35,
+            verticalSpread: 2,
+            rearDepth: -4.55,
+            depthScale: 1.18
+        },
+        mid: {
+            radius: 9.5,
+            verticalRatio: .42,
+            verticalSpread: 2.65,
+            rearDepth: -5.9,
+            depthScale: .94
+        },
+        far: {
+            radius: 16.5,
+            verticalRatio: .5,
+            verticalSpread: 3.4,
+            rearDepth: -8.2,
+            depthScale: .68
+        }
+    }[band];
+    const radius = bandDefinition.radius + radiusOffset;
+    const verticalRatio = bandDefinition.verticalRatio;
     const rawVerticalOffset = verticalOffsetSeed
-        * (band === "far" ? 2.5 : 2);
+        * bandDefinition.verticalSpread;
     const authoredX = Math.sin(phase) * radius;
     const authoredY = rawVerticalOffset
         + Math.cos(phase) * radius * verticalRatio;
@@ -109,8 +134,9 @@ function placementFromSeed(seed, index) {
         radius,
         verticalOffset,
         verticalRatio,
-        rearDepth: band === "far" ? -7.1 : -5.15,
-        depthBreath: thickness * .07,
+        rearDepth: bandDefinition.rearDepth,
+        depthBreath: 0,
+        depthScale: bandDefinition.depthScale,
         sizeTier,
         scale: SIZE_SCALES[sizeTier],
         rotation: [

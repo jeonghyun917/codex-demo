@@ -991,7 +991,7 @@ export const DETAIL_PLACEMENTS_BY_DISTRICT = Object.freeze({
                 [-4.28 + index * .22, .62, 1.86],
                 [
                     .035 + index % 2 * .008,
-                    .68 + index % 2 * .035,
+                    .45 + index % 2 * .025,
                     .045 + index % 3 * .008
                 ],
                 [index % 2 ? -.05 : .05, Math.PI / 2, index * .025]
@@ -1002,7 +1002,7 @@ export const DETAIL_PLACEMENTS_BY_DISTRICT = Object.freeze({
                 [-3.9 + index * .17, -.78, 1.81],
                 [
                     .032 + index % 2 * .007,
-                    .56 + index % 3 * .025,
+                    .37 + index % 3 * .02,
                     .042 + (index + 1) % 3 * .007
                 ],
                 [index % 2 ? .05 : -.05, Math.PI / 2, -index * .025]
