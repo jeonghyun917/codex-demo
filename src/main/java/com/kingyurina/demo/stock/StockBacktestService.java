@@ -35,8 +35,8 @@ public class StockBacktestService {
     private static final List<Integer> HORIZONS = List.of(5, 20, 60);
     private static final List<Integer> PROMOTION_HORIZONS = List.of(20, 60);
     private static final int VIEW_RESULT_LIMIT = 100_000;
-    private static final String EXPECTED_RETURN_MODEL_VERSION = "EXPECTED_RETURN_V9";
-    private static final String BACKTEST_VIEW_VERSION = "BACKTEST_RESEARCH_V1";
+    private static final String EXPECTED_RETURN_MODEL_VERSION = "EXPECTED_RETURN_V9_CORRECTED_20261017";
+    private static final String BACKTEST_VIEW_VERSION = "BACKTEST_RESEARCH_V2";
     private static final Duration BACKTEST_VIEW_CACHE_TTL = Duration.ofMinutes(10);
     private static final int REGIME_DIAGNOSTIC_HORIZON = 20;
 
@@ -68,13 +68,12 @@ public class StockBacktestService {
             backtestViewCache.put(effectiveIndexCode, new CachedBacktestView(materialized, Instant.now()));
             return materialized;
         }
-        StockBacktestView view = buildUncached(effectiveIndexCode);
-        saveMaterializedBacktestView(mapper, effectiveIndexCode, view, "ON_DEMAND");
-        backtestViewCache.put(effectiveIndexCode, new CachedBacktestView(view, Instant.now()));
-        return view;
+        // Research is computed by refreshBacktestViewSnapshot, never by an interactive GET.
+        // An empty result is an explicit not-ready state, not a fabricated zero return.
+        return empty(effectiveIndexCode);
     }
 
-    public BacktestViewSnapshotRefreshResult refreshBacktestViewSnapshot(String indexCode) {
+    public synchronized BacktestViewSnapshotRefreshResult refreshBacktestViewSnapshot(String indexCode) {
         String effectiveIndexCode = normalizeIndexCode(indexCode);
         backtestViewCache.clear();
         StockBacktestMapper mapper = stockBacktestMapper.getIfAvailable();
@@ -140,7 +139,10 @@ public class StockBacktestService {
         }
         try {
             StockBacktestViewSnapshot snapshot = mapper.findLatestBacktestViewSnapshot(indexCode, BACKTEST_VIEW_VERSION);
-            if (snapshot == null || snapshot.getPayloadJson() == null || snapshot.getPayloadJson().isBlank()) {
+            if (snapshot == null || snapshot.getPayloadJson() == null || snapshot.getPayloadJson().isBlank()
+                    || snapshot.getGeneratedAt() == null
+                    || snapshot.getGeneratedAt().isAfter(LocalDateTime.now())
+                    || snapshot.getGeneratedAt().isBefore(LocalDateTime.now().minusDays(1))) {
                 return null;
             }
             StockBacktestView view = objectMapper.readValue(snapshot.getPayloadJson(), StockBacktestView.class);
@@ -191,12 +193,14 @@ public class StockBacktestService {
             }
             for (int horizon : HORIZONS) {
                 List<StockCandleDaily> futureCandles = mapper.findFutureCandles(
-                        snapshot.getSymbol(), snapshot.getSignalDate(), horizon);
-                if (futureCandles.size() < horizon) {
+                        snapshot.getSymbol(), snapshot.getSignalDate(), horizon + 1);
+                if (futureCandles.size() < horizon + 1) {
                     continue;
                 }
                 StockCandleDaily entry = futureCandles.getFirst();
-                StockCandleDaily exit = futureCandles.get(horizon - 1);
+                // Entry is the next trading close; N-day performance needs N later closes.
+                // Mapper stores this corrected contract separately from legacy N-bar outcomes.
+                StockCandleDaily exit = futureCandles.get(horizon);
                 if (!hasValidClose(entry) || !hasValidClose(exit)) {
                     continue;
                 }

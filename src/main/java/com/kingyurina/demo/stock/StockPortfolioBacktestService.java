@@ -47,14 +47,14 @@ public class StockPortfolioBacktestService {
     private static final int MIN_RISK_OBSERVATIONS = 40;
     private static final int DEFAULT_COVARIANCE_LOOKBACK_DAYS = 126;
     private static final int MIN_COVARIANCE_OBSERVATIONS = 40;
-    private static final String EXPECTED_RETURN_MODEL_VERSION = "EXPECTED_RETURN_V9";
-    private static final String EXPECTED_RETURN_V2_MODEL_VERSION = "EXPECTED_RETURN_V2";
-    private static final String EXPECTED_RETURN_V3_MODEL_VERSION = "EXPECTED_RETURN_V3";
-    private static final String EXPECTED_RETURN_V4_MODEL_VERSION = "EXPECTED_RETURN_V4";
-    private static final String EXPECTED_RETURN_V5_MODEL_VERSION = "EXPECTED_RETURN_V5";
-    private static final String EXPECTED_RETURN_V6_MODEL_VERSION = "EXPECTED_RETURN_V6";
-    private static final String EXPECTED_RETURN_V7_MODEL_VERSION = "EXPECTED_RETURN_V7";
-    private static final String EXPECTED_RETURN_HISTORICAL_SOURCE = "PIT_HISTORICAL_SCORE_SECTOR_QUANTILE_CALIBRATION";
+    private static final String EXPECTED_RETURN_MODEL_VERSION = "EXPECTED_RETURN_V9_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V2_MODEL_VERSION = "EXPECTED_RETURN_V2_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V3_MODEL_VERSION = "EXPECTED_RETURN_V3_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V4_MODEL_VERSION = "EXPECTED_RETURN_V4_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V5_MODEL_VERSION = "EXPECTED_RETURN_V5_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V6_MODEL_VERSION = "EXPECTED_RETURN_V6_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V7_MODEL_VERSION = "EXPECTED_RETURN_V7_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_HISTORICAL_SOURCE = "RESEARCH_RECONSTRUCTED_SCORE_SECTOR_QUANTILE";
     private static final String EXPECTED_RETURN_LIVE_SOURCE = "LIVE_SIGNAL_LATEST_EXPECTED_RETURN";
     private static final String EXPECTED_RETURN_V3_HISTORICAL_SOURCE = "FACTOR_EXPOSURE_WALK_FORWARD_V3";
     private static final String EXPECTED_RETURN_V3_LIVE_SOURCE = "LIVE_FACTOR_EXPOSURE_EXPECTED_RETURN_V3";
@@ -68,9 +68,9 @@ public class StockPortfolioBacktestService {
     private static final String EXPECTED_RETURN_V7_LIVE_SOURCE = "LIVE_HORIZON_DECAY_STABILIZED_EXPECTED_RETURN_V7";
     private static final String FACTOR_EXPOSURE_SOURCE = "SIGNAL_FACTOR_SCORE_V3";
     private static final String DEFAULT_RISK_FREE_SERIES_CODE = "DGS3MO";
-    private static final String PORTFOLIO_VIEW_VERSION = "PORTFOLIO_OPTIMIZATION_V5_OJALGO_SHADOW_MATERIALIZED_V3";
-    private static final String OJALGO_SHADOW_OPTIMIZER_V1 = "OJALGO_QP_SHADOW_V1";
-    private static final String OJALGO_SHADOW_OPTIMIZER_V2 = "OJALGO_QP_SHADOW_V2";
+    private static final String PORTFOLIO_VIEW_VERSION = "PORTFOLIO_NON_OVERLAPPING_RESEARCH_20261017";
+    private static final String OJALGO_SHADOW_OPTIMIZER_V1 = "OJALGO_QP_SHADOW_V1_CORRECTED_20261017";
+    private static final String OJALGO_SHADOW_OPTIMIZER_V2 = "OJALGO_QP_SHADOW_V2_CORRECTED_20261017";
     private static final List<String> OJALGO_SHADOW_OPTIMIZERS = List.of(
             OJALGO_SHADOW_OPTIMIZER_V1,
             OJALGO_SHADOW_OPTIMIZER_V2);
@@ -119,6 +119,7 @@ public class StockPortfolioBacktestService {
     private final ObjectMapper objectMapper;
     private final double annualRiskFreeRatePct;
     private final Map<String, CachedPortfolioBacktestView> portfolioViewCache = new ConcurrentHashMap<>();
+    private final Set<String> refreshingPortfolioViews = ConcurrentHashMap.newKeySet();
 
     public StockPortfolioBacktestService(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
             ObjectMapper objectMapper,
@@ -140,10 +141,8 @@ public class StockPortfolioBacktestService {
             portfolioViewCache.put(effectiveIndexCode, new CachedPortfolioBacktestView(materialized, Instant.now()));
             return materialized;
         }
-        StockPortfolioBacktestView view = buildUncached(effectiveIndexCode);
-        saveMaterializedPortfolioView(mapper, effectiveIndexCode, view, "ON_DEMAND");
-        portfolioViewCache.put(effectiveIndexCode, new CachedPortfolioBacktestView(view, Instant.now()));
-        return view;
+        // Collection/scheduled refresh owns computation. A GET is always read-only.
+        return empty(effectiveIndexCode);
     }
 
     public PortfolioViewSnapshotRefreshResult refreshPortfolioViewSnapshot(String indexCode) {
@@ -153,14 +152,21 @@ public class StockPortfolioBacktestService {
         if (mapper == null) {
             return new PortfolioViewSnapshotRefreshResult(effectiveIndexCode, false, "mapper unavailable", 0);
         }
-        long start = System.currentTimeMillis();
-        StockPortfolioBacktestView view = buildUncached(effectiveIndexCode);
-        boolean saved = saveMaterializedPortfolioView(mapper, effectiveIndexCode, view, "MATERIALIZED_BATCH");
-        if (saved) {
-            portfolioViewCache.put(effectiveIndexCode, new CachedPortfolioBacktestView(view, Instant.now()));
+        if (!refreshingPortfolioViews.add(effectiveIndexCode)) {
+            return new PortfolioViewSnapshotRefreshResult(effectiveIndexCode, false, "refresh already running", 0);
         }
-        return new PortfolioViewSnapshotRefreshResult(effectiveIndexCode, saved,
-                saved ? "saved" : "serialization failed", System.currentTimeMillis() - start);
+        try {
+            long start = System.currentTimeMillis();
+            StockPortfolioBacktestView view = buildUncached(effectiveIndexCode);
+            boolean saved = saveMaterializedPortfolioView(mapper, effectiveIndexCode, view, "MATERIALIZED_BATCH");
+            if (saved) {
+                portfolioViewCache.put(effectiveIndexCode, new CachedPortfolioBacktestView(view, Instant.now()));
+            }
+            return new PortfolioViewSnapshotRefreshResult(effectiveIndexCode, saved,
+                    saved ? "saved" : "serialization failed", System.currentTimeMillis() - start);
+        } finally {
+            refreshingPortfolioViews.remove(effectiveIndexCode);
+        }
     }
 
     public OptimizerShadowRefreshResult refreshOptimizerShadowSnapshots(String indexCode, int resultLimit,
@@ -172,7 +178,7 @@ public class StockPortfolioBacktestService {
             return new OptimizerShadowRefreshResult(effectiveIndexCode, 0, 0, 0, "mapper unavailable");
         }
         int effectiveLimit = resultLimit <= 0 ? VIEW_RESULT_LIMIT : resultLimit;
-        List<StockBacktestResult> results = mapper.findResults(effectiveIndexCode, effectiveLimit)
+        List<StockBacktestResult> results = researchResults(mapper, effectiveIndexCode, effectiveLimit)
                 .stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .toList();
@@ -232,7 +238,7 @@ public class StockPortfolioBacktestService {
             return empty(indexCode);
         }
 
-        List<StockBacktestResult> results = mapper.findResults(indexCode, VIEW_RESULT_LIMIT)
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, VIEW_RESULT_LIMIT)
                 .stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .toList();
@@ -282,7 +288,7 @@ public class StockPortfolioBacktestService {
 
         return new StockPortfolioBacktestView(
                 indexCode,
-                "S&P 500 market-cap weighted proxy",
+                indexCode + " stored market-cap weighted price-return proxy",
                 "Dynamic transaction cost: base " + percentUnsigned(BASE_TRADE_COST_PCT)
                         + " plus liquidity, volatility, and beta impact. Sharpe rf="
                         + percentUnsigned(annualRiskFreeRatePct),
@@ -677,6 +683,87 @@ public class StockPortfolioBacktestService {
                 secSharesRows + proxySharesRows);
     }
 
+    /** Append the weighted-price research proxy from its stored level; never rebase historical returns. */
+    @org.springframework.transaction.annotation.Transactional
+    public MarketSnapshotRefreshResult refreshLatestMarketSnapshotsAndBenchmarks(String indexCode, LocalDate toDate) {
+        if (indexCode == null || indexCode.isBlank() || toDate == null)
+            throw new IllegalArgumentException("Index and end date required");
+        StockBacktestMapper mapper = stockBacktestMapper.getIfAvailable();
+        if (mapper == null) throw new IllegalStateException("StockBacktestMapper unavailable");
+        List<StockBenchmarkReturn> history = mapper.findBenchmarkReturns(indexCode, LocalDate.of(1000, 1, 1), toDate);
+        StockBenchmarkReturn anchor = null;
+        for (StockBenchmarkReturn row : history) {
+            if (row == null || row.getTradeDate() == null || row.getTradeDate().isAfter(toDate)
+                    || (anchor != null && !row.getTradeDate().isAfter(anchor.getTradeDate())))
+                throw new IllegalStateException("Invalid stored benchmark date order");
+            anchor = row;
+        }
+        if (anchor == null || !"MARKET_SNAPSHOT_WEIGHTED".equals(anchor.getSource())
+                || !positive(anchor.getBenchmarkLevel())
+                || !Double.isFinite(number(anchor.getBenchmarkLevel())))
+            throw new IllegalStateException("A finite positive MARKET_SNAPSHOT_WEIGHTED benchmark anchor is required");
+        LocalDate fromDate = anchor.getTradeDate();
+        if (fromDate.equals(toDate)) return new MarketSnapshotRefreshResult(0, 0, 0, 0, 0, 0, 0);
+        clearPortfolioViewCache();
+        int membershipRows = mapper.refreshIndexMembershipSnapshots(indexCode, fromDate, toDate);
+        int removedMembershipRows = mapper.deactivateStaleCurrentMembershipSnapshots(indexCode, fromDate, toDate);
+        mapper.deleteStaleMarketSnapshots(indexCode, fromDate, toDate);
+        int secSharesRows = mapper.refreshSecSharesOutstandingSnapshots(indexCode, fromDate, toDate);
+        int marketRows = mapper.refreshMarketSnapshots(indexCode, fromDate, toDate);
+        int proxySharesRows = mapper.refreshSharesOutstandingSnapshots(indexCode, fromDate, toDate);
+        List<StockMarketSnapshot> snapshots = mapper.findMarketSnapshots(indexCode, fromDate, toDate);
+        Set<LocalDate> expectedDates = new HashSet<>();
+        Set<RiskKey> snapshotKeys = new HashSet<>();
+        for (StockMarketSnapshot row : snapshots) {
+            if (row == null || row.getSnapshotDate() == null || row.getSnapshotDate().isBefore(fromDate)
+                    || row.getSnapshotDate().isAfter(toDate) || row.getSymbol() == null
+                    || !snapshotKeys.add(new RiskKey(row.getSymbol(), row.getSnapshotDate()))
+                    || !positive(row.getClosePrice()) || !Double.isFinite(number(row.getClosePrice()))
+                    || (row.getMarketCapUsd() != null && !Double.isFinite(number(row.getMarketCapUsd()))))
+                throw new IllegalStateException("Invalid LIVE benchmark input snapshot");
+            expectedDates.add(row.getSnapshotDate());
+        }
+        if (!expectedDates.remove(fromDate))
+            throw new IllegalStateException("Market snapshots must include the stored benchmark anchor");
+        List<StockBenchmarkReturn> rows = buildBenchmarkReturns(indexCode, snapshots);
+        double level = number(anchor.getBenchmarkLevel());
+        LocalDate previousDate = fromDate;
+        for (StockBenchmarkReturn row : rows) {
+            double returnPct = number(row.getReturnPct());
+            if (!row.getTradeDate().isAfter(previousDate) || !expectedDates.remove(row.getTradeDate())
+                    || !Double.isFinite(returnPct) || returnPct <= -100.0d)
+                throw new IllegalStateException("Invalid forward benchmark return");
+            level *= 1.0d + returnPct / 100.0d;
+            if (!Double.isFinite(level) || level <= 0)
+                throw new IllegalStateException("Invalid forward benchmark level");
+            row.setBenchmarkLevel(BigDecimal.valueOf(level));
+            previousDate = row.getTradeDate();
+        }
+        if (!expectedDates.isEmpty())
+            throw new IllegalStateException("Missing benchmark returns for market snapshot sessions: " + expectedDates);
+        // Validate the complete append before the first benchmark write (the legacy builder starts at 1000).
+        for (StockBenchmarkReturn row : rows) mapper.upsertBenchmarkReturn(row);
+        int tossRows = (int) snapshots.stream().filter(row -> row.getSharesSource() != null
+                && row.getSharesSource().startsWith("TOSS_CURRENT")).count();
+        int fallbackRows = (int) snapshots.stream().filter(row -> row.getMarketCapSource() == null
+                || "FINNHUB_CURRENT_MARKET_CAP".equals(row.getMarketCapSource())).count();
+        return new MarketSnapshotRefreshResult(marketRows, snapshots.size(), rows.size(), tossRows, fallbackRows,
+                membershipRows + removedMembershipRows, secSharesRows + proxySharesRows);
+    }
+
+    /** Rebuild only the existing research proxy after a price repair, preserving membership/share/cap inputs. */
+    @org.springframework.transaction.annotation.Transactional
+    public int rebuildBenchmarkReturns(String indexCode, LocalDate fromDate, LocalDate toDate) {
+        if(indexCode==null || fromDate==null || toDate==null || fromDate.isAfter(toDate))
+            throw new IllegalArgumentException("Valid index and date interval required");
+        StockBacktestMapper mapper=stockBacktestMapper.getIfAvailable();
+        if(mapper==null) throw new IllegalStateException("StockBacktestMapper unavailable");
+        clearPortfolioViewCache();
+        var rows=buildBenchmarkReturns(indexCode,mapper.findMarketSnapshots(indexCode,fromDate,toDate));
+        for(var row:rows) mapper.upsertBenchmarkReturn(row);
+        return rows.size();
+    }
+
     public RiskFreeRateRefreshResult refreshRiskFreeRateSnapshots(String indexCode,
             List<StockRiskFreeRateSnapshot> snapshots) {
         clearPortfolioViewCache();
@@ -801,7 +888,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -841,7 +928,7 @@ public class StockPortfolioBacktestService {
                 }
                 List<StockBacktestResult> trainingRows = results.stream()
                         .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                        .filter(row -> row.getSignalDate().isBefore(targetDate))
+                        .filter(row -> maturedBefore(row, targetDate))
                         .toList();
                 if (trainingRows.size() < requiredTrainingRows) {
                     continue;
@@ -851,18 +938,18 @@ public class StockPortfolioBacktestService {
                     continue;
                 }
                 trainedRows += observations.size();
-                double targetBenchmark = targetRows.stream()
-                        .mapToDouble(StockPortfolioBacktestService::returnPct)
-                        .average()
-                        .orElse(0.0d);
+                Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
+                // Use the identical complete benchmark horizon for training and evaluation.
                 for (StockBacktestResult row : targetRows) {
-                    ExpectedReturnStats stats = expectedReturnStats(row, observations);
+                    ExpectedReturnStats stats = expectedReturnStats(row,
+                            orderedNeighborhood(observations, score(row), orderedNeighborhoods));
                     mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, row, stats,
                             EXPECTED_RETURN_HISTORICAL_SOURCE, EXPECTED_RETURN_V2_MODEL_VERSION));
-                    double actualExcess = returnPct(row) - targetBenchmark;
-                    evaluations.add(new PredictionEvaluation(horizon,
-                            stats.calibratedUpsideProbabilityPct(),
-                            actualExcess > 0));
+                    double actualExcess = returnPct(row) - number(row.getBenchmarkReturnPct());
+                    if (Double.isFinite(actualExcess) && maturedBefore(row, LocalDate.now())) {
+                        evaluations.add(new PredictionEvaluation(horizon, stats.calibratedUpsideProbabilityPct(),
+                                actualExcess > 0));
+                    }
                     savedRows++;
                 }
                 processedAny = true;
@@ -889,7 +976,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> trainingSource = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> trainingSource = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -914,7 +1001,7 @@ public class StockPortfolioBacktestService {
         for (Integer horizon : horizons) {
             List<StockBacktestResult> trainingRows = trainingSource.stream()
                     .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                    .filter(row -> row.getSignalDate() != null && row.getSignalDate().isBefore(targetDate))
+                    .filter(row -> maturedBefore(row, targetDate))
                     .toList();
             if (trainingRows.size() < requiredTrainingRows) {
                 continue;
@@ -924,9 +1011,11 @@ public class StockPortfolioBacktestService {
                 continue;
             }
             trainedRows += observations.size();
+            Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
             for (StockBacktestResult row : latestRows) {
                 StockBacktestResult targetRow = latestExpectedReturnTarget(row, targetDate, horizon);
-                ExpectedReturnStats stats = expectedReturnStats(targetRow, observations);
+                ExpectedReturnStats stats = expectedReturnStats(targetRow,
+                        orderedNeighborhood(observations, score(targetRow), orderedNeighborhoods));
                 mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, targetRow, stats,
                         EXPECTED_RETURN_LIVE_SOURCE, EXPECTED_RETURN_V2_MODEL_VERSION));
                 savedRows++;
@@ -943,7 +1032,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -990,7 +1079,7 @@ public class StockPortfolioBacktestService {
                 }
                 List<StockBacktestResult> trainingRows = results.stream()
                         .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                        .filter(row -> row.getSignalDate().isBefore(targetDate))
+                        .filter(row -> maturedBefore(row, targetDate))
                         .toList();
                 if (trainingRows.size() < requiredTrainingRows) {
                     continue;
@@ -1000,24 +1089,24 @@ public class StockPortfolioBacktestService {
                     continue;
                 }
                 trainedRows += observations.size();
+                Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
                 Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                         coefficientsBySector(observations, targetRows);
-                double targetBenchmark = targetRows.stream()
-                        .mapToDouble(StockPortfolioBacktestService::returnPct)
-                        .average()
-                        .orElse(0.0d);
+                // Use the identical complete benchmark horizon for training and evaluation.
                 for (StockBacktestResult row : targetRows) {
-                    ExpectedReturnStats baseStats = expectedReturnStats(row, observations);
+                    ExpectedReturnStats baseStats = expectedReturnStats(row,
+                            orderedNeighborhood(observations, score(row), orderedNeighborhoods));
                     FactorAdjustedPrediction prediction = factorAdjustedPrediction(row, baseStats,
                             coefficientsBySector.getOrDefault(fallback(row.getSector()), Map.of()));
                     mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, row, prediction.stats(),
                             EXPECTED_RETURN_V3_HISTORICAL_SOURCE, EXPECTED_RETURN_V3_MODEL_VERSION));
                     saveExpectedReturnFactorContributions(mapper, indexCode, row, prediction.contributions(),
                             EXPECTED_RETURN_V3_HISTORICAL_SOURCE, EXPECTED_RETURN_V3_MODEL_VERSION);
-                    double actualExcess = returnPct(row) - targetBenchmark;
-                    evaluations.add(new PredictionEvaluation(horizon,
-                            prediction.stats().calibratedUpsideProbabilityPct(),
-                            actualExcess > 0));
+                    double actualExcess = returnPct(row) - number(row.getBenchmarkReturnPct());
+                    if (Double.isFinite(actualExcess) && maturedBefore(row, LocalDate.now())) {
+                        evaluations.add(new PredictionEvaluation(horizon, prediction.stats().calibratedUpsideProbabilityPct(),
+                                actualExcess > 0));
+                    }
                     savedRows++;
                 }
                 processedAny = true;
@@ -1044,7 +1133,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> trainingSource = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> trainingSource = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1072,7 +1161,7 @@ public class StockPortfolioBacktestService {
         for (Integer horizon : horizons) {
             List<StockBacktestResult> trainingRows = trainingSource.stream()
                     .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                    .filter(row -> row.getSignalDate() != null && row.getSignalDate().isBefore(targetDate))
+                    .filter(row -> maturedBefore(row, targetDate))
                     .toList();
             if (trainingRows.size() < requiredTrainingRows) {
                 continue;
@@ -1082,11 +1171,13 @@ public class StockPortfolioBacktestService {
                 continue;
             }
             trainedRows += observations.size();
+            Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
             Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                     coefficientsBySector(observations, latestRows);
             for (StockBacktestResult row : latestRows) {
                 StockBacktestResult targetRow = latestExpectedReturnTarget(row, targetDate, horizon);
-                ExpectedReturnStats baseStats = expectedReturnStats(targetRow, observations);
+                ExpectedReturnStats baseStats = expectedReturnStats(targetRow,
+                        orderedNeighborhood(observations, score(targetRow), orderedNeighborhoods));
                 FactorAdjustedPrediction prediction = factorAdjustedPrediction(targetRow, baseStats,
                         coefficientsBySector.getOrDefault(fallback(targetRow.getSector()), Map.of()));
                 mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, targetRow, prediction.stats(),
@@ -1107,7 +1198,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1168,7 +1259,7 @@ public class StockPortfolioBacktestService {
                 }
                 List<StockBacktestResult> trainingRows = results.stream()
                         .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                        .filter(row -> row.getSignalDate().isBefore(targetDate))
+                        .filter(row -> maturedBefore(row, targetDate))
                         .toList();
                 if (trainingRows.size() < requiredTrainingRows) {
                     continue;
@@ -1178,24 +1269,24 @@ public class StockPortfolioBacktestService {
                     continue;
                 }
                 trainedRows += observations.size();
+                Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
                 Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                         coefficientsBySectorAndRegime(observations, targetRows, targetRegime);
-                double targetBenchmark = targetRows.stream()
-                        .mapToDouble(StockPortfolioBacktestService::returnPct)
-                        .average()
-                        .orElse(0.0d);
+                // Use the identical complete benchmark horizon for training and evaluation.
                 for (StockBacktestResult row : targetRows) {
-                    ExpectedReturnStats baseStats = expectedReturnStats(row, observations);
+                    ExpectedReturnStats baseStats = expectedReturnStats(row,
+                            orderedNeighborhood(observations, score(row), orderedNeighborhoods));
                     FactorAdjustedPrediction prediction = factorAdjustedPrediction(row, baseStats,
                             coefficientsBySector.getOrDefault(fallback(row.getSector()), Map.of()));
                     mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, row, prediction.stats(),
                             EXPECTED_RETURN_V4_HISTORICAL_SOURCE, EXPECTED_RETURN_V4_MODEL_VERSION));
                     saveExpectedReturnFactorContributions(mapper, indexCode, row, prediction.contributions(),
                             EXPECTED_RETURN_V4_HISTORICAL_SOURCE, EXPECTED_RETURN_V4_MODEL_VERSION);
-                    double actualExcess = returnPct(row) - targetBenchmark;
-                    evaluations.add(new PredictionEvaluation(horizon,
-                            prediction.stats().calibratedUpsideProbabilityPct(),
-                            actualExcess > 0));
+                    double actualExcess = returnPct(row) - number(row.getBenchmarkReturnPct());
+                    if (Double.isFinite(actualExcess) && maturedBefore(row, LocalDate.now())) {
+                        evaluations.add(new PredictionEvaluation(horizon, prediction.stats().calibratedUpsideProbabilityPct(),
+                                actualExcess > 0));
+                    }
                     savedRows++;
                 }
                 processedAny = true;
@@ -1222,7 +1313,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> trainingSource = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> trainingSource = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1258,7 +1349,7 @@ public class StockPortfolioBacktestService {
         for (Integer horizon : horizons) {
             List<StockBacktestResult> trainingRows = trainingSource.stream()
                     .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                    .filter(row -> row.getSignalDate() != null && row.getSignalDate().isBefore(targetDate))
+                    .filter(row -> maturedBefore(row, targetDate))
                     .toList();
             if (trainingRows.size() < requiredTrainingRows) {
                 continue;
@@ -1268,11 +1359,13 @@ public class StockPortfolioBacktestService {
                 continue;
             }
             trainedRows += observations.size();
+            Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
             Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                     coefficientsBySectorAndRegime(observations, latestRows, targetRegime);
             for (StockBacktestResult row : latestRows) {
                 StockBacktestResult targetRow = latestExpectedReturnTarget(row, targetDate, horizon);
-                ExpectedReturnStats baseStats = expectedReturnStats(targetRow, observations);
+                ExpectedReturnStats baseStats = expectedReturnStats(targetRow,
+                        orderedNeighborhood(observations, score(targetRow), orderedNeighborhoods));
                 FactorAdjustedPrediction prediction = factorAdjustedPrediction(targetRow, baseStats,
                         coefficientsBySector.getOrDefault(fallback(targetRow.getSector()), Map.of()));
                 mapper.upsertExpectedReturnSnapshot(toExpectedReturnSnapshot(indexCode, targetRow, prediction.stats(),
@@ -1293,7 +1386,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1354,7 +1447,7 @@ public class StockPortfolioBacktestService {
                 }
                 List<StockBacktestResult> trainingRows = results.stream()
                         .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                        .filter(row -> row.getSignalDate().isBefore(targetDate))
+                        .filter(row -> maturedBefore(row, targetDate))
                         .toList();
                 if (trainingRows.size() < requiredTrainingRows) {
                     continue;
@@ -1364,16 +1457,15 @@ public class StockPortfolioBacktestService {
                     continue;
                 }
                 trainedRows += observations.size();
+                Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
                 Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                         coefficientsBySectorAndRegime(observations, targetRows, targetRegime);
                 Map<String, Map<String, FactorCoefficient>> interactionsBySector =
                         interactionCoefficientsBySectorAndRegime(observations, targetRows, targetRegime);
-                double targetBenchmark = targetRows.stream()
-                        .mapToDouble(StockPortfolioBacktestService::returnPct)
-                        .average()
-                        .orElse(0.0d);
+                // Use the identical complete benchmark horizon for training and evaluation.
                 for (StockBacktestResult row : targetRows) {
-                    ExpectedReturnStats baseStats = expectedReturnStats(row, observations);
+                    ExpectedReturnStats baseStats = expectedReturnStats(row,
+                            orderedNeighborhood(observations, score(row), orderedNeighborhoods));
                     FactorAdjustedPrediction prediction = nonlinearFactorAdjustedPrediction(row, baseStats,
                             coefficientsBySector.getOrDefault(fallback(row.getSector()), Map.of()),
                             interactionsBySector.getOrDefault(fallback(row.getSector()), Map.of()));
@@ -1381,10 +1473,11 @@ public class StockPortfolioBacktestService {
                             EXPECTED_RETURN_V5_HISTORICAL_SOURCE, EXPECTED_RETURN_V5_MODEL_VERSION));
                     saveExpectedReturnFactorContributions(mapper, indexCode, row, prediction.contributions(),
                             EXPECTED_RETURN_V5_HISTORICAL_SOURCE, EXPECTED_RETURN_V5_MODEL_VERSION);
-                    double actualExcess = returnPct(row) - targetBenchmark;
-                    evaluations.add(new PredictionEvaluation(horizon,
-                            prediction.stats().calibratedUpsideProbabilityPct(),
-                            actualExcess > 0));
+                    double actualExcess = returnPct(row) - number(row.getBenchmarkReturnPct());
+                    if (Double.isFinite(actualExcess) && maturedBefore(row, LocalDate.now())) {
+                        evaluations.add(new PredictionEvaluation(horizon, prediction.stats().calibratedUpsideProbabilityPct(),
+                                actualExcess > 0));
+                    }
                     savedRows++;
                 }
                 processedAny = true;
@@ -1411,7 +1504,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> trainingSource = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> trainingSource = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1447,7 +1540,7 @@ public class StockPortfolioBacktestService {
         for (Integer horizon : horizons) {
             List<StockBacktestResult> trainingRows = trainingSource.stream()
                     .filter(row -> Objects.equals(row.getHorizonDays(), horizon))
-                    .filter(row -> row.getSignalDate() != null && row.getSignalDate().isBefore(targetDate))
+                    .filter(row -> maturedBefore(row, targetDate))
                     .toList();
             if (trainingRows.size() < requiredTrainingRows) {
                 continue;
@@ -1457,13 +1550,15 @@ public class StockPortfolioBacktestService {
                 continue;
             }
             trainedRows += observations.size();
+            Map<Integer, List<TrainingObservation>> orderedNeighborhoods = new HashMap<>();
             Map<String, Map<String, FactorCoefficient>> coefficientsBySector =
                     coefficientsBySectorAndRegime(observations, latestRows, targetRegime);
             Map<String, Map<String, FactorCoefficient>> interactionsBySector =
                     interactionCoefficientsBySectorAndRegime(observations, latestRows, targetRegime);
             for (StockBacktestResult row : latestRows) {
                 StockBacktestResult targetRow = latestExpectedReturnTarget(row, targetDate, horizon);
-                ExpectedReturnStats baseStats = expectedReturnStats(targetRow, observations);
+                ExpectedReturnStats baseStats = expectedReturnStats(targetRow,
+                        orderedNeighborhood(observations, score(targetRow), orderedNeighborhoods));
                 FactorAdjustedPrediction prediction = nonlinearFactorAdjustedPrediction(targetRow, baseStats,
                         coefficientsBySector.getOrDefault(fallback(targetRow.getSector()), Map.of()),
                         interactionsBySector.getOrDefault(fallback(targetRow.getSector()), Map.of()));
@@ -1485,7 +1580,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1505,10 +1600,9 @@ public class StockPortfolioBacktestService {
         if (targetDates.isEmpty()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, Math.max(50, minTrainingRows), 0);
         }
-        LocalDate fromDate = targetDates.get(0);
         LocalDate toDate = targetDates.get(targetDates.size() - 1);
         List<StockExpectedReturnSnapshot> v5Snapshots = mapper.findExpectedReturnSnapshots(indexCode,
-                        fromDate, toDate).stream()
+                        results.getFirst().getSignalDate(), toDate).stream()
                 .filter(snapshot -> EXPECTED_RETURN_V5_MODEL_VERSION.equals(snapshot.getModelVersion()))
                 .toList();
         if (v5Snapshots.isEmpty()) {
@@ -1522,13 +1616,8 @@ public class StockPortfolioBacktestService {
                 .filter(row -> row.getSignalDate() != null && row.getSymbol() != null && row.getHorizonDays() != null)
                 .collect(Collectors.toMap(row -> new ExpectedResultKey(row.getSignalDate(), row.getSymbol(),
                         row.getHorizonDays()), Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        Map<ExpectedBenchmarkKey, Double> benchmarkByKey = results.stream()
-                .filter(row -> row.getSignalDate() != null && row.getHorizonDays() != null)
-                .collect(Collectors.groupingBy(row -> new ExpectedBenchmarkKey(row.getSignalDate(), row.getHorizonDays()),
-                        LinkedHashMap::new, Collectors.averagingDouble(StockPortfolioBacktestService::returnPct)));
-        ExpectedCalibrationLookup calibrationLookup =
-                ExpectedCalibrationLookup.from(mapper.findExpectedReturnCalibrations(indexCode,
-                        EXPECTED_RETURN_V5_MODEL_VERSION));
+
+        // Calibration is fitted independently at every decision date from matured corrected OOF outcomes.
 
         int savedRows = 0;
         int processedDates = 0;
@@ -1540,6 +1629,8 @@ public class StockPortfolioBacktestService {
         int trainedRows = (int) Math.min(Integer.MAX_VALUE, trainedRowCount);
         List<PredictionEvaluation> evaluations = new ArrayList<>();
         for (LocalDate targetDate : targetDates) {
+            ExpectedCalibrationLookup calibrationLookup = calibrationAsOf(indexCode, EXPECTED_RETURN_V5_MODEL_VERSION,
+                    v5Snapshots, results, targetDate);
             List<StockExpectedReturnSnapshot> targetSnapshots = snapshotsByDate.getOrDefault(targetDate, List.of());
             if (targetSnapshots.isEmpty()) {
                 continue;
@@ -1554,9 +1645,9 @@ public class StockPortfolioBacktestService {
                 mapper.upsertExpectedReturnSnapshot(stabilized);
                 StockBacktestResult actual = resultsByKey.get(new ExpectedResultKey(sourceSnapshot.getSignalDate(),
                         sourceSnapshot.getSymbol(), valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                Double benchmark = benchmarkByKey.get(new ExpectedBenchmarkKey(sourceSnapshot.getSignalDate(),
-                        valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                if (actual != null && benchmark != null) {
+                Double benchmark = actual == null || actual.getBenchmarkReturnPct() == null ? null
+                        : actual.getBenchmarkReturnPct().doubleValue();
+                if (actual != null && benchmark != null && maturedBefore(actual, LocalDate.now())) {
                     evaluations.add(new PredictionEvaluation(valueOr(sourceSnapshot.getHorizonDays(), 0),
                             number(stabilized.getCalibratedUpsideProbabilityPct()),
                             returnPct(actual) - benchmark > 0.0d));
@@ -1594,9 +1685,12 @@ public class StockPortfolioBacktestService {
         if (v5Snapshots.isEmpty()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, Math.max(50, minTrainingRows), 0);
         }
-        ExpectedCalibrationLookup calibrationLookup =
-                ExpectedCalibrationLookup.from(mapper.findExpectedReturnCalibrations(indexCode,
-                        EXPECTED_RETURN_V5_MODEL_VERSION));
+        List<StockBacktestResult> calibrationResults = researchResults(mapper, indexCode, Math.max(1, resultLimit));
+        List<StockExpectedReturnSnapshot> calibrationSnapshots = mapper.findExpectedReturnSnapshots(indexCode,
+                targetDate.minusYears(8), targetDate).stream()
+                .filter(snapshot -> EXPECTED_RETURN_V5_MODEL_VERSION.equals(snapshot.getModelVersion())).toList();
+        ExpectedCalibrationLookup calibrationLookup = calibrationAsOf(indexCode, EXPECTED_RETURN_V5_MODEL_VERSION,
+                calibrationSnapshots, calibrationResults, targetDate);
 
         mapper.deleteExpectedReturnFactorContributions(indexCode, targetDate, EXPECTED_RETURN_V6_MODEL_VERSION);
         mapper.copyExpectedReturnFactorContributions(indexCode, targetDate, EXPECTED_RETURN_V5_MODEL_VERSION,
@@ -1621,7 +1715,7 @@ public class StockPortfolioBacktestService {
         if (mapper == null || indexCode == null || indexCode.isBlank()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, 0, 0);
         }
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(StockPortfolioBacktestService::usable)
                 .sorted(Comparator
                         .comparing(StockBacktestResult::getSignalDate)
@@ -1644,7 +1738,7 @@ public class StockPortfolioBacktestService {
         LocalDate fromDate = targetDates.get(0);
         LocalDate toDate = targetDates.get(targetDates.size() - 1);
         List<StockExpectedReturnSnapshot> v6Snapshots = mapper.findExpectedReturnSnapshots(indexCode,
-                        fromDate, toDate).stream()
+                        results.getFirst().getSignalDate(), toDate).stream()
                 .filter(snapshot -> EXPECTED_RETURN_V6_MODEL_VERSION.equals(snapshot.getModelVersion()))
                 .toList();
         if (v6Snapshots.isEmpty()) {
@@ -1658,13 +1752,8 @@ public class StockPortfolioBacktestService {
                 .filter(row -> row.getSignalDate() != null && row.getSymbol() != null && row.getHorizonDays() != null)
                 .collect(Collectors.toMap(row -> new ExpectedResultKey(row.getSignalDate(), row.getSymbol(),
                         row.getHorizonDays()), Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        Map<ExpectedBenchmarkKey, Double> benchmarkByKey = results.stream()
-                .filter(row -> row.getSignalDate() != null && row.getHorizonDays() != null)
-                .collect(Collectors.groupingBy(row -> new ExpectedBenchmarkKey(row.getSignalDate(), row.getHorizonDays()),
-                        LinkedHashMap::new, Collectors.averagingDouble(StockPortfolioBacktestService::returnPct)));
-        ExpectedCalibrationLookup calibrationLookup =
-                ExpectedCalibrationLookup.from(mapper.findExpectedReturnCalibrations(indexCode,
-                        EXPECTED_RETURN_V6_MODEL_VERSION));
+
+        // Calibration is fitted independently at every decision date from matured corrected OOF outcomes.
 
         int savedRows = 0;
         int processedDates = 0;
@@ -1676,6 +1765,8 @@ public class StockPortfolioBacktestService {
         int trainedRows = (int) Math.min(Integer.MAX_VALUE, trainedRowCount);
         List<PredictionEvaluation> evaluations = new ArrayList<>();
         for (LocalDate targetDate : targetDates) {
+            ExpectedCalibrationLookup calibrationLookup = calibrationAsOf(indexCode, EXPECTED_RETURN_V6_MODEL_VERSION,
+                    v6Snapshots, results, targetDate);
             List<StockExpectedReturnSnapshot> targetSnapshots = snapshotsByDate.getOrDefault(targetDate, List.of());
             if (targetSnapshots.isEmpty()) {
                 continue;
@@ -1690,9 +1781,9 @@ public class StockPortfolioBacktestService {
                 mapper.upsertExpectedReturnSnapshot(stabilized);
                 StockBacktestResult actual = resultsByKey.get(new ExpectedResultKey(sourceSnapshot.getSignalDate(),
                         sourceSnapshot.getSymbol(), valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                Double benchmark = benchmarkByKey.get(new ExpectedBenchmarkKey(sourceSnapshot.getSignalDate(),
-                        valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                if (actual != null && benchmark != null) {
+                Double benchmark = actual == null || actual.getBenchmarkReturnPct() == null ? null
+                        : actual.getBenchmarkReturnPct().doubleValue();
+                if (actual != null && benchmark != null && maturedBefore(actual, LocalDate.now())) {
                     evaluations.add(new PredictionEvaluation(valueOr(sourceSnapshot.getHorizonDays(), 0),
                             number(stabilized.getCalibratedUpsideProbabilityPct()),
                             returnPct(actual) - benchmark > 0.0d));
@@ -1730,9 +1821,12 @@ public class StockPortfolioBacktestService {
         if (v6Snapshots.isEmpty()) {
             return new ExpectedReturnRefreshResult(0, 0, 0, Math.max(50, minTrainingRows), 0);
         }
-        ExpectedCalibrationLookup calibrationLookup =
-                ExpectedCalibrationLookup.from(mapper.findExpectedReturnCalibrations(indexCode,
-                        EXPECTED_RETURN_V6_MODEL_VERSION));
+        List<StockBacktestResult> calibrationResults = researchResults(mapper, indexCode, Math.max(1, resultLimit));
+        List<StockExpectedReturnSnapshot> calibrationSnapshots = mapper.findExpectedReturnSnapshots(indexCode,
+                targetDate.minusYears(8), targetDate).stream()
+                .filter(snapshot -> EXPECTED_RETURN_V6_MODEL_VERSION.equals(snapshot.getModelVersion())).toList();
+        ExpectedCalibrationLookup calibrationLookup = calibrationAsOf(indexCode, EXPECTED_RETURN_V6_MODEL_VERSION,
+                calibrationSnapshots, calibrationResults, targetDate);
 
         mapper.deleteExpectedReturnFactorContributions(indexCode, targetDate, EXPECTED_RETURN_V7_MODEL_VERSION);
         mapper.copyExpectedReturnFactorContributions(indexCode, targetDate, EXPECTED_RETURN_V6_MODEL_VERSION,
@@ -1872,19 +1966,67 @@ public class StockPortfolioBacktestService {
                 a.size());
     }
 
+    static String sourceWithCutoff(String source, LocalDate decisionDate) {
+        return source + "_CUTOFF_LT_" + decisionDate.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+    }
+
+    static boolean maturedBefore(StockBacktestResult row, LocalDate decisionDate) {
+        return row.getSignalDate() != null && row.getSignalDate().isBefore(decisionDate)
+                && row.getExitTradeDate() != null && row.getExitTradeDate().isBefore(decisionDate);
+    }
+
+    static List<StockBacktestResult> researchResults(StockBacktestMapper mapper, String indexCode, int limit) {
+        List<StockBacktestResult> rows = mapper.findResults(indexCode, limit);
+        LocalDate from = rows.stream().map(StockBacktestResult::getEntryTradeDate).filter(Objects::nonNull)
+                .min(LocalDate::compareTo).orElse(null);
+        LocalDate to = rows.stream().map(StockBacktestResult::getExitTradeDate).filter(Objects::nonNull)
+                .max(LocalDate::compareTo).orElse(null);
+        List<StockBenchmarkReturn> benchmarks = from == null || to == null ? List.of()
+                : mapper.findBenchmarkReturns(indexCode, from, to);
+        Map<BenchmarkPeriodKey, Double> byPeriod = new HashMap<>();
+        for (StockBacktestResult row : rows) {
+            BenchmarkPeriodKey key = new BenchmarkPeriodKey(row.getEntryTradeDate(), row.getExitTradeDate(),
+                    valueOr(row.getHorizonDays(), 0));
+            if (!byPeriod.containsKey(key)) {
+                byPeriod.put(key, com.kingyurina.demo.stock.evaluation.CompleteBenchmarkReturn.compound(
+                        benchmarks, indexCode, key.entryDate(), key.exitDate(), key.horizonDays()));
+            }
+            Double benchmark = byPeriod.get(key);
+            row.setBenchmarkReturnPct(benchmark == null ? null : BigDecimal.valueOf(benchmark));
+        }
+        return rows;
+    }
+
+    private static ExpectedCalibrationLookup calibrationAsOf(String indexCode, String modelVersion,
+            List<StockExpectedReturnSnapshot> predictions, List<StockBacktestResult> outcomes, LocalDate asOf) {
+        Map<ExpectedResultKey, StockBacktestResult> matured = outcomes.stream()
+                .filter(row -> maturedBefore(row, asOf) && row.getBenchmarkReturnPct() != null)
+                .collect(Collectors.toMap(row -> new ExpectedResultKey(row.getSignalDate(), row.getSymbol(),
+                        valueOr(row.getHorizonDays(), 0)), Function.identity(), (left, right) -> left));
+        List<PredictionEvaluation> evaluations = new ArrayList<>();
+        for (StockExpectedReturnSnapshot prediction : predictions) {
+            if (!modelVersion.equals(prediction.getModelVersion()) || prediction.getSignalDate() == null
+                    || !prediction.getSignalDate().isBefore(asOf)) continue;
+            StockBacktestResult outcome = matured.get(new ExpectedResultKey(prediction.getSignalDate(),
+                    prediction.getSymbol(), valueOr(prediction.getHorizonDays(), 0)));
+            double probability = number(prediction.getCalibratedUpsideProbabilityPct());
+            if (outcome == null || !Double.isFinite(probability)) continue;
+            evaluations.add(new PredictionEvaluation(valueOr(prediction.getHorizonDays(), 0), probability,
+                    returnPct(outcome) > outcome.getBenchmarkReturnPct().doubleValue()));
+        }
+        return ExpectedCalibrationLookup.from(expectedReturnCalibrations(indexCode, modelVersion, evaluations));
+    }
+
     private static List<TrainingObservation> trainingObservations(List<StockBacktestResult> trainingRows) {
         return trainingObservations(trainingRows, MacroRegimeLookup.empty());
     }
 
     private static List<TrainingObservation> trainingObservations(List<StockBacktestResult> trainingRows,
             MacroRegimeLookup macroLookup) {
-        Map<LocalDate, Double> dateBenchmark = trainingRows.stream()
-                .filter(row -> row.getSignalDate() != null)
-                .collect(Collectors.groupingBy(StockBacktestResult::getSignalDate, LinkedHashMap::new,
-                        Collectors.averagingDouble(StockPortfolioBacktestService::returnPct)));
         List<TrainingObservation> observations = new ArrayList<>();
         for (StockBacktestResult row : trainingRows) {
-            Double benchmarkReturn = dateBenchmark.get(row.getSignalDate());
+            Double benchmarkReturn = row.getBenchmarkReturnPct() == null ? null
+                    : row.getBenchmarkReturnPct().doubleValue();
             if (benchmarkReturn == null || !Double.isFinite(benchmarkReturn)) {
                 continue;
             }
@@ -2002,7 +2144,7 @@ public class StockPortfolioBacktestService {
         snapshot.setCalibrationBucket(stats.calibrationBucket());
         snapshot.setCalibrationErrorPct(decimalOrNull(stats.calibrationErrorPct()));
         snapshot.setModelVersion(modelVersion);
-        snapshot.setSource(source);
+        snapshot.setSource(sourceWithCutoff(source, row.getSignalDate()));
         return snapshot;
     }
 
@@ -2091,7 +2233,7 @@ public class StockPortfolioBacktestService {
         stabilized.setCalibrationBucket(probabilityBucket(calibratedUpside));
         stabilized.setCalibrationErrorPct(decimalOrNull(calibrationError));
         stabilized.setModelVersion(EXPECTED_RETURN_V6_MODEL_VERSION);
-        stabilized.setSource(source);
+        stabilized.setSource(sourceWithCutoff(source, sourceSnapshot.getSignalDate()));
         return stabilized;
     }
 
@@ -2191,7 +2333,7 @@ public class StockPortfolioBacktestService {
         stabilized.setCalibrationBucket(probabilityBucket(calibratedUpside));
         stabilized.setCalibrationErrorPct(decimalOrNull(calibrationError));
         stabilized.setModelVersion(EXPECTED_RETURN_V7_MODEL_VERSION);
-        stabilized.setSource(source);
+        stabilized.setSource(sourceWithCutoff(source, sourceSnapshot.getSignalDate()));
         return stabilized;
     }
 
@@ -2773,6 +2915,12 @@ public class StockPortfolioBacktestService {
         return 25.0d;
     }
 
+    private static List<TrainingObservation> orderedNeighborhood(List<TrainingObservation> observations, int score,
+            Map<Integer, List<TrainingObservation>> localByScore) {
+        return localByScore.computeIfAbsent(score,
+                key -> nearestByScore(observations, key, observations.size()));
+    }
+
     private static List<TrainingObservation> scoreBand(List<TrainingObservation> observations, int score,
             int scoreRadius, int limit) {
         return observations.stream()
@@ -3033,6 +3181,7 @@ public class StockPortfolioBacktestService {
 
         List<PortfolioPeriod> periods = new ArrayList<>();
         Map<String, Double> previousWeights = Map.of();
+        LocalDate capitalAvailableAfter = null;
 
         for (Map.Entry<LocalDate, List<StockBacktestResult>> entry : byDate.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -3041,6 +3190,14 @@ public class StockPortfolioBacktestService {
                     .filter(StockPortfolioBacktestService::usable)
                     .toList();
             if (universe.size() < config.topCount()) {
+                continue;
+            }
+            LocalDate entryDate = universe.getFirst().getEntryTradeDate();
+            LocalDate exitDate = universe.getFirst().getExitTradeDate();
+            if (entryDate == null || exitDate == null || !exitDate.isAfter(entryDate)
+                    || (capitalAvailableAfter != null && !entryDate.isAfter(capitalAvailableAfter))
+                    || universe.stream().anyMatch(row -> !entryDate.equals(row.getEntryTradeDate())
+                        || !exitDate.equals(row.getExitTradeDate()) || row.getBenchmarkReturnPct() == null)) {
                 continue;
             }
 
@@ -3066,10 +3223,11 @@ public class StockPortfolioBacktestService {
             double riskFreePeriodReturn = riskFreeRateLookup.periodReturnPct(entry.getKey(), config.horizonDays());
             double cashReturn = cashWeight(weights) * riskFreePeriodReturn;
             double grossReturn = weightedReturn(selected, weights) + cashReturn;
-            double benchmarkReturn = benchmarkReturn(universe);
+            double benchmarkReturn = universe.getFirst().getBenchmarkReturnPct().doubleValue();
             Map<String, Double> sectorWeights = sectorWeights(selected, weights);
             double activeSectorDeviation = activeSectorDeviation(sectorWeights, benchmarkSectorWeights);
-            double transactionCost = transactionCostPct(previousWeights, weights, riskStatsBySymbol);
+            // Every non-overlapping deployment closes fully; both entry and exit incur costs.
+            double transactionCost = 2.0d * transactionCostPct(Map.of(), weights, riskStatsBySymbol);
             double netReturn = grossReturn - transactionCost;
             double portfolioBeta = weightedRiskMetric(selected, weights, riskLookup, entry.getKey(), RiskField.BETA);
             double portfolioVolatility = weightedRiskMetric(selected, weights, riskLookup, entry.getKey(),
@@ -3082,7 +3240,8 @@ public class StockPortfolioBacktestService {
                     grossReturn, netReturn, benchmarkReturn, turnover, transactionCost,
                     riskFreeAnnualRate, riskFreePeriodReturn, cashReturn,
                     portfolioBeta, portfolioVolatility, portfolioLiquidity, activeSectorDeviation));
-            previousWeights = weights;
+            capitalAvailableAfter = exitDate;
+            previousWeights = Map.of();
         }
 
         return new StrategyRun(config, periods);
@@ -4528,7 +4687,7 @@ public class StockPortfolioBacktestService {
         double cumulativeReturn = (equity - 1.0d) * 100.0d;
         double benchmarkReturn = (benchmarkEquity - 1.0d) * 100.0d;
         double excessReturn = cumulativeReturn - benchmarkReturn;
-        double years = periods.size() * run.config().horizonDays() / 252.0d;
+        double years = elapsedYears(periods);
         double annualReturn = years > 0 ? (Math.pow(equity, 1.0d / years) - 1.0d) * 100.0d : 0;
         double volatility = annualizedVolatility(periods, run.config().horizonDays());
         double effectiveRiskFreeRate = Double.isFinite(riskFreeStats.average())
@@ -4561,6 +4720,12 @@ public class StockPortfolioBacktestService {
                 worst);
     }
 
+    private static double elapsedYears(List<PortfolioPeriod> periods) {
+        LocalDate firstEntry = periods.getFirst().positions().getFirst().getEntryTradeDate();
+        LocalDate finalExit = periods.getLast().positions().getFirst().getExitTradeDate();
+        return Math.max(1, ChronoUnit.DAYS.between(firstEntry, finalExit)) / 365.2425d;
+    }
+
     private static double annualizedVolatility(List<PortfolioPeriod> periods, int horizonDays) {
         if (periods.size() < 2) {
             return 0;
@@ -4572,7 +4737,7 @@ public class StockPortfolioBacktestService {
             variance += delta * delta;
         }
         double sampleVariance = variance / (periods.size() - 1);
-        return Math.sqrt(sampleVariance) * Math.sqrt(252.0d / horizonDays) * 100.0d;
+        return Math.sqrt(sampleVariance) * Math.sqrt(periods.size() / elapsedYears(periods)) * 100.0d;
     }
 
     private static StrategyRun selectedRun(List<StrategyRun> runs, List<StrategySummary> summaries) {
@@ -4700,13 +4865,13 @@ public class StockPortfolioBacktestService {
                                 + ", vol " + metricPercent(bestRisk.averagePortfolioVolatility()),
                         "neutral"),
                 new StockPortfolioBacktestView.MetricCard("Best excess", percent(best.excessReturn()),
-                        "vs cap-weight S&P proxy", returnTone(best.excessReturn())),
+                        "vs stored cap-weight price-return proxy", returnTone(best.excessReturn())),
                 new StockPortfolioBacktestView.MetricCard("Best Sharpe",
                         best.sharpe() == null ? "-" : decimal(best.sharpe()),
-                        "annualized, rf=" + percentUnsigned(best.averageRiskFreeRate()),
+                        "holding-endpoint estimate, rf=" + percentUnsigned(best.averageRiskFreeRate()),
                         best.sharpe() != null && best.sharpe() > 1.0d ? "positive" : "neutral"),
                 new StockPortfolioBacktestView.MetricCard("Max drawdown", percent(best.maxDrawdown()),
-                        "best strategy path", best.maxDrawdown() < -15 ? "negative" : "neutral"),
+                        "holding endpoints only; not daily MDD", best.maxDrawdown() < -15 ? "negative" : "neutral"),
                 new StockPortfolioBacktestView.MetricCard("Universe", integer(symbols),
                         integer(rebalanceDates) + " historical signal dates", "neutral"));
     }
@@ -4861,10 +5026,14 @@ public class StockPortfolioBacktestService {
                 && objectiveBreachRate <= 50.0d;
         boolean driftOk = Double.isFinite(avgWeightDistance) && avgWeightDistance <= 20.0d
                 && driftBreachRate <= 20.0d;
-        boolean pathOk = (!Double.isFinite(sharpeDelta) || sharpeDelta >= -0.05d)
-                && (!Double.isFinite(drawdownDelta) || drawdownDelta >= -3.0d)
-                && (!Double.isFinite(excessDelta) || excessDelta >= -2.0d);
-        if (sampleOk && constraintOk && objectiveOk && driftOk && pathOk) {
+        boolean pathAvailable = Double.isFinite(sharpeDelta) && Double.isFinite(drawdownDelta)
+                && Double.isFinite(excessDelta);
+        boolean pathOk = pathAvailable && sharpeDelta >= -0.05d
+                && drawdownDelta >= -3.0d && excessDelta >= -2.0d;
+        if (!pathAvailable) {
+            verdict = "Insufficient path data";
+            tone = "warning";
+        } else if (sampleOk && constraintOk && objectiveOk && driftOk && pathOk) {
             verdict = "V6 candidate";
             tone = "positive";
         } else if (sampleOk && constraintOk && objectiveOk && driftOk) {
@@ -4982,42 +5151,9 @@ public class StockPortfolioBacktestService {
 
     private static ShadowPathSummary shadowPathSummary(List<StockOptimizerShadowSnapshot> snapshots,
             boolean baseline, double annualRiskFreeRatePct) {
-        List<Double> returns = new ArrayList<>();
-        List<Double> benchmarkReturns = new ArrayList<>();
-        double equity = 1.0d;
-        double benchmarkEquity = 1.0d;
-        double peak = 1.0d;
-        double maxDrawdown = 0.0d;
-        for (StockOptimizerShadowSnapshot snapshot : snapshots) {
-            if (!baseline && !Boolean.TRUE.equals(snapshot.getUsable())) {
-                continue;
-            }
-            double returnPct = number(baseline ? snapshot.getBaselineNetReturnPct()
-                    : snapshot.getCandidateNetReturnPct());
-            double benchmarkPct = number(snapshot.getBenchmarkReturnPct());
-            if (!Double.isFinite(returnPct)) {
-                continue;
-            }
-            returns.add(returnPct);
-            equity *= 1.0d + returnPct / 100.0d;
-            peak = Math.max(peak, equity);
-            maxDrawdown = Math.min(maxDrawdown, (equity / peak - 1.0d) * 100.0d);
-            if (Double.isFinite(benchmarkPct)) {
-                benchmarkReturns.add(benchmarkPct);
-                benchmarkEquity *= 1.0d + benchmarkPct / 100.0d;
-            }
-        }
-        if (returns.isEmpty()) {
-            return ShadowPathSummary.empty();
-        }
-        double cumulativeReturn = (equity - 1.0d) * 100.0d;
-        double benchmarkReturn = (benchmarkEquity - 1.0d) * 100.0d;
-        double years = returns.size() * PRIMARY_HORIZON_DAYS / 252.0d;
-        double annualReturn = years > 0 ? (Math.pow(equity, 1.0d / years) - 1.0d) * 100.0d : 0.0d;
-        double volatility = annualizedReturnVolatility(returns, PRIMARY_HORIZON_DAYS);
-        double sharpe = volatility <= 0 ? Double.NaN : (annualReturn - annualRiskFreeRatePct) / volatility;
-        return new ShadowPathSummary(cumulativeReturn, benchmarkReturn, cumulativeReturn - benchmarkReturn,
-                maxDrawdown, annualReturn, volatility, sharpe);
+        // Legacy shadow rows have no entry/exit dates. They cannot prove a capital path.
+        // Keep objective/constraint diagnostics, but do not fabricate performance annualization.
+        return ShadowPathSummary.empty();
     }
 
     private static double annualizedReturnVolatility(List<Double> returnsPct, int horizonDays) {
@@ -5751,7 +5887,10 @@ public class StockPortfolioBacktestService {
         LocalDate minDate = results.stream().map(StockBacktestResult::getSignalDate).min(LocalDate::compareTo).orElse(null);
         LocalDate maxDate = results.stream().map(StockBacktestResult::getSignalDate).max(LocalDate::compareTo).orElse(null);
         return List.of(
-                "v1 composes stored stock_signal_backtest_result rows into portfolio-level performance.",
+                "Research only: non-overlapping entry-to-exit deployments; idle cash earns zero; entry and exit each incur transaction costs.",
+                "Annualization uses actual first-entry to final-exit calendar time; volatility/Sharpe and drawdown are holding-endpoint metrics, not daily mark-to-market.",
+                "Legacy optimizer shadow performance is unavailable because its rows do not preserve entry/exit dates.",
+                "Historical membership, share-count and price-adjustment provenance may be proxies. These results are not certified PIT or total-return performance.",
                 "Risk Model v1 adds a risk-controlled candidate with sector caps, position caps, trailing volatility, dollar-volume liquidity, and beta.",
                 "Portfolio Backtest v2 uses a dynamic transaction-cost model and compares Base vs Risk-controlled Sharpe, MDD, beta, sector concentration, cost, and excess return.",
                 "Expected Return Model v8 adds FRED macro feature adjustment on top of v7 horizon-decay stabilized outputs.",
@@ -5797,7 +5936,7 @@ public class StockPortfolioBacktestService {
             return new StockPortfolioBacktestView.HealthAlert(metric.getLayer(), "missing",
                     "Required model layer has no stored rows.", "negative");
         }
-        if ("UNIVERSE".equals(key) || "SIGNAL_LATEST".equals(key) || "DATA_QUALITY".equals(key)) {
+        if ("UNIVERSE".equals(key)) {
             return null;
         }
         if ("RISK_FREE".equals(key) && metric.getNote() != null
@@ -5829,10 +5968,10 @@ public class StockPortfolioBacktestService {
 
     private static long modelHealthStaleDays(String key) {
         return switch (key) {
-            case "MARKET_SNAPSHOT", "BENCHMARK", "MACRO_REGIME" -> 7;
+            case "SIGNAL_LATEST", "DATA_QUALITY", "MARKET_SNAPSHOT", "BENCHMARK", "MACRO_REGIME" -> 7;
             case "RISK_SNAPSHOT" -> 14;
             case "EXPECTED_RETURN_V4", "EXPECTED_RETURN_V5", "EXPECTED_RETURN_V6", "EXPECTED_RETURN_V7",
-                    "EXPECTED_RETURN_V9",
+                    "EXPECTED_RETURN_V8", "EXPECTED_RETURN_V9",
                     "FACTOR_EXPOSURE", "FACTOR_CONTRIBUTION", "COVARIANCE" -> 45;
             default -> 30;
         };
@@ -5841,11 +5980,11 @@ public class StockPortfolioBacktestService {
     private static StockPortfolioBacktestView empty(String indexCode) {
         return new StockPortfolioBacktestView(
                 indexCode,
-                "S&P 500 market-cap weighted proxy",
+                indexCode + " stored market-cap weighted price-return proxy",
                 "Dynamic transaction cost: base " + percentUnsigned(BASE_TRADE_COST_PCT)
                         + " plus liquidity, volatility, and beta impact",
                 List.of(new StockPortfolioBacktestView.MetricCard("Portfolio samples", "0",
-                        "completed signal backtest rows required", "caution")),
+                        "준비 중 · 배치에서 검증된 데이터와 새 버전 저장본을 생성해야 합니다", "caution")),
                 List.of(),
                 List.of(),
                 List.of(),
@@ -5857,7 +5996,7 @@ public class StockPortfolioBacktestService {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of("Portfolio Backtest requires completed stock_signal_backtest_result rows."));
+                List.of("INSUFFICIENT_DATA / PREPARING: no corrected materialized portfolio is ready; refresh runs in the background batch."));
     }
 
     private static int score(StockBacktestResult result) {
@@ -6897,7 +7036,7 @@ public class StockPortfolioBacktestService {
     private record ExpectedResultKey(LocalDate signalDate, String symbol, int horizonDays) {
     }
 
-    private record ExpectedBenchmarkKey(LocalDate signalDate, int horizonDays) {
+    private record BenchmarkPeriodKey(LocalDate entryDate, LocalDate exitDate, int horizonDays) {
     }
 
     private static final class ExpectedReturnLookup {

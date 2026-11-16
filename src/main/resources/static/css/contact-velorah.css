@@ -1,0 +1,318 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap');
+
+:root {
+    --background: 201 100% 13%;
+    --foreground: 0 0% 100%;
+    --muted-foreground: 240 4% 66%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%;
+    --muted: 0 0% 10%;
+    --accent: 0 0% 10%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --font-display: 'Instrument Serif', serif;
+    --font-body: 'Inter', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+}
+
+body {
+    overflow: hidden;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-body);
+    letter-spacing: -0.02em;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.velorah-hero {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 38rem;
+    flex-direction: column;
+    overflow: hidden;
+    isolation: isolate;
+    background: hsl(var(--background));
+}
+
+.velorah-video {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.velorah-navigation {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    width: min(100%, 80rem);
+    margin: 0 auto;
+    padding: 1.5rem 2rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.velorah-brand {
+    display: inline-flex;
+    align-items: flex-start;
+    font-family: var(--font-display);
+    font-size: 1.875rem;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    white-space: nowrap;
+}
+
+.velorah-brand sup {
+    margin: 0.05rem 0 0 0.13rem;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.velorah-links {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.velorah-links a {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 180ms ease;
+}
+
+.velorah-links a:hover,
+.velorah-links a:focus-visible,
+.velorah-links .is-active {
+    color: hsl(var(--foreground));
+}
+
+.liquid-glass {
+    position: relative;
+    overflow: hidden;
+    border: none;
+    background: rgba(255, 255, 255, 0.01);
+    background-blend-mode: luminosity;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.liquid-glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.4px;
+    background: linear-gradient(180deg,
+        rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.15) 20%,
+        rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 60%,
+        rgba(255, 255, 255, 0.15) 80%, rgba(255, 255, 255, 0.45) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.liquid-glass > span {
+    position: relative;
+    z-index: 1;
+}
+
+.velorah-nav-cta,
+.velorah-hero-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    transition: transform 250ms ease, background-color 250ms ease;
+}
+
+.velorah-nav-cta {
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
+}
+
+.velorah-nav-cta:hover,
+.velorah-hero-cta:hover {
+    transform: scale(1.03);
+    background-color: rgba(255, 255, 255, 0.045);
+}
+
+.velorah-navigation a:focus-visible,
+.velorah-hero-cta:focus-visible {
+    outline: 2px solid hsl(var(--foreground));
+    outline-offset: 4px;
+}
+
+.velorah-copy {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5.625rem 1.5rem;
+    text-align: center;
+}
+
+.velorah-copy h1 {
+    max-width: 80rem;
+    margin: 0;
+    color: hsl(var(--foreground));
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -2.46px;
+    text-wrap: balance;
+}
+
+.velorah-copy h1 em {
+    color: hsl(var(--muted-foreground));
+    font-style: normal;
+}
+
+.velorah-intro {
+    max-width: 42rem;
+    margin: 2rem 0 0;
+    color: hsl(var(--muted-foreground));
+    font-size: 1.125rem;
+    line-height: 1.65;
+    text-wrap: balance;
+}
+
+.velorah-hero-cta {
+    margin-top: 3rem;
+    padding: 1.25rem 3.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+@keyframes fade-rise {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-rise {
+    animation: fade-rise 0.8s ease-out both;
+}
+
+.animate-fade-rise-delay {
+    animation: fade-rise 0.8s ease-out 0.2s both;
+}
+
+.animate-fade-rise-delay-2 {
+    animation: fade-rise 0.8s ease-out 0.4s both;
+}
+
+@media (max-width: 47.99rem) {
+    .velorah-hero {
+        min-height: 34rem;
+    }
+
+    .velorah-navigation {
+        padding: 1.25rem 1.25rem;
+    }
+
+    .velorah-links {
+        display: none;
+    }
+
+    .velorah-brand {
+        font-size: 1.65rem;
+    }
+
+    .velorah-nav-cta {
+        padding: 0.6rem 1.1rem;
+    }
+
+    .velorah-copy {
+        padding: 4.5rem 1.5rem 6rem;
+    }
+
+    .velorah-copy h1 {
+        font-size: clamp(3rem, 13vw, 4.5rem);
+    }
+
+    .velorah-intro {
+        margin-top: 1.75rem;
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+
+    .velorah-hero-cta {
+        margin-top: 2.25rem;
+        padding: 1.05rem 2.75rem;
+    }
+}
+
+@media (max-height: 43.75rem) and (min-width: 48rem) {
+    .velorah-navigation {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .velorah-copy {
+        padding-top: 2rem;
+        padding-bottom: 3.5rem;
+    }
+
+    .velorah-copy h1 {
+        font-size: clamp(3rem, 7vw, 5rem);
+    }
+
+    .velorah-intro {
+        margin-top: 1.4rem;
+    }
+
+    .velorah-hero-cta {
+        margin-top: 2rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-fade-rise,
+    .animate-fade-rise-delay,
+    .animate-fade-rise-delay-2 {
+        animation: none;
+    }
+
+    .velorah-nav-cta,
+    .velorah-hero-cta {
+        transition: none;
+    }
+}

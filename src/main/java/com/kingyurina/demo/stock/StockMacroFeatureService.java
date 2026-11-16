@@ -149,7 +149,7 @@ public class StockMacroFeatureService {
         return snapshot;
     }
 
-    private static int macroTightnessScore(double shortRate, double longRate, double spread, double fedFunds) {
+    static int macroTightnessScore(double shortRate, double longRate, double spread, double fedFunds) {
         double score = 56.0d;
         if (finite(shortRate)) {
             score -= Math.max(0.0d, shortRate - 2.5d) * 5.5d;
@@ -166,7 +166,7 @@ public class StockMacroFeatureService {
         return clampInt(Math.round((float) score));
     }
 
-    private static int macroGrowthStressScore(double cpiYoy, double cpiMom, double unemploymentRate,
+    static int macroGrowthStressScore(double cpiYoy, double cpiMom, double unemploymentRate,
             double unemploymentChange3m) {
         double score = 58.0d;
         if (finite(cpiYoy)) {
@@ -186,7 +186,7 @@ public class StockMacroFeatureService {
         return clampInt(Math.round((float) score));
     }
 
-    private static int macroRiskScore(double vix, double vixChange20d, double dollarChange20d, double spread) {
+    static int macroRiskScore(double vix, double vixChange20d, double dollarChange20d, double spread) {
         double score = 58.0d;
         if (finite(vix)) {
             score -= Math.max(0.0d, vix - 18.0d) * 1.15d;

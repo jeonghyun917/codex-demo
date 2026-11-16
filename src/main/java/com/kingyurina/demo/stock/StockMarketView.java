@@ -28,7 +28,8 @@ public record StockMarketView(
             Integer expectedConfidenceValue, String expectedModelVersion, String expectedSignalDate,
             Integer valuationScore, Integer qualityScore, Integer growthScore, Integer stabilityScore,
             Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore,
-            String threeMonthHighRatio, BigDecimal threeMonthHighRatioValue, String threeMonthHighRatioTone) {
+            String threeMonthHighRatio, BigDecimal threeMonthHighRatioValue, String threeMonthHighRatioTone,
+            String priceContext, String priceBasis) {
     }
 
     public record SectorRow(String sector, String count, String marketCap, String averageChange) {

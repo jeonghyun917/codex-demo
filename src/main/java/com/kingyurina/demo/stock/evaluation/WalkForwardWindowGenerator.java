@@ -24,6 +24,9 @@ public final class WalkForwardWindowGenerator {
         List<ExpectedReturnEvaluationRow> rows = sourceRows.stream()
                 .filter(Objects::nonNull)
                 .filter(row -> row.signalDate() != null && row.labelEndDate() != null)
+                .filter(row -> row.availableAt() != null
+                        && row.availableAt().toLocalDate().equals(row.signalDate())
+                        && row.labelEndDate().isAfter(row.signalDate()))
                 .sorted(Comparator.comparing(ExpectedReturnEvaluationRow::signalDate)
                         .thenComparing(ExpectedReturnEvaluationRow::symbol,
                                 Comparator.nullsLast(String::compareTo)))

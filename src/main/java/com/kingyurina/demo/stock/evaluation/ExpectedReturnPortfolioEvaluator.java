@@ -1,13 +1,12 @@
 package com.kingyurina.demo.stock.evaluation;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class ExpectedReturnPortfolioEvaluator {
@@ -22,17 +21,22 @@ public final class ExpectedReturnPortfolioEvaluator {
     }
 
     public ExpectedReturnPortfolioMetrics evaluate(List<ExpectedReturnEvaluationRow> rows, double costBps) {
+        if (!Double.isFinite(costBps) || costBps < 0 || costBps >= 5000) {
+            throw new IllegalArgumentException("costBps must be finite and between 0 and 5000 per side");
+        }
         Map<LocalDate, List<ExpectedReturnEvaluationRow>> byDate = rows == null ? Map.of() : rows.stream()
-                .filter(row -> row != null && row.signalDate() != null)
+                .filter(row -> row != null && row.signalDate() != null && row.labelEndDate() != null
+                        && row.labelEndDate().isAfter(row.signalDate()))
                 .collect(Collectors.groupingBy(ExpectedReturnEvaluationRow::signalDate,
                         LinkedHashMap::new, Collectors.toList()));
         List<LocalDate> dates = byDate.keySet().stream().sorted().toList();
         if (dates.isEmpty()) {
-            return new ExpectedReturnPortfolioMetrics(0, 0.0d, 0.0d, 0.0d, 0.0d,
-                    Double.NaN, Double.NaN, 0.0d, 0.0d, 0.0d, 0.0d, Double.NaN);
+            return unavailable(0);
         }
 
-        Set<String> previous = Set.of();
+        LocalDate capitalAvailableOn = null;
+        LocalDate firstDecision = null;
+        LocalDate lastExit = null;
         double grossEquity = 1.0d;
         double netEquity = 1.0d;
         double benchmarkEquity = 1.0d;
@@ -45,10 +49,13 @@ public final class ExpectedReturnPortfolioEvaluator {
         List<Double> excessPeriodReturns = new ArrayList<>();
 
         for (LocalDate date : dates) {
+            // Reserve the entire capital from decision through liquidation. No overlapping cohorts.
+            if (capitalAvailableOn != null && date.isBefore(capitalAvailableOn)) continue;
             List<ExpectedReturnEvaluationRow> selected = byDate.get(date).stream()
                     .filter(row -> Double.isFinite(row.predictedExcessReturnPct())
                             && Double.isFinite(row.actualReturnPct())
-                            && Double.isFinite(row.benchmarkReturnPct()))
+                            && Double.isFinite(row.benchmarkReturnPct())
+                            && row.actualReturnPct() >= -100 && row.benchmarkReturnPct() >= -100)
                     .sorted(Comparator.comparingDouble(
                             ExpectedReturnEvaluationRow::predictedExcessReturnPct).reversed())
                     .limit(positionCount)
@@ -56,19 +63,23 @@ public final class ExpectedReturnPortfolioEvaluator {
             if (selected.isEmpty()) {
                 continue;
             }
-            Set<String> current = selected.stream().map(ExpectedReturnEvaluationRow::symbol)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            double turnover = previous.isEmpty() ? 1.0d : turnover(previous, current);
-            double costPct = turnover * Math.max(0.0d, costBps) / 100.0d;
+            // Different exit calendars/benchmark windows cannot be pooled into one holding period.
+            if (selected.stream().map(ExpectedReturnEvaluationRow::labelEndDate).distinct().count() != 1
+                    || selected.stream().map(ExpectedReturnEvaluationRow::benchmarkReturnPct).distinct().count() != 1
+                    || selected.stream().map(ExpectedReturnEvaluationRow::symbol).distinct().count() != selected.size()) continue;
+            double turnover = 2.0d; // full cash -> portfolio -> cash, including terminal liquidation
+            double costPct = turnover * costBps / 100.0d;
             double grossPct = selected.stream()
                     .mapToDouble(ExpectedReturnEvaluationRow::actualReturnPct).average().orElse(0.0d);
             double benchmarkPct = selected.stream()
                     .mapToDouble(ExpectedReturnEvaluationRow::benchmarkReturnPct).average().orElse(0.0d);
-            double netPct = grossPct - costPct;
+            double netPct = Math.max(-100.0d, grossPct - costPct);
 
             grossEquity *= 1.0d + grossPct / 100.0d;
             netEquity *= 1.0d + netPct / 100.0d;
             benchmarkEquity *= 1.0d + benchmarkPct / 100.0d;
+            if (!Double.isFinite(grossEquity) || !Double.isFinite(netEquity)
+                    || !Double.isFinite(benchmarkEquity)) return unavailable(netPeriodReturns.size() + 1);
             peak = Math.max(peak, netEquity);
             maxDrawdown = Math.min(maxDrawdown, (netEquity / peak - 1.0d) * 100.0d);
             turnoverSum += turnover * 100.0d;
@@ -78,20 +89,25 @@ public final class ExpectedReturnPortfolioEvaluator {
             if (netPct > benchmarkPct) {
                 beatCount++;
             }
-            previous = current;
+            if (firstDecision == null) firstDecision = date;
+            lastExit = selected.getFirst().labelEndDate();
+            capitalAvailableOn = lastExit;
+            if (netEquity == 0) break;
         }
 
         int periods = netPeriodReturns.size();
-        double annualizedNet = annualized(netEquity, periods);
-        double annualizedBenchmark = annualized(benchmarkEquity, periods);
+        long elapsedDays = firstDecision == null ? 0 : ChronoUnit.DAYS.between(firstDecision, lastExit);
+        double periodsPerYear = elapsedDays > 0 ? periods * 365.0d / elapsedDays : Double.NaN;
+        double annualizedNet = annualized(netEquity, elapsedDays);
+        double annualizedBenchmark = annualized(benchmarkEquity, elapsedDays);
         return new ExpectedReturnPortfolioMetrics(
                 periods,
                 (grossEquity - 1.0d) * 100.0d,
                 (netEquity - 1.0d) * 100.0d,
                 (benchmarkEquity - 1.0d) * 100.0d,
                 annualizedNet - annualizedBenchmark,
-                sharpe(netPeriodReturns),
-                sortino(netPeriodReturns),
+                sharpe(netPeriodReturns, periodsPerYear),
+                sortino(netPeriodReturns, periodsPerYear),
                 maxDrawdown,
                 periods == 0 ? 0.0d : beatCount * 100.0d / periods,
                 turnoverSum,
@@ -99,34 +115,28 @@ public final class ExpectedReturnPortfolioEvaluator {
                 tailLoss(excessPeriodReturns));
     }
 
-    private static double turnover(Set<String> previous, Set<String> current) {
-        Set<String> union = new LinkedHashSet<>(previous);
-        union.addAll(current);
-        double previousWeight = previous.isEmpty() ? 0.0d : 1.0d / previous.size();
-        double currentWeight = current.isEmpty() ? 0.0d : 1.0d / current.size();
-        double absoluteChange = 0.0d;
-        for (String symbol : union) {
-            absoluteChange += Math.abs((current.contains(symbol) ? currentWeight : 0.0d)
-                    - (previous.contains(symbol) ? previousWeight : 0.0d));
-        }
-        return absoluteChange / 2.0d;
+    private static ExpectedReturnPortfolioMetrics unavailable(int periods) {
+        return new ExpectedReturnPortfolioMetrics(periods, Double.NaN, Double.NaN, Double.NaN,
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, Double.NaN);
     }
 
-    private static double annualized(double equity, int periods) {
-        return periods == 0 ? 0.0d : (Math.pow(equity, 12.0d / periods) - 1.0d) * 100.0d;
+    private static double annualized(double equity, long elapsedDays) {
+        if (elapsedDays <= 0 || !Double.isFinite(equity) || equity < 0) return Double.NaN;
+        double value = (Math.pow(equity, 365.0d / elapsedDays) - 1.0d) * 100.0d;
+        return Double.isFinite(value) ? value : Double.NaN;
     }
 
-    private static double sharpe(List<Double> returns) {
+    private static double sharpe(List<Double> returns, double periodsPerYear) {
         double mean = returns.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
         double deviation = standardDeviation(returns, mean);
-        return deviation == 0.0d ? Double.NaN : mean / deviation * Math.sqrt(12.0d);
+        return deviation == 0.0d ? Double.NaN : mean / deviation * Math.sqrt(periodsPerYear);
     }
 
-    private static double sortino(List<Double> returns) {
+    private static double sortino(List<Double> returns, double periodsPerYear) {
         double mean = returns.stream().mapToDouble(Double::doubleValue).average().orElse(Double.NaN);
-        double downside = Math.sqrt(returns.stream().filter(value -> value < 0.0d)
-                .mapToDouble(value -> value * value).average().orElse(0.0d));
-        return downside == 0.0d ? Double.NaN : mean / downside * Math.sqrt(12.0d);
+        double downside = Math.sqrt(returns.stream()
+                .mapToDouble(value -> Math.min(0, value) * Math.min(0, value)).average().orElse(0.0d));
+        return downside == 0.0d ? Double.NaN : mean / downside * Math.sqrt(periodsPerYear);
     }
 
     private static double standardDeviation(List<Double> values, double mean) {

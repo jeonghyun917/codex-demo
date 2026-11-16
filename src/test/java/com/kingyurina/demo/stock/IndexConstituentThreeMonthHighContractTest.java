@@ -13,16 +13,21 @@ import org.springframework.core.io.ClassPathResource;
 class IndexConstituentThreeMonthHighContractTest {
 
     @Test
-    void marketQueriesProjectOneLatestDateAnchoredThreeMonthHigh() throws IOException {
+    void marketQueriesUseOneCorporateActionAdjustedCandleSeriesForPriceChangeAndThreeMonthHigh() throws IOException {
         String xml = resource("mapper/stock/IndexConstituentMapper.xml");
-        String marketRows = selectBody(xml, "findMarketRows");
-        String marketRowsBySymbols = selectBody(xml, "findMarketRowsBySymbols");
+        String marketRows = selectBody(xml, "findRawMarketRows");
+        String marketRowsBySymbols = selectBody(xml, "findRawMarketRowsBySymbols");
 
         assertTrue(xml.contains("MAX(trade_date) AS latest_trade_date"));
         assertTrue(xml.contains("DATE_SUB(date_window.latest_trade_date, INTERVAL 3 MONTH)"));
         assertTrue(xml.contains("AND date_window.latest_trade_date"));
         assertFalse(xml.contains(") window"));
+        assertTrue(xml.contains("ROW_NUMBER() OVER ("));
+        assertTrue(xml.contains("PARTITION BY c.symbol"));
+        assertTrue(xml.contains("ORDER BY c.trade_date DESC"));
         assertTrue(xml.contains("MAX(c.high_price) AS three_month_high"));
+        assertTrue(xml.contains("MAX(CASE WHEN candle_rank = 1 THEN close_price END) AS latest_close"));
+        assertTrue(xml.contains("MAX(CASE WHEN candle_rank = 2 THEN close_price END) AS previous_close"));
         assertTrue(xml.contains("GROUP BY c.symbol"));
         assertTrue(xml.contains("highs.three_month_high AS threeMonthHigh"));
         assertEquals(2, occurrences(xml, "highs.three_month_high AS threeMonthHigh"));
@@ -31,6 +36,11 @@ class IndexConstituentThreeMonthHighContractTest {
         assertEquals(1, occurrences(marketRowsBySymbols, "<include refid=\"threeMonthHighBySymbol\"/>"));
         assertTrue(marketRows.contains("ON highs.symbol = i.symbol"));
         assertTrue(marketRowsBySymbols.contains("ON highs.symbol = p.symbol"));
+        assertEquals(2, occurrences(xml, "<include refid=\"rawPriceInputs\"/>"));
+        assertFalse(xml.contains("COALESCE(highs.previous_close, q.previous_close)"));
+        assertTrue(xml.contains("q.quote_time AS quoteTime"));
+        assertTrue(xml.contains("highs.latest_source AS candleSource"));
+        assertTrue(xml.contains("ON date_window.symbol = c.symbol"));
     }
 
     private static String resource(String path) throws IOException {

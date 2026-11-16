@@ -1,10 +1,16 @@
 package com.kingyurina.demo.stock;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StockCacheService {
@@ -22,6 +28,10 @@ public class StockCacheService {
     private final ObjectProvider<Institution13fMapper> institution13fMapper;
     private final ObjectProvider<StockSymbolMapper> symbolMapper;
     private final ObjectProvider<ApiCallLogMapper> apiCallLogMapper;
+    private StockSourceFinancialService sourceFinancialService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setSourceFinancialService(StockSourceFinancialService service) { this.sourceFinancialService=service; }
 
     public StockCacheService(ObjectProvider<CompanyProfileMapper> profileMapper,
             ObjectProvider<StockQuoteMapper> quoteMapper,
@@ -162,17 +172,66 @@ public class StockCacheService {
         return mapper == null ? List.of() : mapper.findRecentBySymbol(symbol, limit);
     }
 
-    public void saveCandles(List<StockCandleDaily> candles) {
+    @Transactional
+    public CandleSaveResult saveCandles(List<StockCandleDaily> candles) {
         StockCandleMapper mapper = candleMapper.getIfAvailable();
-        if (mapper != null && !candles.isEmpty()) {
-            mapper.upsertSourceBatch(candles);
-            List<StockCandleDaily> canonicalCandles = candles.stream()
-                    .filter(StockCacheService::isCanonicalCandleSource)
-                    .toList();
-            if (!canonicalCandles.isEmpty()) {
-                mapper.upsertBatch(canonicalCandles);
+        if (candles == null || candles.isEmpty() || mapper == null) {
+            return new CandleSaveResult(candles == null ? 0 : candles.size(), 0, 0,
+                    candles == null ? 0 : candles.size(), null, "NO_PERSISTENCE");
+        }
+        List<StockCandleDaily> sourceRows = candles.stream().filter(Objects::nonNull)
+                .filter(c -> c.getSymbol() != null && !c.getSymbol().isBlank() && c.getTradeDate() != null
+                        && c.getOpenPrice() != null && c.getHighPrice() != null && c.getLowPrice() != null
+                        && c.getClosePrice() != null).toList();
+        if (!sourceRows.isEmpty()) { mapper.upsertSourceBatch(sourceRows); }
+        List<StockCandleDaily> valid = sourceRows.stream().filter(StockCacheService::isCanonicalCandleSource)
+                .filter(StockCacheService::hasValidCandlePrices).toList();
+        int accepted = 0;
+        LocalDate latest = null;
+        boolean quarantined = false;
+        for (var entry : valid.stream().collect(Collectors.groupingBy(StockCandleDaily::getSymbol)).entrySet()) {
+            mapper.lockCanonicalSymbol(entry.getKey());
+            List<StockCandleDaily> existing = mapper.findRecentBySymbol(entry.getKey(), Integer.MAX_VALUE);
+            String source = existing.isEmpty() ? entry.getValue().stream()
+                    .map(StockCandleDaily::getSource).filter("yahoo-chart"::equalsIgnoreCase).findFirst()
+                    .orElse(entry.getValue().getFirst().getSource()) : existing.getFirst().getSource();
+            List<StockCandleDaily> selected = entry.getValue().stream()
+                    .filter(c -> Objects.equals(source, c.getSource())).toList();
+            Map<LocalDate, StockCandleDaily> byDate = new LinkedHashMap<>();
+            selected.forEach(c -> byDate.put(c.getTradeDate(), c));
+            boolean compatible = !selected.isEmpty() && existing.stream().allMatch(old ->
+                    Objects.equals(source, old.getSource()) && (!byDate.containsKey(old.getTradeDate())
+                            || samePrices(old, byDate.get(old.getTradeDate()))));
+            // Appends must overlap the previous endpoint. An unverified rebase/source switch stays source-only.
+            if (!existing.isEmpty() && selected.stream().anyMatch(c -> c.getTradeDate().isAfter(existing.getFirst().getTradeDate()))) {
+                compatible &= byDate.containsKey(existing.getFirst().getTradeDate());
+            }
+            if (compatible) {
+                List<StockCandleDaily> canonical = List.copyOf(byDate.values());
+                mapper.upsertBatch(canonical);
+                accepted += canonical.size();
+                LocalDate max = canonical.stream().map(StockCandleDaily::getTradeDate).max(LocalDate::compareTo).orElse(null);
+                if (latest == null || max != null && max.isAfter(latest)) { latest = max; }
+            } else {
+                quarantined = true;
             }
         }
+        return new CandleSaveResult(candles.size(), sourceRows.size(), accepted, candles.size() - accepted,
+                latest, quarantined ? "QUARANTINED_BASIS_CHANGE" : accepted > 0 ? "PERSISTED" : "NO_VALID_CANONICAL_ROWS");
+    }
+
+    public record CandleSaveResult(int receivedRows, int sourceRows, int canonicalRows, int rejectedRows,
+            LocalDate latestMarketDate, String status) { }
+
+    private static boolean samePrices(StockCandleDaily left, StockCandleDaily right) {
+        return equalPrice(left.getOpenPrice(), right.getOpenPrice()) && equalPrice(left.getHighPrice(), right.getHighPrice())
+                && equalPrice(left.getLowPrice(), right.getLowPrice()) && equalPrice(left.getClosePrice(), right.getClosePrice());
+    }
+
+    private static boolean equalPrice(java.math.BigDecimal left, java.math.BigDecimal right) {
+        // Both source/canonical SQL columns are DECIMAL(24,6); compare the actual persisted values.
+        return left != null && right != null && left.setScale(6, java.math.RoundingMode.HALF_UP)
+                .compareTo(right.setScale(6, java.math.RoundingMode.HALF_UP)) == 0;
     }
 
     private static boolean isCanonicalCandleSource(StockCandleDaily candle) {
@@ -181,6 +240,18 @@ public class StockCacheService {
         }
         return "yahoo-chart".equalsIgnoreCase(candle.getSource())
                 || "stooq".equalsIgnoreCase(candle.getSource());
+    }
+
+    private static boolean hasValidCandlePrices(StockCandleDaily candle) {
+        var open = candle.getOpenPrice();
+        var high = candle.getHighPrice();
+        var low = candle.getLowPrice();
+        var close = candle.getClosePrice();
+        return open != null && high != null && low != null && close != null
+                && open.signum() > 0 && high.signum() > 0 && low.signum() > 0 && close.signum() > 0
+                && high.compareTo(open.max(low).max(close)) >= 0
+                && low.compareTo(open.min(high).min(close)) <= 0
+                && (candle.getVolume() == null || candle.getVolume() >= 0);
     }
 
     public StockSignalLatest findLatestSignal(String symbol) {
@@ -205,12 +276,17 @@ public class StockCacheService {
 
     public SecFinancialStandard findLatestSecQuarterFinancial(String symbol) {
         SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
-        return mapper == null ? null : mapper.findLatestQuarter(symbol);
+        var legacy=mapper == null ? null : mapper.findLatestQuarter(symbol);
+        return sourceFinancialService==null?legacy:sourceFinancialService.resolveQuarter(symbol,
+            LocalDate.now(java.time.ZoneId.of("America/New_York")),null,legacy,false);
     }
 
     public SecFinancialStandard findPreviousSecQuarterFinancial(String symbol, java.time.LocalDate endDate) {
+        if(endDate==null)return null;
         SecFinancialStandardMapper mapper = secFinancialStandardMapper.getIfAvailable();
-        return mapper == null || endDate == null ? null : mapper.findPreviousQuarter(symbol, endDate);
+        var legacy=mapper == null ? null : mapper.findPreviousQuarter(symbol, endDate);
+        return sourceFinancialService==null?legacy:sourceFinancialService.resolveQuarter(symbol,
+            LocalDate.now(java.time.ZoneId.of("America/New_York")),endDate,legacy,false);
     }
 
     public StockInstitutionFlow findLatestInstitutionFlow(String symbol) {

@@ -47,15 +47,43 @@ class ExpectedReturnPromotionGateTest {
     }
 
     @Test
-    void materiallyBetterCandidatePromotes() {
+    void otherMetricsCannotPromoteWithoutLowerPredictionError() {
         ExpectedReturnEvaluationEvidence baseline = qualifiedEvidence(0.03d, 3.0d, 0.5d);
         ExpectedReturnEvaluationEvidence candidate = qualifiedEvidence(0.05d, 5.0d, 0.7d)
                 .withRelativeQuality(62.0d, 0.19d, 7.0d, -0.01d, 1050.0d);
 
         ExpectedReturnPromotionResult result = gate.evaluateCandidate(baseline, candidate);
 
-        assertEquals(PROMOTE, result.decision());
-        assertTrue(result.checks().stream().allMatch(ExpectedReturnPromotionResult.Check::passed));
+        assertEquals(com.kingyurina.demo.stock.evaluation.ExpectedReturnPromotionResult.Decision.HOLD, result.decision());
+        assertFalse(result.check("MAE_IMPROVEMENT").passed());
+    }
+
+    @Test
+    void lowerErrorAndOtherRequiredImprovementsPromote() {
+        ExpectedReturnEvaluationEvidence baseline = qualifiedEvidence(0.03d, 3.0d, 0.5d);
+        ExpectedReturnEvaluationEvidence candidate = withMae(
+                qualifiedEvidence(0.05d, 5.0d, 0.7d)
+                        .withRelativeQuality(62.0d, 0.19d, 7.0d, -0.01d, 1050.0d), 3.5d);
+        assertEquals(PROMOTE, gate.evaluateCandidate(baseline, candidate).decision());
+    }
+
+    @Test
+    void invalidOrWorseErrorNeverPromotes() {
+        for (double mae : new double[] {Double.NaN, Double.POSITIVE_INFINITY, -1.0d, 5.0d}) {
+            ExpectedReturnEvaluationEvidence candidate = withMae(
+                    qualifiedEvidence(0.05d, 5.0d, 0.7d)
+                            .withRelativeQuality(62.0d, 0.19d, 7.0d, -0.01d, 1050.0d), mae);
+            assertFalse(gate.evaluateCandidate(qualifiedEvidence(0.03d, 3.0d, 0.5d), candidate)
+                    .check("MAE_IMPROVEMENT").passed());
+        }
+    }
+
+    private static ExpectedReturnEvaluationEvidence withMae(ExpectedReturnEvaluationEvidence e, double mae) {
+        ExpectedReturnMetrics m = e.metrics();
+        return new ExpectedReturnEvaluationEvidence(new ExpectedReturnMetrics(m.sampleCount(), m.rankIc(),
+                m.positiveIcDatePct(), mae, m.directionalAccuracyPct(), m.brierScore(), m.calibrationErrorPct(),
+                m.intervalCoveragePct(), m.quintileSpreadPct(), m.coveragePct()), e.portfolio(),
+                e.validMonths(), e.totalRows(), e.coveragePct(), e.worstRegimeRankIc(), e.pitViolationCount());
     }
 
     private static ExpectedReturnEvaluationEvidence qualifiedEvidence(

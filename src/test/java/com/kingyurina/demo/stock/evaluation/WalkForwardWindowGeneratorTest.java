@@ -17,11 +17,11 @@ class WalkForwardWindowGeneratorTest {
 
     @Test
     void contractFixesSp500TwentyDayRules() {
-        ExpectedReturnPredictionContract contract = ExpectedReturnPredictionContract.sp500Excess20dV1();
+        ExpectedReturnPredictionContract contract = ExpectedReturnPredictionContract.sp500Excess20dCorrected();
 
-        assertEquals("SP500_EXCESS_20D_V1", contract.version());
+        assertEquals("SP500_EXCESS_20D_V2_CORRECTED_20261017", contract.version());
         assertEquals("SP500", contract.indexCode());
-        assertEquals("EXPECTED_RETURN_V9", contract.baselineModel());
+        assertEquals("EXPECTED_RETURN_V9_CORRECTED_20261017", contract.baselineModel());
         assertEquals(20, contract.horizonTradingDays());
         assertEquals(3, contract.minimumTrainingYears());
         assertEquals(1000, contract.minimumTrainingRows());

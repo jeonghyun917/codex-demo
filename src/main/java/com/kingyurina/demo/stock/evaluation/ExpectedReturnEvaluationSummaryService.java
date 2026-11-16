@@ -1,6 +1,9 @@
 package com.kingyurina.demo.stock.evaluation;
 
 import java.util.Locale;
+import java.util.ArrayList;
+
+import tools.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -10,7 +13,7 @@ import com.kingyurina.demo.stock.StockBacktestMapper;
 @Service
 public class ExpectedReturnEvaluationSummaryService {
 
-    private static final String CONTRACT_VERSION = "SP500_EXCESS_20D_V1";
+    private static final String CONTRACT_VERSION = ExpectedReturnPredictionContract.sp500Excess20dCorrected().version();
 
     private final ObjectProvider<StockBacktestMapper> mapperProvider;
 
@@ -25,7 +28,7 @@ public class ExpectedReturnEvaluationSummaryService {
         if (run == null) {
             return new ExpectedReturnEvaluationSummaryView(
                     "Not evaluated", "neutral", "NOT_EVALUATED", CONTRACT_VERSION,
-                    "EXPECTED_RETURN_V9", "-", "0 / 0", "-", "-", "-", "-", "Run the evaluation batch");
+                    ExpectedReturnPredictionContract.sp500Excess20dCorrected().baselineModel(), "-", "0 / 0", "-", "-", "-", "-", "Corrected proxy-benchmark evaluation not run");
         }
         String decision = value(run.getDecision(), run.getStatus());
         return new ExpectedReturnEvaluationSummaryView(
@@ -54,7 +57,19 @@ public class ExpectedReturnEvaluationSummaryService {
             failures++;
             index += marker.length();
         }
-        return failures == 0 ? "All stored gates passed" : failures + " gate checks failed";
+        String result = failures == 0 ? "All stored gates passed" : failures + " gate checks failed";
+        try {
+            var root = new ObjectMapper().readTree(checksJson);
+            var reasons = new ArrayList<String>();
+            root.path("exclusions").properties().stream().sorted(java.util.Map.Entry.comparingByKey())
+                    .forEach(entry -> reasons.add(entry.getKey() + "=" + entry.getValue().asInt()));
+            if (root.has("datasetTargets")) result += "; source targets=" + root.path("datasetTargets").asInt();
+            if (!reasons.isEmpty()) result += "; exclusions: " + String.join(", ", reasons);
+            if (root.has("benchmarkDefinition")) result += "; weighted price-return proxy, not official index";
+        } catch (RuntimeException ignored) {
+            return "Stored gate details unavailable";
+        }
+        return result;
     }
 
     private static String tone(String decision) {

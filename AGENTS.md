@@ -2,19 +2,6 @@
 
 These instructions apply to the entire repository.
 
-## Superpowers workflow
-
-Use the applicable Superpowers skills by default for repository work. The user does not need to mention the Superpowers plugin in every prompt.
-
-- Start feature additions, behavior changes, and other creative implementation work with `superpowers:brainstorming`.
-- Do not implement until the proposed design has been presented and approved by the user.
-- Use `superpowers:writing-plans` for approved work that needs a multi-step implementation plan.
-- Use `superpowers:systematic-debugging` before proposing or implementing a bug fix.
-- Use `superpowers:test-driven-development` for feature and bug-fix implementation.
-- Use `superpowers:verification-before-completion` before claiming that work is complete, fixed, or passing.
-- Use other Superpowers skills whenever their descriptions match the task.
-- For read-only questions, analysis, or status reports, use only the skills relevant to that request; do not create implementation artifacts unless asked.
-
 ## Branch and worktree policy
 
 - Treat `main` as the source branch for Quant AI product and application development.

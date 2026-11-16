@@ -53,7 +53,8 @@ class StockThreeMonthHighRatioTest {
         assertEquals(List.of(
                 "valuationScore", "qualityScore", "growthScore", "stabilityScore", "earningsScore",
                 "analystScore", "newsScore", "momentumScore", "riskScore",
-                "threeMonthHighRatio", "threeMonthHighRatioValue", "threeMonthHighRatioTone"),
+                "threeMonthHighRatio", "threeMonthHighRatioValue", "threeMonthHighRatioTone",
+                "priceContext", "priceBasis"),
                 Arrays.stream(StockMarketView.Row.class.getRecordComponents())
                         .skip(27)
                         .map(component -> component.getName())

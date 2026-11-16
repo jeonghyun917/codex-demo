@@ -54,6 +54,7 @@ public class StooqCandleService {
         int fail = 0;
         int savedRows = 0;
         List<String> failedSymbols = new ArrayList<>();
+        java.util.Map<String, String> failureReasons = new java.util.LinkedHashMap<>();
         int resolvedYears = years <= 0 ? properties.defaultYears() : years;
         long resolvedDelay = delayMillis < 0 ? properties.requestDelayMillis() : delayMillis;
         LocalDate to = LocalDate.now();
@@ -69,19 +70,29 @@ public class StooqCandleService {
                 if (candles.isEmpty()) {
                     fail++;
                     failedSymbols.add(symbol);
+                    failureReasons.put(symbol, "EMPTY_PROVIDER_DATA");
                 } else {
-                    cacheService.saveCandles(candles);
-                    success++;
-                    savedRows += candles.size();
+                    StockCacheService.CandleSaveResult saved = cacheService.saveCandles(candles);
+                    if (saved != null) { savedRows += saved.canonicalRows(); }
+                    if (saved != null && saved.canonicalRows() > 0 && saved.rejectedRows() == 0) {
+                        success++;
+                    } else {
+                        fail++;
+                        failedSymbols.add(symbol);
+                        failureReasons.put(symbol, saved == null ? "NO_PERSISTENCE_RESULT"
+                                : saved.status() + "; rejected=" + saved.rejectedRows()
+                                        + "; canonical=" + saved.canonicalRows());
+                    }
                 }
             } catch (RuntimeException ex) {
                 fail++;
                 failedSymbols.add(symbol);
+                failureReasons.put(symbol, "COLLECTION_FAILED");
                 log.warn("Failed to sync Stooq candles for {}", symbol, ex);
             }
             sleep(resolvedDelay);
         }
-        return new SyncSummary(requested, success, fail, savedRows, failedSymbols);
+        return new SyncSummary(requested, success, fail, savedRows, failedSymbols, java.util.Map.copyOf(failureReasons));
     }
 
     private List<StockCandleDaily> fetch(String symbol, LocalDate from, LocalDate to) {
@@ -241,6 +252,10 @@ public class StooqCandleService {
         }
     }
 
-    public record SyncSummary(int requested, int success, int fail, int savedRows, List<String> failedSymbols) {
+    public record SyncSummary(int requested, int success, int fail, int savedRows, List<String> failedSymbols,
+            java.util.Map<String, String> failureReasons) {
+        public SyncSummary(int requested, int success, int fail, int savedRows, List<String> failedSymbols) {
+            this(requested, success, fail, savedRows, failedSymbols, java.util.Map.of());
+        }
     }
 }

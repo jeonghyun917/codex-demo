@@ -34,6 +34,7 @@ public record StockHeatmapView(
             String roe,
             String layoutStyle,
             String colorClass,
-            String href) {
+            String href,
+            String priceContext) {
     }
 }

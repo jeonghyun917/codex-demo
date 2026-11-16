@@ -1,6 +1,7 @@
 package com.kingyurina.demo.stock.evaluation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -34,9 +35,9 @@ class ExpectedReturnEvaluationSummaryServiceTest {
         ObjectProvider<StockBacktestMapper> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(mapper);
         ExpectedReturnEvaluationRun run = new ExpectedReturnEvaluationRun();
-        run.setContractVersion("SP500_EXCESS_20D_V1");
+        run.setContractVersion(ExpectedReturnPredictionContract.sp500Excess20dCorrected().version());
         run.setIndexCode("SP500");
-        run.setBaselineModelVersion("EXPECTED_RETURN_V9");
+        run.setBaselineModelVersion(ExpectedReturnPredictionContract.sp500Excess20dCorrected().baselineModel());
         run.setAsOfDate(LocalDate.of(2026, 7, 15));
         run.setStatus("COMPLETED");
         run.setDecision("BASELINE_QUALIFIED");
@@ -46,8 +47,9 @@ class ExpectedReturnEvaluationSummaryServiceTest {
         run.setRankIc(0.035d);
         run.setBrierScore(0.21d);
         run.setAnnualizedExcessReturnPct(3.2d);
-        run.setChecksJson("[{\"name\":\"RANK_IC_POSITIVE\",\"passed\":true}]");
-        when(mapper.findLatestExpectedReturnEvaluationRun("SP500", "SP500_EXCESS_20D_V1"))
+        run.setChecksJson("{\"checks\":[{\"name\":\"RANK_IC_POSITIVE\",\"passed\":true}],"
+                + "\"exclusions\":{\"MISSING_PREDICTION\":42},\"datasetTargets\":5542}");
+        when(mapper.findLatestExpectedReturnEvaluationRun("SP500", ExpectedReturnPredictionContract.sp500Excess20dCorrected().version()))
                 .thenReturn(run);
 
         ExpectedReturnEvaluationSummaryView view =
@@ -60,6 +62,8 @@ class ExpectedReturnEvaluationSummaryServiceTest {
         assertEquals("0.0350", view.rankIc());
         assertEquals("0.2100", view.brierScore());
         assertEquals("+3.20%", view.annualizedExcessReturn());
+        assertTrue(view.gateSummary().contains("MISSING_PREDICTION=42"));
+        assertTrue(view.gateSummary().contains("5542"));
     }
 }
 

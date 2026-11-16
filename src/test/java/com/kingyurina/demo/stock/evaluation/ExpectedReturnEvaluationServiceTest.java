@@ -31,7 +31,7 @@ class ExpectedReturnEvaluationServiceTest {
         when(mapper.findExpectedReturnSnapshots(anyString(), any(), any())).thenReturn(List.of());
         when(mapper.findResultsForEvaluation(anyString(), anyInt(), any(), any())).thenReturn(List.of());
         when(mapper.findBenchmarkReturns(anyString(), any(), any())).thenReturn(List.of());
-        when(mapper.findIndexMembershipSnapshots(anyString(), any(), any())).thenReturn(List.of());
+        when(mapper.findEvaluationMembershipSnapshots(anyString(), any(), any())).thenReturn(List.of());
         doAnswer(invocation -> {
             ExpectedReturnEvaluationRun run = invocation.getArgument(0);
             run.setId(42L);

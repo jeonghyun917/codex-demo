@@ -15,9 +15,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class StockMarketViewService {
 
-    private static final BigDecimal USD_KRW_RATE = BigDecimal.valueOf(1365);
-    private static final DecimalFormat ONE_DECIMAL_FORMAT = new DecimalFormat("#,##0.0");
-    private static final DecimalFormat WON_FORMAT = new DecimalFormat("#,##0");
 
     private final ObjectProvider<IndexConstituentMapper> indexConstituentMapper;
 
@@ -65,6 +62,8 @@ public class StockMarketViewService {
                 .count();
         if (changeCount > 0) {
             averageChange = averageChange.divide(BigDecimal.valueOf(changeCount), 4, RoundingMode.HALF_UP);
+        } else {
+            averageChange = null;
         }
 
         List<StockMarketView.Row> viewRows = new ArrayList<>();
@@ -164,7 +163,7 @@ public class StockMarketViewService {
                         change = change.divide(BigDecimal.valueOf(count), 4, RoundingMode.HALF_UP);
                     }
                     return new SectorSummary(entry.getKey(), String.valueOf(entry.getValue().size()),
-                            marketCap, formatMarketCapKrw(marketCap), formatPercent(change));
+                            marketCap, formatMarketCapKrw(marketCap), formatPercent(count > 0 ? change : null));
                 })
                 .sorted(Comparator.comparing(SectorSummary::marketCap).reversed())
                 .map(summary -> new StockMarketView.SectorRow(summary.sector(), summary.count(),
@@ -215,7 +214,21 @@ public class StockMarketViewService {
                 row.getRiskScore(),
                 threeMonthHighRatio.display(),
                 threeMonthHighRatio.value(),
-                threeMonthHighRatio.tone());
+                threeMonthHighRatio.tone(), priceContext(row), row.getPriceBasis());
+    }
+
+    static String priceContext(StockMarketRow row) {
+        if (row.getPriceAsOf() == null) {
+            return "가격 기준일 미확인";
+        }
+        String kind = "CLOSE".equals(row.getPriceKind()) ? "종가" : "시세";
+        String stale = row.getPriceAsOf().isBefore(java.time.LocalDateTime.now().minusDays(4)) ? " · 지연" : "";
+        var date = "CLOSE".equals(row.getPriceKind())
+                ? row.getPriceAsOf().atZone(java.time.ZoneId.systemDefault())
+                        .withZoneSameInstant(java.time.ZoneId.of("America/New_York")).toLocalDate()
+                : row.getPriceAsOf().toLocalDate();
+        return date + " " + kind + " · "
+                + (row.getPriceSource() == null ? "출처 미확인" : row.getPriceSource()) + stale;
     }
 
     private static String blankToNull(String value) {
@@ -241,18 +254,15 @@ public class StockMarketViewService {
         if (marketCapMillionUsd == null) {
             return "-";
         }
-        BigDecimal trillionKrw = marketCapMillionUsd
-                .multiply(USD_KRW_RATE)
-                .divide(BigDecimal.valueOf(1_000_000), 1, RoundingMode.HALF_UP);
-        return ONE_DECIMAL_FORMAT.format(trillionKrw) + " 조원";
+        BigDecimal billionUsd = marketCapMillionUsd.divide(BigDecimal.valueOf(1_000), 1, RoundingMode.HALF_UP);
+        return "$" + new DecimalFormat("#,##0.0").format(billionUsd) + "B";
     }
 
     private static String formatPriceKrw(BigDecimal usdPrice) {
         if (usdPrice == null) {
             return "-";
         }
-        BigDecimal krw = usdPrice.multiply(USD_KRW_RATE).setScale(0, RoundingMode.HALF_UP);
-        return WON_FORMAT.format(krw) + "원";
+        return "$" + new DecimalFormat("#,##0.00").format(usdPrice);
     }
 
     private static String formatRatio(BigDecimal value, String suffix) {

@@ -14,13 +14,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class StockExpectedReturnV9Service {
 
-    public static final String MODEL_VERSION = "EXPECTED_RETURN_V9";
-    private static final String SOURCE_MODEL = "EXPECTED_RETURN_V8";
+    public static final String MODEL_VERSION = "EXPECTED_RETURN_V9_CORRECTED_20261017";
+    private static final String SOURCE_MODEL = "EXPECTED_RETURN_V8_CORRECTED_20261017";
     private static final String SOURCE_HISTORICAL = "PROVENANCE_STABILIZED_EXPECTED_RETURN_V9";
     private static final String SOURCE_LIVE = "LIVE_PROVENANCE_STABILIZED_EXPECTED_RETURN_V9";
     private static final String SOURCE_FACTOR = "PROVENANCE_STABILIZED_EXPECTED_RETURN_V9";
@@ -28,9 +29,17 @@ public class StockExpectedReturnV9Service {
     private static final int MIN_CALIBRATION_BUCKET_ROWS = 50;
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
+    private StockExpectedReturnForwardArchive forwardArchive;
 
     public StockExpectedReturnV9Service(ObjectProvider<StockBacktestMapper> stockBacktestMapper) {
         this.stockBacktestMapper = stockBacktestMapper;
+    }
+
+    @Autowired
+    public StockExpectedReturnV9Service(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
+            StockExpectedReturnForwardArchive forwardArchive) {
+        this(stockBacktestMapper);
+        this.forwardArchive = forwardArchive;
     }
 
     public StockPortfolioBacktestService.ExpectedReturnRefreshResult refreshHistorical(String indexCode,
@@ -64,15 +73,13 @@ public class StockExpectedReturnV9Service {
                 .filter(snapshot -> targetDates.contains(snapshot.getSignalDate()))
                 .collect(Collectors.groupingBy(StockExpectedReturnSnapshot::getSignalDate,
                         LinkedHashMap::new, Collectors.toList()));
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = StockPortfolioBacktestService.researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(row -> row.getSignalDate() != null && row.getSymbol() != null && row.getHorizonDays() != null)
                 .toList();
         Map<ExpectedResultKey, StockBacktestResult> resultsByKey = results.stream()
                 .collect(Collectors.toMap(row -> new ExpectedResultKey(row.getSignalDate(), row.getSymbol(),
                         row.getHorizonDays()), Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        Map<ExpectedBenchmarkKey, Double> benchmarkByKey = results.stream()
-                .collect(Collectors.groupingBy(row -> new ExpectedBenchmarkKey(row.getSignalDate(), row.getHorizonDays()),
-                        LinkedHashMap::new, Collectors.averagingDouble(StockExpectedReturnV9Service::returnPct)));
+
 
         int savedRows = 0;
         int processedDates = 0;
@@ -99,9 +106,10 @@ public class StockExpectedReturnV9Service {
                 mapper.upsertExpectedReturnSnapshot(adjusted);
                 StockBacktestResult actual = resultsByKey.get(new ExpectedResultKey(source.getSignalDate(),
                         source.getSymbol(), valueOr(source.getHorizonDays(), 0)));
-                Double benchmark = benchmarkByKey.get(new ExpectedBenchmarkKey(source.getSignalDate(),
-                        valueOr(source.getHorizonDays(), 0)));
-                if (actual != null && benchmark != null) {
+                Double benchmark = actual == null || actual.getBenchmarkReturnPct() == null ? null
+                        : actual.getBenchmarkReturnPct().doubleValue();
+                if (actual != null && benchmark != null
+                        && StockPortfolioBacktestService.maturedBefore(actual, LocalDate.now())) {
                     evaluations.add(new PredictionEvaluation(valueOr(source.getHorizonDays(), 0),
                             number(adjusted.getCalibratedUpsideProbabilityPct()),
                             returnPct(actual) - benchmark > 0.0d));
@@ -133,21 +141,53 @@ public class StockExpectedReturnV9Service {
         if (sourceSnapshots.isEmpty()) {
             return empty();
         }
-        MarketLookup marketLookup = MarketLookup.from(
-                mapper.findMarketSnapshots(indexCode, targetDate.minusDays(45), targetDate));
+        if (forwardArchive != null && sourceSnapshots.stream().anyMatch(p -> p.getSource() == null
+                || !p.getSource().startsWith("LIVE_FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8_CUTOFF_LT_"))) {
+            throw new IllegalStateException("Forward V9 refresh requires live V8 provenance; historical/unknown input rejected");
+        }
+        List<StockMarketSnapshot> marketSnapshots =
+                mapper.findMarketSnapshots(indexCode, targetDate.minusDays(45), targetDate);
+        MarketLookup marketLookup = MarketLookup.from(marketSnapshots);
+        LocalDate freshestMarketDate = forwardArchive == null || marketSnapshots == null ? null : marketSnapshots.stream()
+                .filter(Objects::nonNull)
+                .map(StockMarketSnapshot::getSnapshotDate)
+                .filter(Objects::nonNull)
+                .filter(date -> !date.isAfter(targetDate))
+                .max(LocalDate::compareTo).orElse(null);
         mapper.deleteExpectedReturnFactorContributions(indexCode, targetDate, MODEL_VERSION);
         mapper.copyExpectedReturnFactorContributions(indexCode, targetDate, SOURCE_MODEL, MODEL_VERSION, SOURCE_FACTOR);
         int savedRows = 0;
         int trainedRows = 0;
+        List<String> savedSymbols = new ArrayList<>();
+        List<StockMarketSnapshot> usedMarkets = new ArrayList<>();
         for (StockExpectedReturnSnapshot source : sourceSnapshots) {
             trainedRows += valueOr(source.getSampleCount(), 0);
             StockMarketSnapshot market = marketLookup.floor(source.getSymbol(), targetDate);
+            if (forwardArchive != null && (market == null || freshestMarketDate == null
+                    || !freshestMarketDate.equals(market.getSnapshotDate()))) {
+                continue;
+            }
             StockExpectedReturnSnapshot adjusted = provenanceAdjustedSnapshot(source, market, SOURCE_LIVE);
             if (adjusted == null) {
                 continue;
             }
             mapper.upsertExpectedReturnSnapshot(adjusted);
             savedRows++;
+            if (Integer.valueOf(20).equals(adjusted.getHorizonDays())) {
+                savedSymbols.add(adjusted.getSymbol());
+                usedMarkets.add(market);
+            }
+        }
+        if (forwardArchive != null && !savedSymbols.isEmpty()) {
+            List<StockExpectedReturnSnapshot> persisted = mapper.findExpectedReturnSnapshots(indexCode,
+                    targetDate, targetDate).stream()
+                    .filter(p -> MODEL_VERSION.equals(p.getModelVersion()) && Integer.valueOf(20).equals(p.getHorizonDays())
+                            && savedSymbols.contains(p.getSymbol()))
+                    .toList();
+            if (persisted.size() != savedSymbols.size()) {
+                throw new IllegalStateException("Forward archive must match every successfully saved prediction");
+            }
+            forwardArchive.capture(indexCode, targetDate, persisted, sourceSnapshots, usedMarkets);
         }
         return new StockPortfolioBacktestService.ExpectedReturnRefreshResult(savedRows > 0 ? 1 : 0,
                 savedRows, trainedRows, 0, 0);
@@ -205,7 +245,9 @@ public class StockExpectedReturnV9Service {
         adjusted.setCalibrationBucket(probabilityBucket(clamp(calibratedUpside, 1.0d, 99.0d)));
         adjusted.setCalibrationErrorPct(source.getCalibrationErrorPct());
         adjusted.setModelVersion(MODEL_VERSION);
-        adjusted.setSource(sourceName + "_" + adjustment.sourceTag());
+        String provenance = (sourceName.startsWith("LIVE_") ? "LIVE_V9_" : "RESEARCH_V9_")
+                + adjustment.sourceTag();
+        adjusted.setSource(StockPortfolioBacktestService.sourceWithCutoff(provenance, source.getSignalDate()));
         return adjusted;
     }
 
@@ -213,7 +255,7 @@ public class StockExpectedReturnV9Service {
         String sharesSource = safeUpper(market.getSharesSource());
         String marketCapSource = safeUpper(market.getMarketCapSource());
         if (sharesSource.startsWith("SEC_XBRL")) {
-            return new ProvenanceAdjustment(1.0d, 1.0d, 1.0d, 0, 0.0d, "SEC_PIT");
+            return new ProvenanceAdjustment(1.0d, 1.0d, 1.0d, 0, 0.0d, "SEC_SOURCE");
         }
         if (sharesSource.contains("ALIAS") || marketCapSource.contains("ALIAS")) {
             return new ProvenanceAdjustment(0.88d, 0.82d, 0.86d, -8, 0.35d, "ALIAS_SHARES");
@@ -327,9 +369,6 @@ public class StockExpectedReturnV9Service {
     }
 
     private record ExpectedResultKey(LocalDate signalDate, String symbol, int horizonDays) {
-    }
-
-    private record ExpectedBenchmarkKey(LocalDate signalDate, int horizonDays) {
     }
 
     private record PredictionEvaluation(int horizonDays, double predictedUpsidePct, boolean actualUpside) {

@@ -19,6 +19,7 @@ public class YahooChartCandleBatchRunner implements ApplicationRunner {
 
     private final boolean enabled;
     private final boolean exitOnComplete;
+    private final boolean refreshSignals;
     private final int symbolLimit;
     private final int years;
     private final long delayMillis;
@@ -36,6 +37,7 @@ public class YahooChartCandleBatchRunner implements ApplicationRunner {
     public YahooChartCandleBatchRunner(
             @Value("${app.batch.yahoo-candle.enabled:false}") boolean enabled,
             @Value("${app.batch.yahoo-candle.exit-on-complete:false}") boolean exitOnComplete,
+            @Value("${app.batch.yahoo-candle.refresh-signals:true}") boolean refreshSignals,
             @Value("${app.batch.yahoo-candle.symbol-limit:1000}") int symbolLimit,
             @Value("${app.batch.yahoo-candle.years:${yahoo-chart.default-years:5}}") int years,
             @Value("${app.batch.yahoo-candle.delay-millis:${yahoo-chart.request-delay-millis:250}}") long delayMillis,
@@ -49,6 +51,7 @@ public class YahooChartCandleBatchRunner implements ApplicationRunner {
             ConfigurableApplicationContext applicationContext) {
         this.enabled = enabled;
         this.exitOnComplete = exitOnComplete;
+        this.refreshSignals = refreshSignals;
         this.symbolLimit = symbolLimit;
         this.years = years;
         this.delayMillis = delayMillis;
@@ -98,23 +101,29 @@ public class YahooChartCandleBatchRunner implements ApplicationRunner {
                     targetSymbols,
                     years,
                     delayMillis);
-            StockSignalRefreshService.RefreshResult signalRefresh = stockSignalRefreshService
-                    .recalculateSymbols(targetSymbols);
+            boolean shouldRefreshSignals = refreshSignals && candleSummary.fail() == 0;
+            StockSignalRefreshService.RefreshResult signalRefresh = shouldRefreshSignals
+                    ? stockSignalRefreshService.recalculateSymbols(targetSymbols)
+                    : new StockSignalRefreshService.RefreshResult(0, 0, 0);
             String targetMessage = !explicitSymbols.isEmpty()
                     ? "Target symbols=" + String.join(",", explicitSymbols) + ". "
                     : "Target indexes=" + String.join(",", targetIndexCodes()) + ". ";
             String message = targetMessage
                     + "Yahoo chart candle sync savedRows=" + candleSummary.savedRows()
-                    + ". Signal refreshed " + signalRefresh.success() + "/" + signalRefresh.requested() + ".";
+                    + (shouldRefreshSignals
+                            ? ". Signal refreshed " + signalRefresh.success() + "/" + signalRefresh.requested() + "."
+                            : ". Signal refresh skipped (disabled or collection failed).");
             if (!candleSummary.failedSymbols().isEmpty()) {
                 message += " Failed symbols="
                         + String.join(",", candleSummary.failedSymbols().stream().limit(30).toList()) + ".";
+                message += " Reasons=" + candleSummary.failureReasons().entrySet().stream().limit(30).toList()
+                        + ". Basis changes require a verified corporate-action reconciliation; canonical history preserved.";
             }
             run.setFinishedAt(LocalDateTime.now());
             run.setRequestedCount(candleSummary.requested());
             run.setSuccessCount(candleSummary.success());
             run.setFailCount(candleSummary.fail());
-            run.setSkippedCount(0);
+            run.setSkippedCount(Math.max(0, targetSymbols.size() - candleSummary.requested()));
             run.setSavedRows(candleSummary.savedRows());
             run.setSignalRefreshedCount(signalRefresh.success());
             run.setStatus(candleSummary.fail() == 0 ? "COMPLETED" : "COMPLETED_WITH_ERRORS");

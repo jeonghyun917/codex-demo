@@ -37,7 +37,7 @@
 
     <select id="countResults" resultType="int">
         SELECT COUNT(*)
-        FROM stock_signal_backtest_result r
+        FROM stock_backtest_result_v2 r
         INNER JOIN index_constituent i
             ON i.symbol = r.symbol
            AND i.index_code = #{indexCode}
@@ -48,7 +48,7 @@
 
     <select id="countResultsByHorizon" resultType="int">
         SELECT COUNT(*)
-        FROM stock_signal_backtest_result r
+        FROM stock_backtest_result_v2 r
         INNER JOIN index_constituent i
             ON i.symbol = r.symbol
            AND i.index_code = #{indexCode}
@@ -99,19 +99,41 @@
             s.source_freshness_json,
             s.raw_json
         FROM stock_signal_snapshot s
-        LEFT JOIN (
-            SELECT
-                snapshot_id,
-                COUNT(*) AS completed_count,
-                MAX(calculated_at) AS latest_result_calculated_at,
-                SUM(CASE WHEN institution_score IS NULL THEN 1 ELSE 0 END) AS missing_institution_count
-            FROM stock_signal_backtest_result
-            GROUP BY snapshot_id
-        ) r
-            ON r.snapshot_id = s.id
-        WHERE COALESCE(r.completed_count, 0) &lt; 3
-           OR r.latest_result_calculated_at &lt; s.calculated_at
-           OR (s.institution_score IS NOT NULL AND COALESCE(r.missing_institution_count, 0) &gt; 0)
+        LEFT JOIN stock_backtest_result_v2 r5
+            ON r5.snapshot_id = s.id AND r5.horizon_days = 5
+        LEFT JOIN stock_backtest_result_v2 r20
+            ON r20.snapshot_id = s.id AND r20.horizon_days = 20
+        LEFT JOIN stock_backtest_result_v2 r60
+            ON r60.snapshot_id = s.id AND r60.horizon_days = 60
+        WHERE EXISTS (
+            SELECT 1 FROM stock_candle_daily c5
+            WHERE c5.symbol = s.symbol AND c5.trade_date &gt; s.signal_date
+            ORDER BY c5.trade_date
+            LIMIT 5, 1
+        )
+          AND (
+              r5.snapshot_id IS NULL
+              OR (r20.snapshot_id IS NULL AND EXISTS (
+                  SELECT 1 FROM stock_candle_daily c20
+                  WHERE c20.symbol = s.symbol AND c20.trade_date &gt; s.signal_date
+                  ORDER BY c20.trade_date
+                  LIMIT 20, 1
+              ))
+              OR (r60.snapshot_id IS NULL AND EXISTS (
+                  SELECT 1 FROM stock_candle_daily c60
+                  WHERE c60.symbol = s.symbol AND c60.trade_date &gt; s.signal_date
+                  ORDER BY c60.trade_date
+                  LIMIT 60, 1
+              ))
+              OR r5.calculated_at &lt; s.calculated_at
+              OR r20.calculated_at &lt; s.calculated_at
+              OR r60.calculated_at &lt; s.calculated_at
+              OR (s.institution_score IS NOT NULL AND (
+                  (r5.snapshot_id IS NOT NULL AND r5.institution_score IS NULL)
+                  OR (r20.snapshot_id IS NOT NULL AND r20.institution_score IS NULL)
+                  OR (r60.snapshot_id IS NOT NULL AND r60.institution_score IS NULL)
+              ))
+          )
         ORDER BY s.signal_date DESC, s.symbol
         LIMIT #{limit}
     </select>
@@ -722,7 +744,7 @@
 
     <select id="findCovarianceSnapshotDates" resultType="java.time.LocalDate">
         SELECT DISTINCT r.signal_date
-        FROM stock_signal_backtest_result r
+        FROM stock_backtest_result_v2 r
         INNER JOIN index_constituent i
             ON i.symbol = r.symbol
            AND i.index_code = #{indexCode}
@@ -740,7 +762,7 @@
                 r.symbol,
                 MAX(r.integrated_score) AS score,
                 MAX(COALESCE(ms.market_cap_usd, p.market_cap * 1000000, 0)) AS market_cap_usd
-            FROM stock_signal_backtest_result r
+            FROM stock_backtest_result_v2 r
             INNER JOIN index_constituent i
                 ON i.symbol = r.symbol
                AND i.index_code = #{indexCode}
@@ -835,18 +857,17 @@
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
           AND signal_date BETWEEN #{fromDate} AND #{toDate}
-          AND model_version IN ('EXPECTED_RETURN_V1', 'EXPECTED_RETURN_V2', 'EXPECTED_RETURN_V3', 'EXPECTED_RETURN_V4', 'EXPECTED_RETURN_V5', 'EXPECTED_RETURN_V6', 'EXPECTED_RETURN_V7', 'EXPECTED_RETURN_V8', 'EXPECTED_RETURN_V9')
+          AND model_version IN ('EXPECTED_RETURN_V2_CORRECTED_20261017', 'EXPECTED_RETURN_V3_CORRECTED_20261017', 'EXPECTED_RETURN_V4_CORRECTED_20261017', 'EXPECTED_RETURN_V5_CORRECTED_20261017', 'EXPECTED_RETURN_V6_CORRECTED_20261017', 'EXPECTED_RETURN_V7_CORRECTED_20261017', 'EXPECTED_RETURN_V8_CORRECTED_20261017', 'EXPECTED_RETURN_V9_CORRECTED_20261017')
         ORDER BY signal_date, horizon_days, symbol,
             CASE model_version
-                WHEN 'EXPECTED_RETURN_V1' THEN 1
-                WHEN 'EXPECTED_RETURN_V2' THEN 2
-                WHEN 'EXPECTED_RETURN_V3' THEN 3
-                WHEN 'EXPECTED_RETURN_V4' THEN 4
-                WHEN 'EXPECTED_RETURN_V5' THEN 5
-                WHEN 'EXPECTED_RETURN_V6' THEN 6
-                WHEN 'EXPECTED_RETURN_V7' THEN 7
-                WHEN 'EXPECTED_RETURN_V8' THEN 8
-                WHEN 'EXPECTED_RETURN_V9' THEN 9
+                WHEN 'EXPECTED_RETURN_V2_CORRECTED_20261017' THEN 2
+                WHEN 'EXPECTED_RETURN_V3_CORRECTED_20261017' THEN 3
+                WHEN 'EXPECTED_RETURN_V4_CORRECTED_20261017' THEN 4
+                WHEN 'EXPECTED_RETURN_V5_CORRECTED_20261017' THEN 5
+                WHEN 'EXPECTED_RETURN_V6_CORRECTED_20261017' THEN 6
+                WHEN 'EXPECTED_RETURN_V7_CORRECTED_20261017' THEN 7
+                WHEN 'EXPECTED_RETURN_V8_CORRECTED_20261017' THEN 8
+                WHEN 'EXPECTED_RETURN_V9_CORRECTED_20261017' THEN 9
                 ELSE 0
             END
     </select>
@@ -913,7 +934,7 @@
         SELECT
             sl.symbol,
             COALESCE(p.name, i.name, sl.symbol) AS name,
-            CURRENT_DATE AS signalDate,
+            DATE(sl.calculated_at) AS signalDate,
             sl.integrated_score AS integratedScore,
             sl.valuation_score AS valuationScore,
             sl.quality_score AS qualityScore,
@@ -950,6 +971,9 @@
                   AND symbol = sl.symbol
            )
         WHERE sl.integrated_score IS NOT NULL
+          AND sl.signal_version = 'q4-fin-20261031'
+          AND sl.calculated_at >= CURRENT_DATE
+          AND sl.calculated_at &lt;= CURRENT_TIMESTAMP
         ORDER BY COALESCE(ms.market_cap_usd, p.market_cap) DESC, sl.symbol
     </select>
 
@@ -1139,10 +1163,14 @@
             COUNT(DISTINCT sl.symbol) AS symbolCount,
             0 AS dateCount,
             CAST(NULL AS DATE) AS latestDate,
-            MAX(sl.calculated_at) AS latestCalculatedAt,
+            MIN(sl.calculated_at) AS latestCalculatedAt,
             '리스트/상세 화면이 우선 조회하는 최신 Signal 저장값입니다.' AS note
         FROM stock_signal_latest sl
-        WHERE EXISTS (
+        WHERE sl.signal_version = 'q4-fin-20261031'
+          AND sl.integrated_score IS NOT NULL
+          AND sl.calculated_at >= CURRENT_DATE
+          AND sl.calculated_at &lt;= CURRENT_TIMESTAMP
+          AND EXISTS (
             SELECT 1
             FROM index_constituent i
             WHERE i.symbol = sl.symbol
@@ -1156,16 +1184,65 @@
             'Data quality' AS layer,
             'DATA_QUALITY' AS metricKey,
             COUNT(*) AS rowCount,
-            COUNT(DISTINCT dq.symbol) AS symbolCount,
+            COUNT(DISTINCT CASE
+                WHEN JSON_LENGTH(dq.stale_sources_json) = 0
+                 AND dq.calculated_at &lt;= CURRENT_TIMESTAMP
+                THEN dq.symbol END) AS symbolCount,
             0 AS dateCount,
             CAST(NULL AS DATE) AS latestDate,
-            MAX(dq.calculated_at) AS latestCalculatedAt,
-            '커버리지, 최신성, 이상치, 원천 충돌을 반영한 품질 점수입니다.' AS note
+            MIN(dq.calculated_at) AS latestCalculatedAt,
+            'symbols는 stale source가 없는 종목 수이며 전체 현재 편입 종목과 비교합니다.' AS note
         FROM stock_data_quality_latest dq
         WHERE EXISTS (
             SELECT 1
             FROM index_constituent i
             WHERE i.symbol = dq.symbol
+              AND i.index_code = #{indexCode}
+              AND i.current_member = TRUE
+              AND i.symbol NOT IN ('TICKER', 'SECURITY')
+              AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        )
+        UNION ALL
+        SELECT
+            'Quote source' AS layer,
+            'QUOTE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT q.symbol) AS symbolCount,
+            COUNT(DISTINCT DATE(q.quote_time)) AS dateCount,
+            MIN(DATE(q.quote_time)) AS latestDate,
+            MIN(q.quote_time) AS latestCalculatedAt,
+            '실제 quote_time 기준이며 수집 시각은 최신성 근거로 사용하지 않습니다.' AS note
+        FROM stock_quote_cache q
+        WHERE q.current_price > 0
+          AND q.quote_time &lt;= CURRENT_TIMESTAMP
+          AND EXISTS (
+            SELECT 1 FROM index_constituent i
+            WHERE i.symbol = q.symbol
+              AND i.index_code = #{indexCode}
+              AND i.current_member = TRUE
+              AND i.symbol NOT IN ('TICKER', 'SECURITY')
+              AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        )
+        UNION ALL
+        SELECT
+            'Candle source' AS layer,
+            'CANDLE' AS metricKey,
+            COUNT(*) AS rowCount,
+            COUNT(DISTINCT c.symbol) AS symbolCount,
+            COUNT(DISTINCT c.latest_trade_date) AS dateCount,
+            MIN(c.latest_trade_date) AS latestDate,
+            CAST(NULL AS DATETIME) AS latestCalculatedAt,
+            '현재 편입 종목별 마지막 거래일 중 가장 오래된 날짜입니다.' AS note
+        FROM (
+            SELECT symbol, MAX(trade_date) AS latest_trade_date
+            FROM stock_candle_daily
+            WHERE close_price > 0
+              AND trade_date &lt;= CURRENT_DATE
+            GROUP BY symbol
+        ) c
+        WHERE EXISTS (
+            SELECT 1 FROM index_constituent i
+            WHERE i.symbol = c.symbol
               AND i.index_code = #{indexCode}
               AND i.current_member = TRUE
               AND i.symbol NOT IN ('TICKER', 'SECURITY')
@@ -1328,7 +1405,7 @@
             '국면별 factor 효과를 반영한 기대수익/확률 snapshot입니다.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V4'
+          AND model_version = 'EXPECTED_RETURN_V4_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Expected return v5' AS layer,
@@ -1341,7 +1418,7 @@
             'Regime-aware nonlinear interaction expected-return snapshot.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V5'
+          AND model_version = 'EXPECTED_RETURN_V5_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Expected return v6' AS layer,
@@ -1354,7 +1431,7 @@
             'Calibration-stabilized expected-return snapshot used as the current production expected-return layer.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V6'
+          AND model_version = 'EXPECTED_RETURN_V6_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Expected return v7' AS layer,
@@ -1367,7 +1444,7 @@
             'Horizon-decay stabilized expected-return snapshot used as the current production expected-return layer.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V7'
+          AND model_version = 'EXPECTED_RETURN_V7_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Expected return v8' AS layer,
@@ -1380,7 +1457,7 @@
             'FRED macro feature adjusted expected-return snapshot used as the current production expected-return layer.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V8'
+          AND model_version = 'EXPECTED_RETURN_V8_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Expected return v9' AS layer,
@@ -1393,7 +1470,7 @@
             'Provenance-stabilized expected-return snapshot used as the current production expected-return layer.' AS note
         FROM stock_expected_return_snapshot
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V9'
+          AND model_version = 'EXPECTED_RETURN_V9_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Factor contribution' AS layer,
@@ -1406,7 +1483,7 @@
             'Quant Opinion에서 factor별 기대수익 기여도를 설명하는 원천입니다.' AS note
         FROM stock_expected_return_factor_contribution
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V9'
+          AND model_version = 'EXPECTED_RETURN_V9_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Probability calibration' AS layer,
@@ -1419,7 +1496,7 @@
             '상승확률 예측값이 실제 적중률과 얼마나 맞는지 보는 calibration bucket입니다.' AS note
         FROM stock_expected_return_calibration
         WHERE index_code = #{indexCode}
-          AND model_version = 'EXPECTED_RETURN_V9'
+          AND model_version = 'EXPECTED_RETURN_V9_CORRECTED_20261017'
         UNION ALL
         SELECT
             'Covariance snapshot' AS layer,
@@ -1484,6 +1561,8 @@
             WHEN 'UNIVERSE' THEN 1
             WHEN 'SIGNAL_LATEST' THEN 2
             WHEN 'DATA_QUALITY' THEN 3
+            WHEN 'QUOTE' THEN 3.1
+            WHEN 'CANDLE' THEN 3.2
             WHEN 'MARKET_SNAPSHOT' THEN 4
             WHEN 'MEMBERSHIP_PIT' THEN 5
             WHEN 'SHARES_PIT' THEN 6
@@ -1617,21 +1696,21 @@
     <select id="findPitQuality" resultType="com.kingyurina.demo.stock.StockPitQualityMetric">
         SELECT
             'Membership PIT' AS layer,
-            COUNT(*) AS totalRows,
+            COALESCE(SUM(source_rows), 0) AS totalRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%'
                   OR UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%'
-                    THEN 1 ELSE 0 END) AS officialRows,
+                    THEN source_rows ELSE 0 END) AS officialRows,
             0 AS secRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'WIKIPEDIA%'
-                    THEN 1 ELSE 0 END) AS wikipediaRows,
+                    THEN source_rows ELSE 0 END) AS wikipediaRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
                   OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
                   OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%'
-                    THEN 1 ELSE 0 END) AS proxyRows,
-            AVG(CASE
+                    THEN source_rows ELSE 0 END) AS proxyRows,
+            SUM(source_rows * CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%' THEN 100
                 WHEN UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%' THEN 90
                 WHEN UPPER(COALESCE(source, '')) LIKE 'WIKIPEDIA%' THEN 65
@@ -1639,22 +1718,26 @@
                   OR UPPER(COALESCE(source, '')) LIKE 'CURRENT%'
                   OR UPPER(COALESCE(source, '')) LIKE '%FALLBACK%' THEN 35
                 ELSE 50
-            END) AS score
-        FROM stock_index_membership_snapshot
-        WHERE index_code = #{indexCode}
-          AND is_member = TRUE
+            END) / NULLIF(SUM(source_rows), 0) AS score
+        FROM (
+            SELECT source, COUNT(*) AS source_rows
+            FROM stock_index_membership_snapshot
+            WHERE index_code = #{indexCode}
+              AND is_member = TRUE
+            GROUP BY source
+        ) membership_sources
         UNION ALL
         SELECT
             'Shares PIT' AS layer,
-            COUNT(*) AS totalRows,
+            COALESCE(SUM(source_rows), 0) AS totalRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%'
                   OR UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%'
-                    THEN 1 ELSE 0 END) AS officialRows,
+                    THEN source_rows ELSE 0 END) AS officialRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'SEC%'
                   OR UPPER(COALESCE(source, '')) LIKE '%SEC%'
-                    THEN 1 ELSE 0 END) AS secRows,
+                    THEN source_rows ELSE 0 END) AS secRows,
             0 AS wikipediaRows,
             SUM(CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE '%PROXY%'
@@ -1663,8 +1746,8 @@
                   OR UPPER(COALESCE(source, '')) LIKE '%FINNHUB%'
                   OR UPPER(COALESCE(source, '')) LIKE '%TOSS%'
                   OR UPPER(COALESCE(source, '')) LIKE '%MISSING%'
-                    THEN 1 ELSE 0 END) AS proxyRows,
-            AVG(CASE
+                    THEN source_rows ELSE 0 END) AS proxyRows,
+            SUM(source_rows * CASE
                 WHEN UPPER(COALESCE(source, '')) LIKE 'OFFICIAL%' THEN 100
                 WHEN UPPER(COALESCE(source, '')) LIKE 'CSV_IMPORT%PIT%' THEN 90
                 WHEN UPPER(COALESCE(source, '')) LIKE 'SEC%' OR UPPER(COALESCE(source, '')) LIKE '%SEC%' THEN 85
@@ -1675,9 +1758,13 @@
                   OR UPPER(COALESCE(source, '')) LIKE '%TOSS%' THEN 40
                 WHEN UPPER(COALESCE(source, '')) LIKE '%MISSING%' THEN 0
                 ELSE 50
-            END) AS score
-        FROM stock_shares_outstanding_snapshot
-        WHERE index_code = #{indexCode}
+            END) / NULLIF(SUM(source_rows), 0) AS score
+        FROM (
+            SELECT source, COUNT(*) AS source_rows
+            FROM stock_shares_outstanding_snapshot
+            WHERE index_code = #{indexCode}
+            GROUP BY source
+        ) shares_sources
     </select>
 
     <select id="findSectorForSymbol" resultType="string">
@@ -1689,7 +1776,7 @@
     </select>
 
     <insert id="upsertResult">
-        INSERT INTO stock_signal_backtest_result (
+        INSERT INTO stock_backtest_result_v2 (
             snapshot_id, symbol, signal_date, horizon_days, entry_trade_date, entry_close,
             exit_trade_date, exit_close, forward_return_pct, integrated_score, valuation_score,
             quality_score, growth_score, stability_score, earnings_score, analyst_score, news_score,
@@ -2226,7 +2313,7 @@
         SELECT
             r.snapshot_id AS snapshotId,
             r.symbol,
-            COALESCE(p.name, i.name, r.symbol) AS name,
+            COALESCE(p.name, r.symbol) AS name,
             r.signal_date AS signalDate,
             r.horizon_days AS horizonDays,
             r.entry_trade_date AS entryTradeDate,
@@ -2246,16 +2333,15 @@
             r.risk_score AS riskScore,
             r.institution_score AS institutionScore,
             r.data_quality_score AS dataQualityScore,
-            COALESCE(ms.market_cap_usd / 1000000, p.market_cap) AS marketCap,
+            ms.market_cap_usd / 1000000 AS marketCap,
             r.sector,
             r.calculated_at AS calculatedAt
-        FROM stock_signal_backtest_result r
-        INNER JOIN index_constituent i
-            ON i.symbol = r.symbol
-           AND i.index_code = #{indexCode}
-           AND i.current_member = TRUE
-           AND i.symbol NOT IN ('TICKER', 'SECURITY')
-           AND UPPER(COALESCE(i.sector, '')) &lt;&gt; 'TICKER'
+        FROM stock_backtest_result_v2 r
+        INNER JOIN stock_index_membership_snapshot m
+            ON m.symbol = r.symbol
+           AND m.index_code = #{indexCode}
+           AND m.snapshot_date = r.signal_date
+           AND m.is_member = TRUE
         LEFT JOIN company_profile p
             ON p.symbol = r.symbol
         LEFT JOIN stock_market_snapshot ms
@@ -2269,28 +2355,41 @@
     <select id="findResultsForEvaluation" resultType="com.kingyurina.demo.stock.StockBacktestResult">
         SELECT
             r.snapshot_id AS snapshotId,
-            r.symbol,
-            r.signal_date AS signalDate,
-            r.horizon_days AS horizonDays,
+            m.symbol,
+            m.snapshot_date AS signalDate,
+            #{horizonDays} AS horizonDays,
             r.entry_trade_date AS entryTradeDate,
             r.entry_close AS entryClose,
             r.exit_trade_date AS exitTradeDate,
             r.exit_close AS exitClose,
             r.forward_return_pct AS forwardReturnPct,
-            r.sector,
+            COALESCE(r.sector, m.sector) AS sector,
             r.calculated_at AS calculatedAt
-        FROM stock_signal_backtest_result r
-        WHERE r.horizon_days = #{horizonDays}
-          AND r.signal_date BETWEEN #{fromDate} AND #{toDate}
-          AND EXISTS (
-              SELECT 1
-              FROM stock_expected_return_snapshot e
-              WHERE e.index_code = #{indexCode}
-                AND e.symbol = r.symbol
-                AND e.signal_date = r.signal_date
-                AND e.horizon_days = r.horizon_days
-          )
-        ORDER BY r.signal_date, r.symbol
+        FROM stock_index_membership_snapshot m
+        LEFT JOIN (
+            stock_signal_snapshot outcome_signal
+            INNER JOIN stock_backtest_result_v2 r
+                ON r.snapshot_id = outcome_signal.id
+               AND r.horizon_days = #{horizonDays}
+        ) ON outcome_signal.symbol = m.symbol
+           AND outcome_signal.signal_date = m.snapshot_date
+           AND r.symbol = m.symbol
+           AND r.signal_date = m.snapshot_date
+        WHERE m.index_code = #{indexCode}
+          AND m.is_member = TRUE
+          AND m.snapshot_date BETWEEN #{fromDate} AND #{toDate}
+          AND EXISTS (SELECT 1 FROM stock_signal_snapshot s WHERE s.signal_date = m.snapshot_date)
+        ORDER BY m.snapshot_date, m.symbol
+    </select>
+
+    <select id="findEvaluationMembershipSnapshots" resultType="com.kingyurina.demo.stock.StockIndexMembershipSnapshot">
+        SELECT m.index_code AS indexCode, m.symbol, m.snapshot_date AS snapshotDate,
+               m.sector, m.industry, m.exchange, m.is_member AS member, m.source
+        FROM stock_index_membership_snapshot m
+        WHERE m.index_code = #{indexCode}
+          AND m.snapshot_date BETWEEN #{fromDate} AND #{toDate}
+          AND EXISTS (SELECT 1 FROM stock_signal_snapshot s WHERE s.signal_date = m.snapshot_date)
+        ORDER BY m.snapshot_date, m.symbol
     </select>
 
     <select id="findIndexMembershipSnapshots" resultType="com.kingyurina.demo.stock.StockIndexMembershipSnapshot">
@@ -2352,13 +2451,13 @@
             transaction_cost_pct
         ) VALUES (
             #{runId}, #{windowId}, #{testFrom}, #{testTo}, #{modelVersion}, #{status},
-            #{trainRowCount}, #{testRowCount}, #{metrics.rankIc}, #{metrics.positiveIcDatePct},
-            #{metrics.maePct}, #{metrics.directionalAccuracyPct}, #{metrics.brierScore},
-            #{metrics.calibrationErrorPct}, #{metrics.intervalCoveragePct},
-            #{metrics.quintileSpreadPct}, #{portfolio.netReturnPct},
-            #{portfolio.annualizedExcessReturnPct}, #{portfolio.sharpe},
-            #{portfolio.maximumDrawdownPct}, #{portfolio.turnoverPct},
-            #{portfolio.transactionCostPct}
+            #{trainRowCount}, #{testRowCount}, #{finiteMetrics.rankIc,jdbcType=DOUBLE}, #{finiteMetrics.positiveIcDatePct,jdbcType=DOUBLE},
+            #{finiteMetrics.maePct,jdbcType=DOUBLE}, #{finiteMetrics.directionalAccuracyPct,jdbcType=DOUBLE}, #{finiteMetrics.brierScore,jdbcType=DOUBLE},
+            #{finiteMetrics.calibrationErrorPct,jdbcType=DOUBLE}, #{finiteMetrics.intervalCoveragePct,jdbcType=DOUBLE},
+            #{finiteMetrics.quintileSpreadPct,jdbcType=DOUBLE}, #{finiteMetrics.netReturnPct,jdbcType=DOUBLE},
+            #{finiteMetrics.annualizedExcessReturnPct,jdbcType=DOUBLE}, #{finiteMetrics.sharpe,jdbcType=DOUBLE},
+            #{finiteMetrics.maximumDrawdownPct,jdbcType=DOUBLE}, #{finiteMetrics.turnoverPct,jdbcType=DOUBLE},
+            #{finiteMetrics.transactionCostPct,jdbcType=DOUBLE}
         )
     </insert>
 

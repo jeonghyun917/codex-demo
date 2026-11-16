@@ -125,9 +125,10 @@ public class FinnhubBatchRunner implements ApplicationRunner {
             for (String symbol : symbols) {
                 requested++;
                 try {
-                    StockDashboard dashboard = stockAnalysisService.dashboard(symbol);
-                    if (dashboard.quote() != null || dashboard.profile() != null || dashboard.metric() != null
-                            || !dashboard.recommendations().isEmpty() || !dashboard.epsSurprises().isEmpty()) {
+                    StockDashboard dashboard = stockAnalysisService.refreshDashboard(symbol);
+                    if (dashboard.quote() != null && !dashboard.quoteCacheHit()
+                            || dashboard.profile() != null && !dashboard.profileCacheHit()
+                            || dashboard.metric() != null && !dashboard.metricCacheHit()) {
                         success++;
                         symbolMapper.markCollected(symbol);
                         refreshedSymbols.add(symbol);

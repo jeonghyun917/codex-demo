@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class StockHeatmapViewService {
 
-    private static final BigDecimal USD_KRW_RATE = BigDecimal.valueOf(1365);
 
     private final ObjectProvider<IndexConstituentMapper> indexConstituentMapper;
 
@@ -101,7 +100,7 @@ public class StockHeatmapViewService {
                     formatPercent(row.getRoeTtm()),
                     tileStyles.getOrDefault(row.getSymbol(), fullSizeStyle()),
                     colorClass(change),
-                    "/stocks/" + row.getSymbol()));
+                    "/stocks/" + row.getSymbol(), StockMarketViewService.priceContext(row)));
         }
         return tiles;
     }
@@ -317,8 +316,7 @@ public class StockHeatmapViewService {
         if (usdPrice == null) {
             return "-";
         }
-        BigDecimal krw = usdPrice.multiply(USD_KRW_RATE).setScale(0, RoundingMode.HALF_UP);
-        return new DecimalFormat("#,##0").format(krw) + "원";
+        return "$" + new DecimalFormat("#,##0.00").format(usdPrice);
     }
 
     private static String formatPriceRangeKrw(BigDecimal lowPrice, BigDecimal highPrice) {
@@ -332,10 +330,8 @@ public class StockHeatmapViewService {
         if (marketCapMillionUsd == null) {
             return "-";
         }
-        BigDecimal trillionKrw = marketCapMillionUsd
-                .multiply(USD_KRW_RATE)
-                .divide(BigDecimal.valueOf(1_000_000), 1, RoundingMode.HALF_UP);
-        return new DecimalFormat("#,##0.0").format(trillionKrw) + "조원";
+        BigDecimal billionUsd = marketCapMillionUsd.divide(BigDecimal.valueOf(1_000), 1, RoundingMode.HALF_UP);
+        return "$" + new DecimalFormat("#,##0.0").format(billionUsd) + "B";
     }
 
     private static String formatRatio(BigDecimal value, String suffix) {

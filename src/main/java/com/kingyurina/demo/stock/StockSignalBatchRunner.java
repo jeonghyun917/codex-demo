@@ -56,7 +56,11 @@ public class StockSignalBatchRunner implements ApplicationRunner {
             StockSignalRefreshService.RefreshResult result = refreshService.recalculateSymbols(symbols);
             System.out.println("Stock signal refresh requested=" + result.requested()
                     + ", success=" + result.success()
-                    + ", fail=" + result.fail());
+                    + ", fail=" + result.fail()
+                    + ", failedStages=" + result.failedStages());
+            if (result.fail() > 0 || !result.failedStages().isEmpty()) {
+                exitCode = 1;
+            }
         } catch (RuntimeException ex) {
             exitCode = 1;
             throw ex;

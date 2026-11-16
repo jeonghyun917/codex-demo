@@ -42,13 +42,14 @@ public class MenuService {
     private static List<MenuItem> fallbackMainMenus() {
         return List.of(
                 new MenuItem("Quant", "/quant"),
+                new MenuItem("모의운용", "/paper-trading"),
                 new MenuItem("Stocks", "/stocks"),
                 new MenuItem("Heatmap", "/stocks/heatmap"),
                 new MenuItem("ETF", "/etfs"),
                 new MenuItem("Atelier", "/atelier"),
                 new MenuItem("Systems", "#systems"),
                 new MenuItem("Signal", "/signals/backtest"),
-                new MenuItem("Contact", "#contact"));
+                new MenuItem("Contact", "/contact"));
     }
 
     private static List<MenuItem> fallbackSideMenus() {

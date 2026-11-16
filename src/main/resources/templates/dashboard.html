@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Quant | King Yurina</title>
     <link rel="stylesheet" th:href="@{/css/main.css}" href="../static/css/main.css">
+    <link rel="stylesheet" th:href="@{/css/quant-buy-candidates.css}">
 </head>
 <body class="market-body">
 <div class="market-shell">
@@ -25,6 +26,7 @@
     </header>
 
     <main class="market-home quant-dashboard-home">
+        <section th:replace="~{fragments/quant-buy-candidates :: candidates}"></section>
         <section class="market-landing quant-dashboard-landing">
             <div>
                 <p>Quant</p>
@@ -53,10 +55,11 @@
                         <h2 th:text="${market.title + ' Quant AI'}">S&amp;P 500 Quant AI</h2>
                         <p>
                             구성종목 <b th:text="${market.totalMembers}">0</b>,
-                            quote 캐시 <b th:text="${market.cachedQuotes}">0</b>,
+                            저장 가격 <b th:text="${market.cachedQuotes}">0</b>,
                             Signal 평균 <b th:text="${market.indexCards[2].value}">-</b>,
                             강한 Signal <b th:text="${market.indexCards[3].value}">0개</b>
                         </p>
+                        <p>가격·시가총액은 USD입니다. 가격 아래 기준일을 확인하세요. 예측은 재검증 전 연구용이며, ‘-’는 계산·근거 데이터 부족입니다.</p>
                     </div>
                     <div class="toolbar-pills">
                         <a th:href="@{/stocks}" href="/stocks">Stocks</a>
@@ -71,7 +74,7 @@
                         <span class="dashboard-head-cell"><span>종목</span></span>
                         <span class="dashboard-head-cell"><span>섹터</span></span>
                         <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="price">현재가</button>
+                            <button class="sp-sort" type="button" data-sort="price">가격 (USD)</button>
                         </span>
                         <span class="dashboard-head-cell">
                             <button class="sp-sort" type="button" data-sort="marketCap">시가총액</button>
@@ -89,12 +92,12 @@
                         <span class="dashboard-head-cell">
                             <button class="sp-sort" type="button" data-sort="expected">20D 기대</button>
                             <span class="header-help" tabindex="0" aria-label="20D 기대 초과수익 설명"
-                                  data-tip="Expected Return v8이 계산한 20거래일 기대 초과수익입니다. FRED macro feature와 horizon별 decay/calibration을 함께 반영한 확률 의견입니다.">i</span>
+                                  data-tip="정정 모델의 20거래일 기대 초과수익입니다. 비교 대상은 저장 시가총액가중 가격수익 대용 지수이며 공식 배당포함 지수가 아닙니다. 실제 검증 통과 여부는 평가 패널에서 확인하세요.">i</span>
                         </span>
                         <span class="dashboard-head-cell">
-                            <button class="sp-sort" type="button" data-sort="upside">상승확률</button>
-                            <span class="header-help" tabindex="0" aria-label="상승확률 설명"
-                                  data-tip="보정된 상승확률입니다. calibration bucket을 통해 raw 확률을 보수적으로 조정합니다.">i</span>
+                            <button class="sp-sort" type="button" data-sort="upside">초과확률</button>
+                            <span class="header-help" tabindex="0" aria-label="비교지수 초과 확률 설명"
+                                  data-tip="비교지수보다 높은 수익률을 낼 보정 확률입니다. 주가 자체가 오를 확률과 다릅니다.">i</span>
                         </span>
                         <span class="dashboard-head-cell">
                             <button class="sp-sort" type="button" data-sort="confidence">모델신뢰</button>
@@ -106,7 +109,7 @@
                             <span class="header-help"
                                   tabindex="0"
                                   aria-label="3개월 고점 대비 현재가 비율 설명"
-                                  data-tip="저장된 최신 거래일부터 3개월간의 장중 고가 최댓값을 100으로 본 현재가 비율입니다.">i</span>
+                                  data-tip="동일 가격 기준의 최신 저장 일봉부터 3개월간 장중 고가 최댓값을 100으로 본 비율입니다. 시세와 일봉의 조정 기준을 확인할 수 없으면 표시하지 않습니다.">i</span>
                         </span>
                     </div>
                     <a class="quant-dashboard-row"
@@ -125,7 +128,10 @@
                             </span>
                         </strong>
                         <span th:text="${row.sector}">Information Technology</span>
-                        <span th:text="${row.price}">0원</span>
+                        <span th:attr="data-sort-value=${row.price}" th:title="${row.priceBasis}">
+                            <span th:text="${row.price}">$0.00</span>
+                            <small style="display:block;font-size:10px;white-space:normal" th:text="${row.priceContext}">가격 기준일</small>
+                        </span>
                         <span th:text="${row.marketCap}">0.0 조원</span>
                         <span class="market-signal-score" th:classappend="${row.signalTone}" th:text="${row.signalScore}">-</span>
                         <span class="market-signal-score compact" th:classappend="${row.dataQualityTone}" th:text="${row.dataQualityScore}">-</span>
@@ -145,6 +151,29 @@
             </div>
 
             <aside class="market-board-side quant-dashboard-side">
+                <section class="quant-evaluation-panel" aria-labelledby="forward-validation-title" th:if="${forwardValidation != null}">
+                    <div class="quant-evaluation-head">
+                        <div><span class="market-kicker">실제 20D 검증 상태</span><h2 id="forward-validation-title">예측 오차 · 전방 관측</h2></div>
+                        <span class="quant-health-status" th:text="${forwardValidation.status}">전방 상태 미발행</span>
+                    </div>
+                    <p class="quant-health-summary" th:text="${forwardValidation.modelStatus}">운영 모델 승격 근거 없음</p>
+                    <p class="quant-health-summary" th:text="${forwardValidation.forwardSummary}">전방 관측 상태 미확인</p>
+                    <div class="quant-evaluation-grid">
+                        <div style="background:#171a23;border:1px solid #363b4b"><small style="color:#bec8d8">전방 가격수익 MAE</small><strong style="color:#f7f9ff" th:text="${forwardValidation.rawMae}">미평가</strong></div>
+                        <div style="background:#171a23;border:1px solid #363b4b"><small style="color:#bec8d8">전방 초과수익 MAE</small><strong style="color:#f7f9ff" th:text="${forwardValidation.excessMae}">미평가</strong></div>
+                    </div>
+                    <div class="quant-side-note"><strong>가장 이른 평가 시각</strong><p th:text="${forwardValidation.firstEvaluation}">미확인</p></div>
+                    <div class="quant-side-note"><strong>진입·누락 진단</strong><p th:text="${forwardValidation.entrySummary}">진입 상태 미확인</p></div>
+                    <details class="quant-side-note">
+                        <summary>연구 결과와 평가 한계</summary>
+                        <p th:text="${forwardValidation.researchSummary}">연구 상태 미확인</p>
+                        <p>표시 순서: 가격수익 MAE / 초과수익 MAE. 학습 결과는 실제 전방 성과가 아닙니다.</p>
+                        <p th:text="${forwardValidation.benchmark}">비교지수 기준 미확인</p>
+                        <ul><li th:each="limitation : ${forwardValidation.limitations}" th:text="${limitation}">평가 한계</li></ul>
+                        <p>예측 오차는 투자 수익이 아닙니다. 전략 성과는 비중첩 자본 회계·거래비용·배당·실제 청산가를 별도로 검증해야 합니다.</p>
+                    </details>
+                    <small th:text="${'상태 기준 ' + forwardValidation.generatedAt}">상태 기준 -</small>
+                </section>
                 <section class="quant-evaluation-panel" th:if="${expectedReturnEvaluation != null}">
                     <div class="quant-evaluation-head">
                         <div>
@@ -176,8 +205,8 @@
                         <p>Valuation, Quality, Growth, Stability, Earnings, Analyst, News, Momentum, Risk, Institution factor를 통합합니다.</p>
                     </div>
                     <div class="quant-side-note">
-                        <strong>Expected Return v8</strong>
-                        <p>시장 국면별 factor 효과와 nonlinear interaction을 walk-forward로 학습해 기대 초과수익, 상승확률, 하락 리스크를 계산합니다.</p>
+                        <strong>Expected Return · 정정 모델</strong>
+                        <p>확정된 과거 결과만 학습해 기대 초과수익과 비교지수 초과확률을 계산합니다. 과거 구성종목·기업행사·입력 시점의 근거가 부족한 결과는 검증 완료로 인정하지 않습니다.</p>
                     </div>
                     <div class="quant-side-note">
                         <strong>Risk Model</strong>
@@ -337,7 +366,8 @@
         if (index == null) {
             return null;
         }
-        return parseNumber(row.children[index]?.textContent);
+        const cell = row.children[index];
+        return parseNumber(cell?.hasAttribute("data-sort-value") ? cell.dataset.sortValue : cell?.textContent);
     };
 
     button?.addEventListener("click", () => {

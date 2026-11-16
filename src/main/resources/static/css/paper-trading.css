@@ -1,0 +1,87 @@
+.paper-main { max-width: 1440px; margin: 0 auto; padding: 30px 16px 48px; }
+.paper-main * { box-sizing: border-box; letter-spacing: 0; }
+.paper-heading,.paper-section-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.paper-heading h1 { margin: 4px 0 12px; font-size: 28px; font-weight: 700; }
+.paper-eyebrow { color: #97a7b4; font-size: 11px; margin: 0; }
+.paper-status { color: #efc86c; border: 1px solid #635632; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+.paper-notice { color: #bbc4cf; padding: 12px 0; margin: 0; font-size: 13px; line-height: 1.7; }
+.paper-meta { display: flex; flex-wrap: wrap; gap: 6px 24px; color: #8894a3; font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.paper-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-top: 1px solid #2b2e35; border-bottom: 1px solid #2b2e35; margin: 24px 0 8px; }
+.paper-metrics>div { padding: 22px 16px; }
+.paper-metrics>div+div { border-left: 1px solid #2b2e35; }
+.paper-main dt { color: #98a4b4; font-size: 12px; }
+.paper-main dd { margin: 8px 0 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.paper-metrics dd { font-size: 26px; font-weight: 650; }
+.paper-metrics dd.paper-date { font-size: 20px; }
+.paper-metrics small { font-size: 13px; margin-left: 8px; color: #9ba5b3; }
+.paper-section { padding: 24px 0; border-bottom: 1px solid #2b2e35; }
+.paper-section h2 { font-size: 16px; margin: 0; }
+.paper-empty { padding: 28px 0 12px; }
+.paper-empty h3 { margin: 0 0 7px; font-size: 14px; font-weight: 500; color: #bcc6d2; }
+.paper-empty p,.paper-caption { color: #8e9baa; font-size: 12px; line-height: 1.7; }
+.paper-empty p { margin: 0; }
+.paper-filters,.paper-search { display: flex; align-items: center; gap: 8px; color: #98a4b4; font-size: 12px; }
+.paper-search { margin: 14px 0; }
+.paper-main input,.paper-main select { background: #1b1d24; border: 1px solid #3b414b; color: #edf0f5; border-radius: 4px; padding: 7px 10px; font: inherit; max-width: 100%; }
+.paper-main select:disabled { opacity: .55; }
+.paper-main :focus-visible { outline: 2px solid #6ed9bb; outline-offset: 3px; }
+.paper-account { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 18px; }
+.paper-account dd { font-size: 17px; }
+.paper-table-wrap { max-width: 100%; overflow: auto; max-height: 480px; margin-top: 16px; }
+.paper-main table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.paper-main th { position: sticky; top: 0; background: #1b1d24; color: #aab7c6; font-weight: 500; }
+.paper-main th,.paper-main td { padding: 12px 14px; border-bottom: 1px solid #292d35; text-align: right; }
+.paper-main th:first-child,.paper-main td:first-child { text-align: left; }
+.paper-main td { font-variant-numeric: tabular-nums; }
+.paper-selected { color: #65d6b2; }.paper-muted { color: #8993a2; }
+.paper-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; margin-top: 20px; }
+.paper-rules dd { font-size: 13px; line-height: 1.7; color: #c7cfda; }
+.paper-decision { border-bottom: 1px solid #2b2e35; padding: 14px 0 18px; }
+.paper-decision h2 { font-size: 16px; margin: 0; }
+.paper-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin: 4px 0 14px; }
+.paper-summary dd { font-size: 22px; font-weight: 650; }
+.paper-label { color: #a7b6ba; font-size: 12px; }
+.paper-rank { display: inline-block; width: 30px; color: #8993a2; }
+.paper-search { flex-wrap: wrap; }
+.paper-search input { width: 145px; }
+.paper-reason { white-space: normal; min-width: 190px; max-width: 290px; line-height: 1.6; }
+.paper-main td.paper-reason { text-align: left; }
+.paper-provenance { font-size: 11px; color: #8e9baa; overflow-wrap: anywhere; }
+.paper-provenance summary { cursor: pointer; }
+.paper-subtitle { font-size: 14px; margin: 28px 0 0; }
+.paper-account { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.paper-main tr[hidden] { display: none; }
+.paper-bin-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid #2b2e35; }
+.paper-bin-section h3 { margin: 0; font-size: 15px; }
+.paper-bin-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin: 18px 0; }
+.paper-bin-summary dd { font-size: 18px; }
+.paper-bin-table small { display: block; margin-top: 4px; color: #98a4b4; font-size: 10px; }
+.paper-bin-group[hidden] { display: none; }
+.paper-bin-section .paper-filters { flex-wrap: wrap; }
+@media(max-width:700px) {
+    .paper-main { padding: 24px 4px 32px; }
+    .paper-heading h1 { font-size: 23px; }
+    .paper-metrics { grid-template-columns: 1fr 1fr; }
+    .paper-metrics>div { padding: 18px 10px; }
+    .paper-metrics>div:nth-child(3) { border-left: 0; }
+    .paper-metrics>div:nth-child(n+3) { border-top: 1px solid #2b2e35; }
+    .paper-metrics dd { font-size: 22px; }
+    .paper-account { grid-template-columns: 1fr 1fr; }
+    .paper-rules { grid-template-columns: 1fr; }
+    .paper-section { padding: 22px 0; }
+    .market-logo { flex-shrink: 0; }
+    .paper-summary { grid-template-columns: 1fr 1fr; }
+    .paper-summary dd { font-size: 20px; }
+    .paper-bin-summary { grid-template-columns: 1fr 1fr; }
+    [aria-label="예측 목록"] table { white-space: normal; }
+    [aria-label="예측 목록"] thead { display: none; }
+    [aria-label="예측 목록"] tbody { display: block; }
+    [aria-label="예측 목록"] tr { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #292d35; }
+    [aria-label="예측 목록"] td { display: block; border: 0; padding: 8px 6px; }
+    [aria-label="예측 목록"] td::before { display: block; font-size: 10px; color: #98a4b4; margin-bottom: 5px; }
+    [aria-label="예측 목록"] td:nth-child(2)::before { content: '목표 선도달 확률'; }
+    [aria-label="예측 목록"] td:nth-child(3) { text-align: left; }
+    [aria-label="예측 목록"] td:nth-child(3)::before { content: '20일 변동성'; }
+    [aria-label="예측 목록"] td:nth-child(4)::before { content: '63일 고점 대비'; }
+    [aria-label="예측 목록"] td.paper-reason { grid-column: 1 / -1; min-width: 0; max-width: none; padding-bottom: 12px; }
+}

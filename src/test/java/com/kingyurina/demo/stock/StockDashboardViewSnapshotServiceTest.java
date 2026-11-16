@@ -35,7 +35,7 @@ class StockDashboardViewSnapshotServiceTest {
         StockDashboardViewPayload payload = service.build("SP500");
 
         assertThat(payload.activeIndex()).isEqualTo("SP500");
-        verify(mapper).findLatestDashboardViewSnapshot("SP500", "DASHBOARD_QUANT_AI_EVALUATION_V4");
+        verify(mapper).findLatestDashboardViewSnapshot("SP500", "DASHBOARD_QUANT_AI_EVALUATION_V5");
         verify(mapper, never()).findLatestDashboardViewSnapshot("SP500", "DASHBOARD_QUANT_AI_EVALUATION_V3");
         verify(marketViewService).build("SP500");
     }

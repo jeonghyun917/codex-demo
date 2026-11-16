@@ -24,15 +24,18 @@ class ExpectedReturnEvaluationDatasetServiceTest {
     void compoundsBenchmarkReturnsAcrossTheRealizedHoldingPeriod() {
         LocalDate signalDate = LocalDate.of(2024, 1, 2);
         StockBacktestResult result = result("AAPL", signalDate,
-                LocalDate.of(2024, 1, 3), LocalDate.of(2024, 1, 5), 5.0d);
+                LocalDate.of(2024, 1, 3), LocalDate.of(2024, 1, 23), 5.0d);
+        List<StockBenchmarkReturn> completeBenchmark = new java.util.ArrayList<>();
+        completeBenchmark.add(benchmark(LocalDate.of(2024, 1, 4), 1.0d));
+        completeBenchmark.add(benchmark(LocalDate.of(2024, 1, 5), 2.0d));
+        for (int day = 6; day <= 23; day++) completeBenchmark.add(benchmark(LocalDate.of(2024, 1, day), 0));
 
         ExpectedReturnEvaluationDataset dataset = service.assemble(
                 ExpectedReturnPredictionContract.sp500Excess20dV1(),
                 "EXPECTED_RETURN_V9",
-                List.of(prediction("AAPL", signalDate, 3.0d, LocalDateTime.of(2024, 2, 1, 12, 0))),
+                List.of(prediction("AAPL", signalDate, 3.0d, signalDate.atTime(12, 0))),
                 List.of(result),
-                List.of(benchmark(LocalDate.of(2024, 1, 4), 1.0d),
-                        benchmark(LocalDate.of(2024, 1, 5), 2.0d)),
+                completeBenchmark,
                 List.of(membership("AAPL", signalDate, true)),
                 LocalDate.of(2025, 1, 1));
 
@@ -78,6 +81,7 @@ class ExpectedReturnEvaluationDatasetServiceTest {
         row.setExcessP90Pct(BigDecimal.valueOf(8.0d));
         row.setModelVersion("EXPECTED_RETURN_V9");
         row.setCalculatedAt(calculatedAt);
+        row.setSource("LIVE_PROVENANCE_STABILIZED_EXPECTED_RETURN_V9");
         return row;
     }
 
@@ -99,6 +103,7 @@ class ExpectedReturnEvaluationDatasetServiceTest {
         row.setIndexCode("SP500");
         row.setTradeDate(date);
         row.setReturnPct(BigDecimal.valueOf(returnPct));
+        row.setSource("MARKET_SNAPSHOT_WEIGHTED");
         return row;
     }
 
@@ -109,7 +114,7 @@ class ExpectedReturnEvaluationDatasetServiceTest {
         row.setSnapshotDate(date);
         row.setMember(member);
         row.setSector("Technology");
-        row.setSource("PIT_TEST");
+        row.setSource("OFFICIAL_PIT");
         return row;
     }
 }

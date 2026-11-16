@@ -3,6 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kingyurina.demo.stock.StockCandleMapper">
+    <select id="lockCanonicalSymbol" resultType="string">
+        SELECT symbol FROM stock_symbol WHERE symbol = #{symbol} FOR UPDATE
+    </select>
     <select id="countBySymbol" resultType="int">
         SELECT COUNT(*)
         FROM stock_candle_daily

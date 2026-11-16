@@ -1,0 +1,42 @@
+{
+  "classification": "CURATED_OFFICIAL_SCHEDULE_NOT_RAW_SOURCE_CAPTURE",
+  "preparedOn": "2026-10-31",
+  "calendarFile": "quant-forward-calendar-20261030-20261231.csv",
+  "calendarSha256": "d12f9a14273b8e107e2f4aee25c7719ff55ed5b02d8d14552163d7c6ded65490",
+  "coverageStart": "2026-10-30",
+  "coverageEnd": "2026-12-31",
+  "scheduledSessions": 43,
+  "market": "US_NYSE_NASDAQ_REGULAR_CASH_EQUITY_SESSION",
+  "timezone": "America/New_York",
+  "regularOpenLocal": "09:30:00",
+  "regularCloseLocal": "16:00:00",
+  "excludedFullHolidays": ["2026-11-26", "2026-12-25"],
+  "earlyCloseLocal13Et": ["2026-11-27", "2026-12-24"],
+  "sources": [
+    {
+      "url": "https://www.nyse.com/trade/hours-calendars",
+      "role": "Official regular hours, 2026 Thanksgiving/Christmas closures and post-Thanksgiving/Christmas-Eve early closes",
+      "verification": "Read by parent task through web retrieval on 2026-10-31; source notes supplied to calendar preparer"
+    },
+    {
+      "url": "https://nasdaqtrader.com/Trader.aspx?id=Calendar",
+      "role": "Official 2026 holiday and early-close cross-check",
+      "verification": "Read by parent task through web retrieval on 2026-10-31; source notes supplied to calendar preparer"
+    }
+  ],
+  "derivation": "Enumerate weekdays in coverage, remove the two stated full holidays, use official local regular/early-close hours, and convert each instant with Python zoneinfo America/New_York. Oct 30 is EDT (UTC-04); November/December rows are EST (UTC-05).",
+  "firstWeekendCaptureExample": {
+    "classification": "SCHEDULE_ARITHMETIC_ONLY_NOT_ACTUAL_FORECAST",
+    "captureWindow": "After 2026-10-30T20:00:00Z and before 2026-11-02T21:00:00Z, with protocol already started and cohort frozen before entry close",
+    "anchorSession": "2026-10-30",
+    "entrySession": "2026-11-02",
+    "exitSessionEntryPlus20": "2026-12-01",
+    "earliestMaturityUtc": "2026-12-01T21:00:00Z"
+  },
+  "limitations": [
+    "No original source HTML or signed exchange publication was downloaded or archived here; this is a curated transcription with source links and explicit derivation.",
+    "These are scheduled future sessions, not proof that each session eventually occurred unchanged; emergency closures or schedule changes require a documented protocol amendment rather than silent calendar substitution.",
+    "The calendar establishes session labels and scheduled UTC cutoffs only; it supplies no security price, benchmark price, forecast or realized outcome.",
+    "Freeze/evaluation commands embed this calendar CSV; preserve this source note alongside the protocol for provenance."
+  ]
+}

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#cfe7bc">
+    <meta name="description" content="Where the wind remembers — a living alpine meadow generated in real time.">
+    <title>Where the Wind Remembers — King Yurina</title>
+    <link rel="stylesheet" th:href="@{/css/contact-nature.css(v='2026080521')}" href="/css/contact-nature.css?v=2026080521">
+</head>
+<body class="nature-page">
+<main class="nature-stage" data-nature-stage data-render-state="loading">
+    <canvas class="nature-canvas" data-nature-canvas aria-hidden="true"></canvas>
+
+    <div class="nature-fallback" aria-hidden="true">
+        <span class="fallback-sky"></span>
+        <span class="fallback-ridge fallback-ridge-far"></span>
+        <span class="fallback-ridge fallback-ridge-near"></span>
+        <span class="fallback-meadow fallback-meadow-back"></span>
+        <span class="fallback-meadow fallback-meadow-front"></span>
+    </div>
+    <div class="nature-light" aria-hidden="true"></div>
+    <div class="nature-grain" aria-hidden="true"></div>
+    <div class="nature-vignette" aria-hidden="true"></div>
+
+    <div class="nature-loader" data-nature-loader aria-live="polite" aria-label="Growing the field">
+        <div class="loader-seed" aria-hidden="true"><i></i><span></span></div>
+        <p>GROWING THE FIELD</p>
+        <div class="loader-line"><i data-nature-loader-line></i></div>
+        <output data-nature-loader-value>000</output>
+    </div>
+
+    <header class="nature-header">
+        <a class="nature-brand" href="/" aria-label="King Yurina home">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+                <path d="M24 42C21 31 21 19 24 6M24 25C17 24 12 20 9 14C16 13 22 16 24 22M24 31C31 29 36 24 39 17C32 17 26 21 24 27"/>
+            </svg>
+            <span>KING YURINA<small>FIELD STUDIES / 04</small></span>
+        </a>
+        <nav class="nature-nav" aria-label="Primary navigation">
+            <a href="/">INDEX</a>
+            <a href="/quant">SYSTEM</a>
+            <a href="/atelier">ATELIER</a>
+            <a href="/contact4" aria-current="page">FIELD</a>
+        </nav>
+        <div class="nature-weather" aria-label="Field conditions">
+            <i aria-hidden="true"><span></span></i>
+            <span><small>WIND</small><b data-wind-speed>3.2 M/S</b></span>
+        </div>
+    </header>
+
+    <section class="nature-hero" aria-labelledby="nature-title">
+        <p class="nature-kicker"><i></i>AN ALPINE STUDY / 05:42 AM<i></i></p>
+        <h1 id="nature-title">
+            <span>WHERE THE WIND</span>
+            <em>REMEMBERS</em>
+        </h1>
+        <p class="nature-intro">Every blade carries the weather. Every flower keeps a different rhythm.</p>
+        <a class="nature-entry" href="/quant">
+            <span>STEP INTO THE WILD</span>
+            <i aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </i>
+        </a>
+    </section>
+
+    <aside class="field-note" aria-label="Field observation">
+        <span>FIELD NOTE 04</span>
+        <p>The meadow does not move as one. Soft stems yield first; seed heads answer a moment later.</p>
+    </aside>
+
+    <aside class="field-data" aria-label="Live environmental data">
+        <div><span>HUMIDITY</span><b data-field-humidity>84%</b></div>
+        <div><span>LIGHT</span><b data-field-light>06.8 EV</b></div>
+        <div><span>GUST</span><b data-field-gust>NE · 03</b></div>
+    </aside>
+
+    <footer class="nature-footer">
+        <div><i aria-hidden="true"></i><span>LIVE FIELD</span><b>46.714° N</b></div>
+        <p>MOVE GENTLY <span aria-hidden="true">/</span> THE FIELD IS LISTENING</p>
+        <div><b>09.843° E</b><span data-field-clock>00:00:00</span><i aria-hidden="true"></i></div>
+    </footer>
+
+    <p class="nature-error" data-nature-error role="status" aria-live="polite"></p>
+</main>
+<script type="importmap">
+{
+    "imports": {
+        "three": "/js/vendor/three.module.js"
+    }
+}
+</script>
+<script type="module" th:src="@{/js/contact-nature.js(v='2026080521')}" src="/js/contact-nature.js?v=2026080521"></script>
+</body>
+</html>

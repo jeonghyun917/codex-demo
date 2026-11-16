@@ -140,6 +140,7 @@ public interface StockBacktestMapper {
 
     String findSectorForSymbol(@Param("symbol") String symbol);
 
+    /** Writes only v2 outcomes: next-close entry and horizonDays actual return intervals. */
     void upsertResult(StockBacktestResult result);
 
     void upsertRiskSnapshot(StockRiskSnapshot snapshot);
@@ -201,6 +202,9 @@ public interface StockBacktestMapper {
 
     ExpectedReturnEvaluationRun findLatestExpectedReturnEvaluationRun(@Param("indexCode") String indexCode,
             @Param("contractVersion") String contractVersion);
+
+    List<StockIndexMembershipSnapshot> findEvaluationMembershipSnapshots(@Param("indexCode") String indexCode,
+            @Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
 
     List<StockBacktestResult> findResults(@Param("indexCode") String indexCode, @Param("limit") int limit);
 

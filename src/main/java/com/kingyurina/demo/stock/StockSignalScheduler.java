@@ -107,6 +107,9 @@ public class StockSignalScheduler {
             StockSignalRefreshService.RefreshResult result = refreshService.recalculateIndexLatest(indexCode);
             log.info("Stock signal {} refresh completed. requested={}, success={}, fail={}",
                     trigger, result.requested(), result.success(), result.fail());
+            if (!result.failedStages().isEmpty()) {
+                log.warn("Stock signal refresh is PARTIAL. Failed downstream stages={}", result.failedStages());
+            }
         } finally {
             running.set(false);
         }

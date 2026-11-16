@@ -78,6 +78,11 @@ public final class ExpectedReturnPromotionGate {
         add(checks, "RANK_IC_IMPROVEMENT", ">= " + policy.minimumCandidateRankIcImprovement(),
                 metrics.rankIc() - baseMetrics.rankIc(),
                 metrics.rankIc() - baseMetrics.rankIc() >= policy.minimumCandidateRankIcImprovement());
+        add(checks, "MAE_IMPROVEMENT", "finite, nonnegative and strictly below baseline",
+                metrics.maePct(), Double.isFinite(metrics.maePct())
+                        && Double.isFinite(baseMetrics.maePct())
+                        && metrics.maePct() >= 0.0d && baseMetrics.maePct() >= 0.0d
+                        && metrics.maePct() < baseMetrics.maePct());
         add(checks, "POSITIVE_IC_DATES_NOT_WORSE", ">= baseline", metrics.positiveIcDatePct(),
                 metrics.positiveIcDatePct() >= baseMetrics.positiveIcDatePct());
         add(checks, "SPREAD_IMPROVEMENT", "> 0",
@@ -128,6 +133,10 @@ public final class ExpectedReturnPromotionGate {
                 evidence.totalRows(), evidence.totalRows() >= policy.minimumRows());
         add(checks, "MINIMUM_COVERAGE", ">= " + policy.minimumCoveragePct(),
                 evidence.coveragePct(), evidence.coveragePct() >= policy.minimumCoveragePct());
+        add(checks, "KNOWN_MARKET_REGIME", "finite IC from known PIT regimes",
+                evidence.worstRegimeRankIc(), Double.isFinite(evidence.worstRegimeRankIc()));
+        add(checks, "COMPLETE_PORTFOLIO_PERIODS", "> 0; no missing members substituted",
+                evidence.portfolio().periodCount(), evidence.portfolio().periodCount() > 0);
         return checks;
     }
 

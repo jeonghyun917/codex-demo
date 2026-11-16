@@ -31,4 +31,15 @@ class HomeControllerIndexTest {
         verify(menuService).mainMenus();
         verifyNoInteractions(snapshots);
     }
+
+    @Test
+    void contactRendersDedicatedHeroWithoutDashboardDependencies() {
+        MenuService menuService = mock(MenuService.class);
+        StockDashboardViewSnapshotService snapshots = mock(
+                StockDashboardViewSnapshotService.class);
+        HomeController controller = new HomeController(menuService, snapshots);
+
+        assertEquals("contact", controller.contact());
+        verifyNoInteractions(menuService, snapshots);
+    }
 }

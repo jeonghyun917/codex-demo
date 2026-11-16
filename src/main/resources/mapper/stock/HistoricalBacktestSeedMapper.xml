@@ -37,8 +37,9 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period = 'FY'
+        <include refid="com.kingyurina.demo.stock.SecFinancialStandardMapper.annualDuration"/>
           AND filed_at IS NOT NULL
-          AND filed_at &lt;= #{asOfDate}
+          AND filed_at &lt; #{asOfDate}
         ORDER BY
             end_date DESC,
             CASE
@@ -55,9 +56,11 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period = 'FY'
+        <include refid="com.kingyurina.demo.stock.SecFinancialStandardMapper.annualDuration"/>
           AND filed_at IS NOT NULL
-          AND filed_at &lt;= #{asOfDate}
+          AND filed_at &lt; #{asOfDate}
           AND end_date &lt; #{endDate}
+          AND TIMESTAMPDIFF(DAY, end_date, #{endDate}) BETWEEN 330 AND 380
         ORDER BY
             end_date DESC,
             CASE
@@ -74,8 +77,9 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+        <include refid="com.kingyurina.demo.stock.SecFinancialStandardMapper.quarterDuration"/>
           AND filed_at IS NOT NULL
-          AND filed_at &lt;= #{asOfDate}
+          AND filed_at &lt; #{asOfDate}
         ORDER BY
             end_date DESC,
             CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
@@ -89,9 +93,11 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+        <include refid="com.kingyurina.demo.stock.SecFinancialStandardMapper.quarterDuration"/>
           AND filed_at IS NOT NULL
-          AND filed_at &lt;= #{asOfDate}
+          AND filed_at &lt; #{asOfDate}
           AND end_date &lt; #{endDate}
+          AND TIMESTAMPDIFF(DAY, end_date, #{endDate}) BETWEEN 70 AND 110
         ORDER BY
             end_date DESC,
             CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,

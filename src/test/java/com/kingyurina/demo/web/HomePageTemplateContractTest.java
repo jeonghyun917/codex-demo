@@ -44,6 +44,164 @@ class HomePageTemplateContractTest {
     private int port;
 
     @Test
+    void contactFourServesAssetFreeLivingMeadowHero() throws Exception {
+        HttpResponse<String> response = getBody("/contact4");
+        String renderedText = response.body()
+                .replaceAll("<[^>]+>", " ")
+                .replaceAll("\\s+", " ");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(renderedText.contains("WHERE THE WIND REMEMBERS"));
+        assertTrue(renderedText.contains("STEP INTO THE WILD"));
+        assertTrue(response.body().contains("data-nature-stage"));
+        assertTrue(response.body().contains("data-nature-canvas"));
+        assertTrue(response.body().contains("data-nature-loader"));
+        assertFalse(response.body().contains("<video"));
+        assertFalse(response.body().contains("<img"));
+        assertEquals(200, get("/css/contact-nature.css").statusCode());
+        assertEquals(200, get("/js/contact-nature.js").statusCode());
+        assertEquals(200, get("/js/contact-nature-core.js").statusCode());
+        for (String asset : List.of(
+                "/assets/contact4/grass_bermuda_01_2k.gltf",
+                "/assets/contact4/grass_bermuda_01.bin",
+                "/assets/contact4/grass_bermuda_01_diff_2k.jpg",
+                "/assets/contact4/grass_bermuda_01_nor_gl_2k.jpg",
+                "/assets/contact4/grass_bermuda_01_arm_2k.jpg",
+                "/assets/contact4/sparse_grass_diff_2k.jpg",
+                "/assets/contact4/sparse_grass_nor_gl_2k.jpg",
+                "/assets/contact4/sparse_grass_rough_2k.jpg",
+                "/assets/contact4/sparse_grass_ao_2k.jpg",
+                "/assets/contact4/sparse_grass_disp_2k.png",
+                "/assets/contact4/leafy_grass_diff_2k.jpg",
+                "/assets/contact4/leafy_grass_nor_gl_2k.jpg",
+                "/assets/contact4/leafy_grass_rough_2k.jpg",
+                "/assets/contact4/leafy_grass_ao_2k.jpg",
+                "/assets/contact4/leafy_grass_disp_2k.jpg",
+                "/assets/contact4/lush_meadow_ground_v2.png",
+                "/assets/contact4/kloppenheim_01_2k.hdr",
+                "/assets/contact4/grass_medium_01_2k.gltf",
+                "/assets/contact4/grass_medium_01.bin",
+                "/assets/contact4/grass_medium_01_diff_2k.jpg",
+                "/assets/contact4/grass_medium_01_nor_gl_2k.jpg",
+                "/assets/contact4/grass_medium_01_arm_2k.jpg",
+                "/assets/contact4/grass_medium_01_alpha_2k.png",
+                "/assets/contact4/flower_empodium_2k.gltf",
+                "/assets/contact4/flower_empodium.bin",
+                "/assets/contact4/flower_empodium_diff_2k.jpg",
+                "/assets/contact4/flower_empodium_nor_gl_2k.jpg",
+                "/assets/contact4/flower_empodium_arm_2k.jpg",
+                "/assets/contact4/flower_empodium_alpha_2k.png",
+                "/assets/contact4/dandelion_01_2k.gltf",
+                "/assets/contact4/dandelion_01.bin",
+                "/assets/contact4/dandelion_01_diff_2k.jpg",
+                "/assets/contact4/dandelion_01_nor_gl_2k.jpg",
+                "/assets/contact4/dandelion_01_arm_2k.jpg",
+                "/assets/contact4/dandelion_01_alpha_2k.png",
+                "/assets/contact4/grass_medium_02_4k.gltf",
+                "/assets/contact4/grass_medium_02.bin",
+                "/assets/contact4/grass_medium_02_diff_4k.jpg",
+                "/assets/contact4/grass_medium_02_nor_gl_4k.jpg",
+                "/assets/contact4/grass_medium_02_arm_4k.jpg",
+                "/assets/contact4/grass_medium_02_alpha_4k.png",
+                "/assets/contact4/moss_01_2k.gltf",
+                "/assets/contact4/moss_01.bin",
+                "/assets/contact4/moss_01_diff_2k.jpg",
+                "/assets/contact4/moss_01_nor_gl_2k.jpg",
+                "/assets/contact4/moss_01_arm_2k.jpg",
+                "/assets/contact4/moss_01_alpha_2k.png",
+                "/assets/contact4/grass_bermuda_01_alpha_2k.png",
+                "/assets/contact4/wildflower_field_2k.hdr",
+                "/assets/contact4/meadow_2_2k.hdr")) {
+            assertEquals(200, get(asset).statusCode(), asset);
+        }
+    }
+
+    @Test
+    void contactThreeServesAssetFreeProceduralWebGlHero() throws Exception {
+        HttpResponse<String> response = getBody("/contact3");
+        String renderedText = response.body()
+                .replaceAll("<[^>]+>", " ")
+                .replaceAll("\\s+", " ");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(renderedText.contains("PROCEDURAL INTELLIGENCE"));
+        assertTrue(renderedText.contains("ENTER THE CORE"));
+        assertTrue(response.body().contains("data-signal-cursor"));
+        assertTrue(response.body().contains("data-core-phase"));
+        assertFalse(response.body().contains("<video"));
+        assertFalse(response.body().contains("<img"));
+        assertEquals(200, get("/css/contact-procedural.css").statusCode());
+        assertEquals(200, get("/js/contact-procedural.js").statusCode());
+        assertEquals(200, get("/js/contact-procedural-core.js").statusCode());
+    }
+
+    @Test
+    void contactTwoServesVelorahCinematicVideoHero() throws Exception {
+        HttpResponse<String> response = getBody("/contact2");
+        String renderedText = response.body()
+                .replaceAll("<[^>]+>", " ")
+                .replaceAll("\\s+", " ");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(renderedText.contains("Velorah"));
+        assertTrue(renderedText.contains("Where dreams rise through the silence."));
+        assertTrue(renderedText.contains("Begin Journey"));
+        assertTrue(response.body().contains(
+                "hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4"));
+        assertEquals(200, get("/css/contact-velorah.css").statusCode());
+    }
+
+    @Test
+    void contactOneServesLithosSpotlightHero() throws Exception {
+        HttpResponse<String> response = getBody("/contact1");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("Layers hold"));
+        assertTrue(response.body().contains("tales of time"));
+        assertTrue(response.body().contains("data-lithos-reveal"));
+        assertTrue(response.body().contains("Start Digging"));
+        assertEquals(200, get("/css/contact-lithos.css").statusCode());
+        assertEquals(200, get("/js/contact-lithos.js").statusCode());
+
+        String css = resource("static/css/contact-lithos.css");
+        String javascript = resource("static/js/contact-lithos.js");
+        assertTrue(css.contains("@keyframes heroReveal"));
+        assertTrue(css.contains("@keyframes heroZoom"));
+        assertTrue(css.contains("prefers-reduced-motion: reduce"));
+        assertTrue(javascript.contains("const SPOTLIGHT_R = 260"));
+        assertTrue(javascript.contains("* 0.1"));
+        assertTrue(javascript.contains("canvas.toDataURL()"));
+        assertTrue(javascript.contains("-webkit-mask-image"));
+    }
+
+    @Test
+    void contactPageServesTheAccessibleAxonVideoHero() throws Exception {
+        String template = resource("templates/contact.html");
+        String css = resource("static/css/contact-axon.css");
+        String javascript = resource("static/js/contact-axon.js");
+        HttpResponse<String> response = getBody("/contact");
+
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains(
+                "Axon — Digital Workers for Mundane Workflows"));
+        assertTrue(template.contains("data-axon-video"));
+        assertTrue(template.contains("autoplay muted loop playsinline"));
+        assertTrue(template.contains(
+                "hf_20260714_113715_c7e0daa0-8bdd-4486-a2da-040901f8f0ea.mp4"));
+        assertTrue(template.contains("Deploy digital workers"));
+        assertTrue(template.contains("Get Early Access"));
+        assertFalse(template.contains("axon-nav"));
+        assertFalse(template.contains("axon-badge"));
+        assertTrue(css.contains("height: 130%"));
+        assertTrue(css.contains("object-position: top"));
+        assertTrue(css.contains("@media (prefers-reduced-motion: reduce)"));
+        assertTrue(javascript.contains("prefers-reduced-motion: reduce"));
+        assertTrue(javascript.contains("visibilitychange"));
+        assertEquals(200, get("/css/contact-axon.css").statusCode());
+        assertEquals(200, get("/js/contact-axon.js").statusCode());
+    }
+
+    @Test
     void homepageReferenceTitleAssetIsTransparentAndUnchanged()
             throws IOException, NoSuchAlgorithmException {
         ClassPathResource resource = new ClassPathResource(

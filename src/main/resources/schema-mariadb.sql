@@ -338,6 +338,11 @@ CREATE TABLE IF NOT EXISTS stock_signal_backtest_result (
 ALTER TABLE stock_signal_backtest_result
     ADD COLUMN IF NOT EXISTS institution_score INT NULL;
 
+-- Outcome contract v2: enter at the next trading close after signal_date;
+-- horizon_days counts actual close-to-close return intervals (N intervals need N+1 closes).
+-- This separate table preserves every legacy N-close / N-1-interval outcome unchanged.
+CREATE TABLE IF NOT EXISTS stock_backtest_result_v2 LIKE stock_signal_backtest_result;
+
 CREATE TABLE IF NOT EXISTS stock_risk_snapshot (
     symbol VARCHAR(20) NOT NULL,
     signal_date DATE NOT NULL,
@@ -373,7 +378,8 @@ CREATE TABLE IF NOT EXISTS stock_market_snapshot (
     PRIMARY KEY (index_code, symbol, snapshot_date),
     KEY idx_stock_market_snapshot_date (index_code, snapshot_date),
     KEY idx_stock_market_snapshot_symbol_date (symbol, snapshot_date),
-    KEY idx_stock_market_snapshot_cap (index_code, snapshot_date, market_cap_usd)
+    KEY idx_stock_market_snapshot_cap (index_code, snapshot_date, market_cap_usd),
+    KEY idx_stock_market_health_cover (index_code, snapshot_date, calculated_at)
 );
 
 CREATE TABLE IF NOT EXISTS stock_index_membership_snapshot (
@@ -389,7 +395,8 @@ CREATE TABLE IF NOT EXISTS stock_index_membership_snapshot (
     PRIMARY KEY (index_code, symbol, snapshot_date),
     KEY idx_stock_index_membership_snapshot_date (index_code, snapshot_date, is_member),
     KEY idx_stock_index_membership_snapshot_symbol_date (symbol, snapshot_date),
-    KEY idx_stock_index_membership_snapshot_source (source)
+    KEY idx_stock_index_membership_snapshot_source (source),
+    KEY idx_stock_membership_health_cover (index_code, is_member, source, snapshot_date, calculated_at)
 );
 
 ALTER TABLE stock_market_snapshot
@@ -408,7 +415,8 @@ CREATE TABLE IF NOT EXISTS stock_shares_outstanding_snapshot (
     PRIMARY KEY (index_code, symbol, snapshot_date),
     KEY idx_stock_shares_outstanding_snapshot_date (index_code, snapshot_date),
     KEY idx_stock_shares_outstanding_snapshot_symbol_date (symbol, snapshot_date),
-    KEY idx_stock_shares_outstanding_snapshot_source (source)
+    KEY idx_stock_shares_outstanding_snapshot_source (source),
+    KEY idx_stock_shares_health_cover (index_code, source, snapshot_date, calculated_at)
 );
 
 CREATE TABLE IF NOT EXISTS stock_symbol_data_alias (
@@ -629,7 +637,8 @@ CREATE TABLE IF NOT EXISTS stock_covariance_snapshot (
     PRIMARY KEY (index_code, snapshot_date, symbol_a, symbol_b),
     KEY idx_stock_covariance_snapshot_date (index_code, snapshot_date),
     KEY idx_stock_covariance_snapshot_symbol_a (symbol_a, snapshot_date),
-    KEY idx_stock_covariance_snapshot_symbol_b (symbol_b, snapshot_date)
+    KEY idx_stock_covariance_snapshot_symbol_b (symbol_b, snapshot_date),
+    KEY idx_stock_covariance_health_cover (index_code, snapshot_date, calculated_at)
 );
 
 CREATE TABLE IF NOT EXISTS stock_expected_return_snapshot (
@@ -662,7 +671,8 @@ CREATE TABLE IF NOT EXISTS stock_expected_return_snapshot (
     KEY idx_stock_expected_return_snapshot_date (index_code, signal_date, horizon_days),
     KEY idx_stock_expected_return_snapshot_symbol (symbol, signal_date),
     KEY idx_stock_expected_return_snapshot_expected (index_code, signal_date, horizon_days, expected_excess_return_pct),
-    KEY idx_stock_expected_return_snapshot_confidence (index_code, signal_date, horizon_days, confidence)
+    KEY idx_stock_expected_return_snapshot_confidence (index_code, signal_date, horizon_days, confidence),
+    KEY idx_stock_er_health_cover (index_code, model_version, symbol, horizon_days, signal_date, calculated_at)
 );
 
 ALTER TABLE stock_expected_return_snapshot
@@ -771,7 +781,8 @@ CREATE TABLE IF NOT EXISTS stock_factor_exposure_snapshot (
     PRIMARY KEY (index_code, signal_date, symbol, factor),
     KEY idx_stock_factor_exposure_snapshot_date (index_code, signal_date),
     KEY idx_stock_factor_exposure_snapshot_factor (index_code, signal_date, factor),
-    KEY idx_stock_factor_exposure_snapshot_symbol (symbol, signal_date)
+    KEY idx_stock_factor_exposure_snapshot_symbol (symbol, signal_date),
+    KEY idx_stock_factor_health_cover (index_code, signal_date, calculated_at)
 );
 
 CREATE TABLE IF NOT EXISTS stock_expected_return_factor_contribution (
@@ -790,7 +801,8 @@ CREATE TABLE IF NOT EXISTS stock_expected_return_factor_contribution (
     PRIMARY KEY (index_code, signal_date, symbol, horizon_days, model_version, factor),
     KEY idx_stock_er_factor_contribution_symbol (symbol, signal_date, horizon_days),
     KEY idx_stock_er_factor_contribution_factor (index_code, signal_date, horizon_days, factor),
-    KEY idx_stock_er_factor_contribution_contrib (index_code, signal_date, horizon_days, contribution_pct)
+    KEY idx_stock_er_factor_contribution_contrib (index_code, signal_date, horizon_days, contribution_pct),
+    KEY idx_stock_er_factor_health_cover (index_code, model_version, calculated_at)
 );
 
 CREATE TABLE IF NOT EXISTS stock_signal_weight_profile (

@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,7 +29,7 @@ public class ExpectedReturnEvaluationService {
     }
 
     public ExpectedReturnEvaluationRun evaluateBaseline(String indexCode, LocalDate asOfDate) {
-        ExpectedReturnPredictionContract contract = ExpectedReturnPredictionContract.sp500Excess20dV1();
+        ExpectedReturnPredictionContract contract = ExpectedReturnPredictionContract.sp500Excess20dCorrected();
         if (!contract.indexCode().equalsIgnoreCase(indexCode)) {
             throw new IllegalArgumentException("Contract supports SP500 only");
         }
@@ -47,8 +48,9 @@ public class ExpectedReturnEvaluationService {
                     mapper.findResultsForEvaluation(contract.indexCode(), contract.horizonTradingDays(),
                             fromDate, asOfDate),
                     mapper.findBenchmarkReturns(contract.indexCode(), fromDate.minusDays(40), asOfDate),
-                    mapper.findIndexMembershipSnapshots(contract.indexCode(), fromDate, asOfDate),
-                    asOfDate);
+                    mapper.findEvaluationMembershipSnapshots(contract.indexCode(), fromDate, asOfDate),
+                    asOfDate,
+                    mapper.findMacroRegimeSnapshots(contract.indexCode(), fromDate, asOfDate));
             persistExclusions(mapper, run.getId(), dataset);
 
             List<WalkForwardWindow> windows =
@@ -56,14 +58,23 @@ public class ExpectedReturnEvaluationService {
             ExpectedReturnMetricsCalculator metricsCalculator = new ExpectedReturnMetricsCalculator();
             ExpectedReturnPortfolioEvaluator portfolioEvaluator = new ExpectedReturnPortfolioEvaluator(20);
             int validMonths = 0;
+            Map<String, ExpectedReturnEvaluationRow> eligible = new LinkedHashMap<>();
+            int eligibleTargetCount = 0;
             for (WalkForwardWindow window : windows) {
                 if (window.status() != WalkForwardWindow.Status.ELIGIBLE) {
                     continue;
                 }
+                int windowTargetCount = dataset.targetCountsByDate().entrySet().stream()
+                        .filter(entry -> !entry.getKey().isBefore(window.testFrom())
+                                && !entry.getKey().isAfter(window.testTo()))
+                        .mapToInt(Map.Entry::getValue).sum();
+                eligibleTargetCount += windowTargetCount;
+                window.testRows().forEach(row -> eligible.putIfAbsent(row.signalDate() + "|" + row.symbol(), row));
                 ExpectedReturnMetrics metrics =
-                        metricsCalculator.calculate(window.testRows(), window.testRows().size());
+                        metricsCalculator.calculate(window.testRows(), windowTargetCount);
                 ExpectedReturnPortfolioMetrics portfolio =
-                        portfolioEvaluator.evaluate(window.testRows(), TRANSACTION_COST_BPS);
+                        portfolioEvaluator.evaluate(window.testRows().size() == windowTargetCount
+                                ? window.testRows() : List.of(), TRANSACTION_COST_BPS);
                 mapper.insertExpectedReturnEvaluationWindow(new ExpectedReturnEvaluationWindowResult(
                         run.getId(),
                         window.id(),
@@ -78,22 +89,26 @@ public class ExpectedReturnEvaluationService {
                 validMonths++;
             }
 
+            List<ExpectedReturnEvaluationRow> eligibleRows = List.copyOf(eligible.values());
+            double eligibleCoverage = eligibleTargetCount == 0 ? 0 : eligibleRows.size() * 100.0d / eligibleTargetCount;
             ExpectedReturnMetrics overallMetrics =
-                    metricsCalculator.calculate(dataset.rows(), dataset.targetRowCount());
+                    metricsCalculator.calculate(eligibleRows, eligibleTargetCount);
             ExpectedReturnPortfolioMetrics overallPortfolio =
-                    portfolioEvaluator.evaluate(dataset.rows(), TRANSACTION_COST_BPS);
+                    portfolioEvaluator.evaluate(eligibleRows.size() == eligibleTargetCount
+                            ? eligibleRows : List.of(), TRANSACTION_COST_BPS);
             ExpectedReturnEvaluationEvidence evidence = new ExpectedReturnEvaluationEvidence(
                     overallMetrics,
                     overallPortfolio,
                     validMonths,
-                    dataset.rows().size(),
-                    dataset.coveragePct(),
-                    worstRegimeIc(dataset.rows(), metricsCalculator),
+                    eligibleRows.size(),
+                    eligibleCoverage,
+                    worstRegimeIc(eligibleRows, metricsCalculator),
                     dataset.pitViolationCount());
             ExpectedReturnPromotionResult promotion =
                     new ExpectedReturnPromotionGate(ExpectedReturnPromotionPolicy.sp500Excess20dV1())
                             .qualifyBaseline(evidence);
-            finishRun(run, dataset, validMonths, overallMetrics, overallPortfolio, promotion);
+            finishRun(run, dataset, eligibleTargetCount, eligibleRows.size(), eligibleCoverage,
+                    validMonths, overallMetrics, overallPortfolio, promotion);
             int updated = mapper.completeExpectedReturnEvaluationRun(run);
             if (updated != 1) {
                 throw new IllegalStateException("Evaluation run was not completed from RUNNING state");
@@ -108,6 +123,7 @@ public class ExpectedReturnEvaluationService {
 
     private void finishRun(ExpectedReturnEvaluationRun run,
             ExpectedReturnEvaluationDataset dataset,
+            int targetRowCount, int validRowCount, double coveragePct,
             int validMonths,
             ExpectedReturnMetrics metrics,
             ExpectedReturnPortfolioMetrics portfolio,
@@ -116,14 +132,22 @@ public class ExpectedReturnEvaluationService {
                 ? "INSUFFICIENT_DATA" : "COMPLETED");
         run.setDecision(promotion.decision().name());
         run.setValidMonths(validMonths);
-        run.setTargetRowCount(dataset.targetRowCount());
-        run.setValidRowCount(dataset.rows().size());
-        run.setCoveragePct(dataset.coveragePct());
+        run.setTargetRowCount(targetRowCount);
+        run.setValidRowCount(validRowCount);
+        run.setCoveragePct(coveragePct);
         run.setRankIc(finiteOrNull(metrics.rankIc()));
         run.setBrierScore(finiteOrNull(metrics.brierScore()));
         run.setAnnualizedExcessReturnPct(finiteOrNull(portfolio.annualizedExcessReturnPct()));
         try {
-            run.setChecksJson(objectMapper.writeValueAsString(promotion.checks()));
+            run.setChecksJson(objectMapper.writeValueAsString(Map.of(
+                    "checks", promotion.checks(),
+                    "metricScope", portfolio.accountingScope(),
+                    "benchmarkDefinition", ExpectedReturnPredictionContract.sp500Excess20dCorrected().benchmarkDefinition(),
+                    "population", "ELIGIBLE_OUT_OF_SAMPLE_WINDOWS_ONLY",
+                    "datasetTargets", dataset.targetRowCount(),
+                    "datasetValidRows", dataset.rows().size(),
+                    "exclusions", dataset.exclusions().stream().collect(Collectors.groupingBy(
+                            exclusion -> exclusion.code().name(), Collectors.counting())))));
         } catch (Exception ex) {
             throw new IllegalStateException("PROMOTION_CHECK_SERIALIZATION_FAILED", ex);
         }
@@ -140,6 +164,10 @@ public class ExpectedReturnEvaluationService {
 
     private static double worstRegimeIc(List<ExpectedReturnEvaluationRow> rows,
             ExpectedReturnMetricsCalculator calculator) {
+        if (rows.isEmpty() || rows.stream().anyMatch(row -> row.marketRegime() == null
+                || row.marketRegime().isBlank() || "UNKNOWN".equalsIgnoreCase(row.marketRegime()))) {
+            return Double.NaN;
+        }
         return rows.stream()
                 .collect(Collectors.groupingBy(row ->
                         row.marketRegime() == null ? "UNKNOWN" : row.marketRegime()))
