@@ -170,6 +170,10 @@ def build(root,names=None,tracking_dataset=None):
 
 
 def publish(payload):
+    from paper_view_publication_guard import validate_publication
+    from quant_daily_forward import Database
+    existing=Database().query("SELECT HEX(payload_json) FROM stock_dashboard_view_snapshot WHERE index_code='SP500' AND view_version='SP500_PAPER_WEB_V1'")
+    if existing:validate_publication(payload,json.loads(bytes.fromhex(existing[0][0])))
     # Hex literals avoid SQL quoting issues; only this version and one menu are written.
     body=json.dumps(payload,ensure_ascii=False,allow_nan=False).encode('utf-8').hex()
     label='모의운용'.encode('utf-8').hex()
