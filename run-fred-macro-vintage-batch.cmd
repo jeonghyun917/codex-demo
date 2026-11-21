@@ -11,7 +11,7 @@ set "DB_PASSWORD="
 for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('FRED_API_KEY','Machine')"`) do set "FRED_API_KEY=%%A"
 
 set "FRED_SERIES=%~1"
-if "%FRED_SERIES%"=="" set "FRED_SERIES=DGS3MO,FEDFUNDS,CPIAUCSL,UNRATE"
+if "%FRED_SERIES%"=="" set "FRED_SERIES=DGS3MO,DGS10,FEDFUNDS,CPIAUCSL,UNRATE,VIXCLS,DTWEXBGS"
 set "FRED_YEARS=%~2"
 if "%FRED_YEARS%"=="" set "FRED_YEARS=5"
 

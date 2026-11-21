@@ -1,13 +1,14 @@
 INSERT INTO main_menu (code, label, href, sort_order, enabled)
 VALUES
     ('dashboard', 'Quant', '/quant', 10, TRUE),
+    ('paper-trading', '모의운용', '/paper-trading', 15, TRUE),
     ('stocks', 'Stocks', '/stocks', 20, TRUE),
     ('heatmap', 'Heatmap', '/stocks/heatmap', 30, TRUE),
     ('etfs', 'ETF', '/etfs', 35, TRUE),
     ('atelier', 'Atelier', '/atelier', 40, TRUE),
     ('systems', 'Systems', '#systems', 50, TRUE),
     ('signal', 'Signal', '/signals/backtest', 60, TRUE),
-    ('contact', 'Contact', '#contact', 70, TRUE)
+    ('contact', 'Contact', '/contact', 70, TRUE)
 ON DUPLICATE KEY UPDATE
     label = VALUES(label),
     href = VALUES(href),

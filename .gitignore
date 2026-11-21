@@ -4,3 +4,41 @@ target/
 config/application-secret.yml
 
 *.log
+.worktrees/
+.superpowers/
+
+# Local third-party corporate-action source snapshots; not licensed for redistribution.
+tmp/pit-acquisition/actions/raw/
+tmp/pit-acquisition/actions/official/
+tmp/pit-acquisition/membership/raw/
+tmp/pit-acquisition/actions/__pycache__/
+scripts/__pycache__/
+src/test/python/__pycache__/
+tmp/price-reconciliation-2026-10-18/evidence/*.html
+tmp/price-reconciliation-2026-10-18/evidence/*.csv
+tmp/free-quant-data-2026-10-18/raw/
+
+# Append-only local forward observations; keep on a durable runtime volume, not in Git.
+data/quant-forward/
+data/quant-forward-validation-*/
+data/quant-daily/
+data/quant-candidate-forward-*/
+data/quant-candidate-evaluation-*/
+data/quant-preservation-*/
+data/quant-forward-admission/
+data/quant-forward-events/
+data/quant-forward-inputs/
+
+# Local execution artifacts, runtime ledgers and personal documents.
+/tmp/
+/output/
+/data/sp500-paper-ledger/
+/data/quant-research-exposure-*.json
+__pycache__/
+*.pyc
+/.env
+/.env.*
+*.pem
+*.key
+/resume*.pdf
+/고정현_*

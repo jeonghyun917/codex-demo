@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kingyurina.demo.stock.StockSourceFinancialMapper">
+    <select id="findBySymbol" resultType="com.kingyurina.demo.stock.StockSourceFinancialDocument">
+        SELECT pack_version,identity_sha256,symbol,publication_date,admitted_at_utc,payload_json
+        FROM stock_source_financial_document
+        WHERE symbol=#{symbol} AND pack_version=#{version}
+        ORDER BY publication_date,identity_sha256
+    </select>
+</mapper>

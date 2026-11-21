@@ -5,6 +5,24 @@ import java.time.LocalDateTime;
 
 public class StockQuoteCache {
 
+    private LocalDateTime priceAsOf;
+    private String priceSource;
+    private String priceKind;
+    private String priceBasis;
+
+    public LocalDateTime getPriceAsOf() { return priceAsOf; }
+    public void setPriceAsOf(LocalDateTime value) { priceAsOf = value; }
+
+    public String getPriceSource() { return priceSource; }
+    public void setPriceSource(String value) { priceSource = value; }
+
+    public String getPriceKind() { return priceKind; }
+    public void setPriceKind(String value) { priceKind = value; }
+
+    public String getPriceBasis() { return priceBasis; }
+    public void setPriceBasis(String value) { priceBasis = value; }
+
+
     private String symbol;
     private BigDecimal currentPrice;
     private BigDecimal openPrice;

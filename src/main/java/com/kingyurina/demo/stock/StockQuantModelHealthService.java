@@ -40,8 +40,13 @@ public class StockQuantModelHealthService {
                             "Quant 모델 상태를 읽을 수 없어 운영 판단이 제한됩니다.", "negative")));
         }
 
+        long universeSymbols = metrics.stream().filter(metric -> "UNIVERSE".equals(key(metric)))
+                .mapToLong(metric -> value(metric.getSymbolCount())).max().orElse(0);
+        boolean sourcesHealthy = List.of("QUOTE", "CANDLE").stream().allMatch(source -> metrics.stream()
+                .filter(metric -> source.equals(key(metric)))
+                .anyMatch(metric -> "positive".equals(status(metric, universeSymbols, true).tone())));
         List<StockQuantModelHealthView.Row> rows = metrics.stream()
-                .map(this::toRow)
+                .map(metric -> toRow(metric, universeSymbols, sourcesHealthy))
                 .toList();
         List<StockQuantModelHealthView.OperationRow> operations = mapper.findQuantOperationHealth().stream()
                 .map(this::toOperationRow)
@@ -77,8 +82,9 @@ public class StockQuantModelHealthService {
                 alerts(rows, operations, pitQuality));
     }
 
-    private StockQuantModelHealthView.Row toRow(StockQuantModelHealthMetric metric) {
-        HealthStatus status = status(metric);
+    private StockQuantModelHealthView.Row toRow(StockQuantModelHealthMetric metric, long universeSymbols,
+            boolean sourcesHealthy) {
+        HealthStatus status = status(metric, universeSymbols, sourcesHealthy);
         return new StockQuantModelHealthView.Row(
                 metric.getLayer(),
                 status.label(),
@@ -139,7 +145,7 @@ public class StockQuantModelHealthService {
         return alerts.stream().limit(8).toList();
     }
 
-    private HealthStatus status(StockQuantModelHealthMetric metric) {
+    private HealthStatus status(StockQuantModelHealthMetric metric, long universeSymbols, boolean sourcesHealthy) {
         long rows = value(metric.getRowCount());
         String key = key(metric);
         String note = metric.getNote() == null ? "" : metric.getNote().toLowerCase(Locale.ROOT);
@@ -156,8 +162,15 @@ public class StockQuantModelHealthService {
                 && (note.contains("proxy") || note.contains("current") || note.contains("wikipedia"))) {
             return new HealthStatus("주의", "warning");
         }
-        if ("UNIVERSE".equals(key) || "SIGNAL_LATEST".equals(key) || "DATA_QUALITY".equals(key)) {
+        if ("UNIVERSE".equals(key)) {
             return new HealthStatus("정상", "positive");
+        }
+        if (List.of("SIGNAL_LATEST", "DATA_QUALITY", "QUOTE", "CANDLE").contains(key)
+                && (universeSymbols <= 0 || value(metric.getSymbolCount()) < universeSymbols)) {
+            return new HealthStatus("커버리지 확인", "warning");
+        }
+        if (("SIGNAL_LATEST".equals(key) || "DATA_QUALITY".equals(key)) && !sourcesHealthy) {
+            return new HealthStatus("원천 확인", "warning");
         }
 
         LocalDate latest = metric.getLatestDate();
@@ -169,6 +182,9 @@ public class StockQuantModelHealthService {
         }
 
         long age = ChronoUnit.DAYS.between(latest, LocalDate.now());
+        if (age < 0) {
+            return new HealthStatus("시각 확인", "warning");
+        }
         long staleDays = staleDays(key);
         if (age <= staleDays) {
             return new HealthStatus("정상", "positive");
@@ -179,7 +195,7 @@ public class StockQuantModelHealthService {
         return new HealthStatus("오래됨", "warning");
     }
 
-    private OperationStatus operationStatus(StockQuantOperationHealthMetric metric) {
+    static OperationStatus operationStatus(StockQuantOperationHealthMetric metric) {
         String status = metric.getStatus() == null ? "" : metric.getStatus().trim().toUpperCase(Locale.ROOT);
         long failures = value(metric.getFailCount());
         if (status.contains("FAIL") || status.contains("ERROR") || status.contains("BLOCK")) {
@@ -191,6 +207,9 @@ public class StockQuantModelHealthService {
         if (failures > 0 && value(metric.getSuccessCount()) == 0) {
             return new OperationStatus("실패", "negative");
         }
+        if (failures > 0) {
+            return new OperationStatus("부분 실패", "warning");
+        }
         if (status.contains("RUNNING")) {
             LocalDateTime startedAt = metric.getStartedAt();
             if (startedAt != null && ChronoUnit.HOURS.between(startedAt, LocalDateTime.now()) >= 2) {
@@ -200,6 +219,11 @@ public class StockQuantModelHealthService {
         }
         if (status.contains("SUCCESS") || status.contains("COMPLETED") || status.contains("DONE")
                 || status.equals("OK")) {
+            LocalDateTime finished = metric.getFinishedAt();
+            if (finished == null || finished.isAfter(LocalDateTime.now())
+                    || finished.isBefore(LocalDateTime.now().minusDays(7))) {
+                return new OperationStatus("갱신 확인", "warning");
+            }
             return new OperationStatus("정상", "positive");
         }
         if (status.isBlank()) {
@@ -210,6 +234,7 @@ public class StockQuantModelHealthService {
 
     private static long staleDays(String key) {
         return switch (key) {
+            case "SIGNAL_LATEST", "DATA_QUALITY", "QUOTE", "CANDLE" -> 4;
             case "MARKET_SNAPSHOT", "BENCHMARK", "MACRO_REGIME" -> 7;
             case "PORTFOLIO_VIEW", "BACKTEST_VIEW", "DASHBOARD_VIEW" -> 1;
             case "RISK_SNAPSHOT" -> 14;
@@ -217,7 +242,7 @@ public class StockQuantModelHealthService {
             case "MACRO_FEATURE" -> 14;
             case "EXPECTED_RETURN_V4", "EXPECTED_RETURN_V5", "EXPECTED_RETURN_V6", "EXPECTED_RETURN_V7",
                     "EXPECTED_RETURN_V8", "EXPECTED_RETURN_V9",
-                    "FACTOR_EXPOSURE", "FACTOR_CONTRIBUTION", "COVARIANCE" -> 45;
+                    "FACTOR_EXPOSURE", "FACTOR_CONTRIBUTION", "COVARIANCE" -> 4;
             default -> 30;
         };
     }
@@ -383,6 +408,6 @@ public class StockQuantModelHealthService {
     private record HealthStatus(String label, String tone) {
     }
 
-    private record OperationStatus(String label, String tone) {
+    record OperationStatus(String label, String tone) {
     }
 }

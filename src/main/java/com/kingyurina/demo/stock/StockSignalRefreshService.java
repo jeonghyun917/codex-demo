@@ -88,11 +88,15 @@ public class StockSignalRefreshService {
                 log.warn("Failed to save stock signal for {}", signal.getSymbol(), ex);
             }
         }
-        try {
-            stockBacktestService.refreshCompletedResults(5_000);
+        List<String> failedStages = new ArrayList<>();
+        runStage(failedStages, "completed-results", () -> stockBacktestService.refreshCompletedResults(5_000));
+        runStage(failedStages, "risk", () -> {
             stockPortfolioBacktestService.refreshRiskSnapshots("SP500", 100_000);
             stockPortfolioBacktestService.refreshLatestRiskSnapshots("SP500", 100_000);
-            for (String indexCode : QUANT_INDEX_CODES) {
+        });
+        for (String indexCode : QUANT_INDEX_CODES) {
+            // Dependent model versions stay ordered; failure for one index cannot starve the others.
+            runStage(failedStages, "models:" + indexCode, () -> {
                 stockPortfolioBacktestService.refreshLatestCovarianceSnapshot(indexCode, 120, 126);
                 stockPortfolioBacktestService.refreshLatestExpectedReturnSnapshots(indexCode, 100_000, 300);
                 stockPortfolioBacktestService.refreshLatestExpectedReturnV3Snapshots(indexCode, 100_000, 300);
@@ -103,16 +107,38 @@ public class StockSignalRefreshService {
                 stockMacroFeatureService.refreshLatestMacroFeature(indexCode);
                 stockExpectedReturnV8Service.refreshLatest(indexCode);
                 stockExpectedReturnV9Service.refreshLatest(indexCode);
-            }
-            stockBacktestService.refreshBacktestViewSnapshot("SP500");
-            stockPortfolioBacktestService.refreshPortfolioViewSnapshot("SP500");
-            for (String dashboardIndexCode : QUANT_INDEX_CODES) {
-                stockDashboardViewSnapshotService.refreshDashboardViewSnapshot(dashboardIndexCode);
-            }
-        } catch (RuntimeException ex) {
-            log.warn("Failed to refresh stock signal backtest, risk/covariance snapshot, live expected return, or materialized views.", ex);
+            });
         }
-        return new RefreshResult(requested, success, fail);
+        runStage(failedStages, "backtest-view", () -> {
+            var result = stockBacktestService.refreshBacktestViewSnapshot("SP500");
+            requirePublished(result != null && result.saved());
+        });
+        runStage(failedStages, "portfolio-view", () -> {
+            var result = stockPortfolioBacktestService.refreshPortfolioViewSnapshot("SP500");
+            requirePublished(result != null && result.saved());
+        });
+        for (String dashboardIndexCode : QUANT_INDEX_CODES) {
+            runStage(failedStages, "dashboard:" + dashboardIndexCode, () -> {
+                var result = stockDashboardViewSnapshotService.refreshDashboardViewSnapshot(dashboardIndexCode);
+                requirePublished(result != null && result.saved());
+            });
+        }
+        return new RefreshResult(requested, success, fail, List.copyOf(failedStages));
+    }
+
+    private static void requirePublished(boolean saved) {
+        if (!saved) {
+            throw new IllegalStateException("Snapshot publication returned unsuccessful; see publisher diagnostics");
+        }
+    }
+
+    private void runStage(List<String> failedStages, String stage, Runnable work) {
+        try {
+            work.run();
+        } catch (RuntimeException ex) {
+            failedStages.add(stage);
+            log.warn("Quant refresh stage failed: {}. Other independent stages will continue.", stage, ex);
+        }
     }
 
     private void saveSnapshot(StockSignalLatest signal) {
@@ -197,7 +223,7 @@ public class StockSignalRefreshService {
             signal.setIntegratedLabel(integratedLabel(score));
             signal.setTone(tone(score));
             signal.setSummary(signal.getIntegratedLabel()
-                    + "입니다. 10개 핵심 Signal과 동일 수집 대상 내 factor ranking을 함께 반영한 Quant Signal v2 점수입니다. 확정 예측은 아닙니다.");
+                    + "입니다. 10개 핵심 Signal과 동일 수집 대상 내 factor ranking을 함께 반영한 가격 기준 보정 Signal 점수입니다. 확정 예측은 아닙니다.");
         }
     }
 
@@ -315,6 +341,9 @@ public class StockSignalRefreshService {
         Integer score(StockSignalLatest signal);
     }
 
-    public record RefreshResult(int requested, int success, int fail) {
+    public record RefreshResult(int requested, int success, int fail, List<String> failedStages) {
+        public RefreshResult(int requested, int success, int fail) {
+            this(requested, success, fail, List.of());
+        }
     }
 }

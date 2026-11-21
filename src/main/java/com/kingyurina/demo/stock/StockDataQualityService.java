@@ -91,7 +91,7 @@ public class StockDataQualityService {
         return messages;
     }
 
-    private StockDataQualityLatest assess(StockDashboard dashboard) {
+    public StockDataQualityLatest assess(StockDashboard dashboard) {
         StockDashboard safeDashboard = dashboard == null
                 ? new StockDashboard("", false, false, false, false, false, false, false, false, false,
                         "No dashboard.", null, null, null, List.of(), List.of(), List.of(), List.of(), null)
@@ -179,8 +179,8 @@ public class StockDataQualityService {
         }
         if (quote == null) {
             stale(staleSources, issues, "quote", "quote 캐시가 없습니다.");
-        } else if (olderThan(quote.getFetchedAt(), now, 3)) {
-            stale(staleSources, issues, "quote", "quote 캐시가 3일보다 오래됐습니다.");
+        } else if (olderThan(quote.getQuoteTime(), now, 3)) {
+            stale(staleSources, issues, "quote", "시세의 시장 기준 시각이 없거나 3일보다 오래됐습니다.");
         }
         if (metric == null) {
             stale(staleSources, issues, "metric", "basic financial metric 데이터가 없습니다.");

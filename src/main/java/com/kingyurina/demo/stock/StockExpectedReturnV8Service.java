@@ -19,12 +19,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class StockExpectedReturnV8Service {
 
-    public static final String MODEL_VERSION = "EXPECTED_RETURN_V8";
+    public static final String MODEL_VERSION = "EXPECTED_RETURN_V8_CORRECTED_20261017";
     private static final String SOURCE_HISTORICAL = "FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8";
     private static final String SOURCE_LIVE = "LIVE_FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8";
     private static final String SOURCE_FACTOR = "FRED_MACRO_FEATURE_ADJUSTED_EXPECTED_RETURN_V8";
     private static final String SOURCE_CALIBRATION = "FRED_MACRO_FEATURE_V8_VALIDATION";
-    private static final String SOURCE_MODEL = "EXPECTED_RETURN_V7";
+    private static final String SOURCE_MODEL = "EXPECTED_RETURN_V7_CORRECTED_20261017";
     private static final int MIN_CALIBRATION_BUCKET_ROWS = 50;
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
@@ -65,15 +65,13 @@ public class StockExpectedReturnV8Service {
                 .filter(snapshot -> targetDates.contains(snapshot.getSignalDate()))
                 .collect(Collectors.groupingBy(StockExpectedReturnSnapshot::getSignalDate,
                         LinkedHashMap::new, Collectors.toList()));
-        List<StockBacktestResult> results = mapper.findResults(indexCode, Math.max(1, resultLimit)).stream()
+        List<StockBacktestResult> results = StockPortfolioBacktestService.researchResults(mapper, indexCode, Math.max(1, resultLimit)).stream()
                 .filter(row -> row.getSignalDate() != null && row.getSymbol() != null && row.getHorizonDays() != null)
                 .toList();
         Map<ExpectedResultKey, StockBacktestResult> resultsByKey = results.stream()
                 .collect(Collectors.toMap(row -> new ExpectedResultKey(row.getSignalDate(), row.getSymbol(),
                         row.getHorizonDays()), Function.identity(), (left, right) -> left, LinkedHashMap::new));
-        Map<ExpectedBenchmarkKey, Double> benchmarkByKey = results.stream()
-                .collect(Collectors.groupingBy(row -> new ExpectedBenchmarkKey(row.getSignalDate(), row.getHorizonDays()),
-                        LinkedHashMap::new, Collectors.averagingDouble(StockExpectedReturnV8Service::returnPct)));
+
 
         int savedRows = 0;
         int processedDates = 0;
@@ -97,9 +95,10 @@ public class StockExpectedReturnV8Service {
                 mapper.upsertExpectedReturnSnapshot(adjusted);
                 StockBacktestResult actual = resultsByKey.get(new ExpectedResultKey(sourceSnapshot.getSignalDate(),
                         sourceSnapshot.getSymbol(), valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                Double benchmark = benchmarkByKey.get(new ExpectedBenchmarkKey(sourceSnapshot.getSignalDate(),
-                        valueOr(sourceSnapshot.getHorizonDays(), 0)));
-                if (actual != null && benchmark != null) {
+                Double benchmark = actual == null || actual.getBenchmarkReturnPct() == null ? null
+                        : actual.getBenchmarkReturnPct().doubleValue();
+                if (actual != null && benchmark != null
+                        && StockPortfolioBacktestService.maturedBefore(actual, LocalDate.now())) {
                     evaluations.add(new PredictionEvaluation(valueOr(sourceSnapshot.getHorizonDays(), 0),
                             number(adjusted.getCalibratedUpsideProbabilityPct()),
                             returnPct(actual) - benchmark > 0.0d));
@@ -209,7 +208,7 @@ public class StockExpectedReturnV8Service {
         adjusted.setCalibrationBucket(probabilityBucket(clamp(calibratedUpside, 1.0d, 99.0d)));
         adjusted.setCalibrationErrorPct(source.getCalibrationErrorPct());
         adjusted.setModelVersion(MODEL_VERSION);
-        adjusted.setSource(sourceName);
+        adjusted.setSource(StockPortfolioBacktestService.sourceWithCutoff(sourceName, source.getSignalDate()));
         return adjusted;
     }
 
@@ -363,9 +362,6 @@ public class StockExpectedReturnV8Service {
     }
 
     private record ExpectedResultKey(LocalDate signalDate, String symbol, int horizonDays) {
-    }
-
-    private record ExpectedBenchmarkKey(LocalDate signalDate, int horizonDays) {
     }
 
     private record PredictionEvaluation(int horizonDays, double predictedUpsidePct, boolean actualUpside) {

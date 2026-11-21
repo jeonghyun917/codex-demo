@@ -87,8 +87,11 @@ public class StooqCandleBatchRunner implements ApplicationRunner {
                 targetSymbols,
                 years,
                 delayMillis);
-        StockSignalRefreshService.RefreshResult signalRefresh = stockSignalRefreshService
-                .recalculateSymbols(targetSymbols);
+        List<String> refreshedSymbols = targetSymbols.stream()
+                .filter(symbol -> !candleSummary.failedSymbols().contains(symbol)).toList();
+        StockSignalRefreshService.RefreshResult signalRefresh = refreshedSymbols.isEmpty()
+                ? new StockSignalRefreshService.RefreshResult(0, 0, 0)
+                : stockSignalRefreshService.recalculateSymbols(refreshedSymbols);
         System.out.println("Stooq candle sync requested=" + candleSummary.requested()
                 + ", success=" + candleSummary.success()
                 + ", fail=" + candleSummary.fail()
@@ -97,6 +100,8 @@ public class StooqCandleBatchRunner implements ApplicationRunner {
         if (!candleSummary.failedSymbols().isEmpty()) {
             System.out.println("Stooq candle failed symbols="
                     + String.join(",", candleSummary.failedSymbols().stream().limit(30).toList()));
+            System.out.println("Stooq failure reasons=" + candleSummary.failureReasons().entrySet().stream().limit(30).toList()
+                    + "; basis changes require verified corporate-action reconciliation; canonical history preserved.");
         }
     }
 

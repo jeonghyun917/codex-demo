@@ -29,7 +29,8 @@ sec:
     files-base-url: https://www.sec.gov
     user-agent: ${SEC_EDGAR_USER_AGENT:king-yurina-stock-research/0.1 contact@example.com}
     company-facts-cache-hours: 168
-    max-facts-per-concept: 80
+    # 0 keeps complete filing history; positive limits truncate comparative observations.
+    max-facts-per-concept: 0
     request-delay-millis: 300
     full-concept-enabled: false
 
@@ -51,6 +52,11 @@ toss:
 
 app:
   batch:
+    expected-return-evaluation:
+      enabled: false
+      exit-on-complete: false
+      index-code: SP500
+      as-of-date: ""
     toss:
       enabled: false
       exit-on-complete: false
@@ -160,7 +166,7 @@ app:
       exit-on-complete: false
       fetch-fred-api: false
       index-code: SP500
-      series-codes: DGS3MO,FEDFUNDS,CPIAUCSL,UNRATE
+      series-codes: DGS3MO,DGS10,FEDFUNDS,CPIAUCSL,UNRATE,VIXCLS,DTWEXBGS
       api-key: ${FRED_API_KEY:}
       csv-path: ""
       years: 5

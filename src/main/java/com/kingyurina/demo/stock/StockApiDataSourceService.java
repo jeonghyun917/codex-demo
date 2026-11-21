@@ -44,12 +44,11 @@ public class StockApiDataSourceService {
 
     private StockQuantModelHealthView.OperationRow toOperationRow(StockQuantOperationHealthMetric metric) {
         String operation = metric.getOperation() == null ? "-" : metric.getOperation();
-        String status = metric.getStatus() == null ? "-" : metric.getStatus();
-        String tone = status.toUpperCase(Locale.ROOT).contains("FAIL") ? "negative" : "positive";
+        var health = StockQuantModelHealthService.operationStatus(metric);
         return new StockQuantModelHealthView.OperationRow(
                 operation,
-                status,
-                tone,
+                health.label(),
+                health.tone(),
                 metric.getStartedAt() == null ? "-" : metric.getStartedAt().toLocalDate().toString(),
                 metric.getFinishedAt() == null ? "-" : metric.getFinishedAt().toLocalDate().toString(),
                 "-",
@@ -143,7 +142,7 @@ public class StockApiDataSourceService {
                             emptyToDash(row.finishedAt()),
                             "-",
                             row.successRate() + " / fail " + row.failures(),
-                            normalizeStatus(row.status()),
+                            "positive".equals(row.tone()) ? "수집 성공 · 데이터 기준일 확인" : normalizeStatus(row.status()),
                             normalizeTone(row.tone())))
                     .orElseGet(SourceRuntime::empty);
         }
@@ -223,7 +222,7 @@ public class StockApiDataSourceService {
         }
         String upper = value.toUpperCase(Locale.ROOT);
         if (upper.contains("SUCCESS") || upper.contains("DONE") || upper.contains("OK") || "정상".equals(value)) {
-            return "Fresh";
+            return "Usable";
         }
         if (upper.contains("FAIL") || upper.contains("ERROR")
                 || "누락".equals(value) || "실패".equals(value) || "위험".equals(value)) {

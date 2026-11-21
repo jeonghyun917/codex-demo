@@ -32,7 +32,15 @@ public interface IndexConstituentMapper {
     List<String> findCurrentSymbolsByIndexCodes(@Param("indexCodes") List<String> indexCodes,
             @Param("limit") int limit);
 
-    List<StockMarketRow> findMarketRows(@Param("indexCode") String indexCode);
+    default List<StockMarketRow> findMarketRows(String indexCode) {
+        return findRawMarketRows(indexCode).stream().map(StockPricePolicy::apply).toList();
+    }
 
-    List<StockMarketRow> findMarketRowsBySymbols(@Param("symbols") List<String> symbols);
+    List<StockMarketRow> findRawMarketRows(@Param("indexCode") String indexCode);
+
+    default List<StockMarketRow> findMarketRowsBySymbols(List<String> symbols) {
+        return findRawMarketRowsBySymbols(symbols).stream().map(StockPricePolicy::apply).toList();
+    }
+
+    List<StockMarketRow> findRawMarketRowsBySymbols(@Param("symbols") List<String> symbols);
 }

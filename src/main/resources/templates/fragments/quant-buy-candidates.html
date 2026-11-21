@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
+<section th:fragment="candidates" class="buy-candidates" aria-labelledby="buy-candidates-title">
+    <div class="buy-heading">
+        <div><p class="buy-eyebrow">S&amp;P 500 · 기존 익절 확률 모델</p><h1 id="buy-candidates-title">익절 확률 상위 <span>TOP20</span> 관심 종목</h1></div>
+        <a class="buy-ledger-link" href="/paper-trading">모의운용 원장 →</a>
+    </div>
+    <form class="buy-date-selector" action="/quant" method="get" th:if="${!#lists.isEmpty(buyCandidates.dates)}">
+        <input type="hidden" name="index" value="SP500">
+        <label for="buy-decision-date">저장된 판단일</label>
+        <select id="buy-decision-date" name="decisionDate">
+            <option th:each="date : ${buyCandidates.dates}" th:value="${date}" th:text="${date}" th:selected="${date == buyCandidates.date}"></option>
+        </select>
+        <button type="submit">조회</button>
+        <a href="/quant?index=SP500">최신 판단</a>
+    </form>
+    <div class="buy-rules"><span>익절 +15%</span><span>손절 -5%</span><span>최대 20거래일</span><span>확률 상위 20% · 지수 50일선 위 · 변동성 75백분위 이하</span></div>
+    <p class="buy-definition">20거래일 안에 -5%보다 +15%에 먼저 도달할 예측 확률 · 다음 거래일 시가 진입 기준 · 수익 보장 아님</p>
+    <div class="buy-status" role="status" th:attr="data-status=${buyCandidates.status}">
+        <strong th:text="${buyCandidates.message}">새 예측 대기</strong>
+        <span th:if="${!#lists.isEmpty(buyCandidates.rows)}" th:text="${'당시 매수 조건 통과 ' + buyCandidates.eligibleCount + '종목 · 관심 목록 ' + #lists.size(buyCandidates.rows) + '종목'}"></span>
+    </div>
+    <dl class="buy-dates">
+        <div><dt>판단일</dt><dd th:text="${buyCandidates.date}">-</dd></div>
+        <div><dt>예측 저장 (UTC)</dt><dd th:text="${buyCandidates.recordedAt}">-</dd></div>
+        <div><dt>진입 예정 (UTC)</dt><dd th:text="${buyCandidates.nextOpen}">-</dd></div>
+        <div><dt>지수 / 50일선</dt><dd th:text="${buyCandidates.trend}">-</dd></div>
+    </dl>
+    <p class="buy-definition" th:if="${!#lists.isEmpty(buyCandidates.rows)}">참고 익절가·손절가는 판단일 종가 × 1.15 / 0.95 (USD, 소수 둘째 자리 반올림)입니다. 실제 매매 기준가는 다음 거래일 체결가이며, 익절·손절 가격은 체결가에서 다시 계산합니다.</p>
+    <div th:if="${!#lists.isEmpty(buyCandidates.rows)}" class="buy-table-scroll" tabindex="0" aria-label="익절 확률 상위 관심 종목 및 매수 제외 사유">
+        <table class="buy-table">
+            <thead><tr><th>순위</th><th>종목</th><th>판단일 종가</th><th>참고 익절가 +15%</th><th>참고 손절가 -5%</th><th>+15% 선도달 확률</th><th>매수 판정 · 제외 사유</th><th>과거 익절률</th><th>과거 손절률</th><th>평균 순수익률</th><th>구간 표본</th></tr></thead>
+            <tbody><tr th:each="r, state : ${buyCandidates.rows}">
+                <td th:text="${state.count}"></td><th scope="row"><a th:href="@{/stocks/{symbol}(symbol=${r.symbol})}" th:text="${r.symbol}"></a> <span class="buy-company buy-muted" th:if="${r['companyName'] != null}" th:text="${r['companyName']}"></span></th>
+                <td class="buy-muted" th:text="${r.referencePrice}"></td>
+                <td th:text="${r['referenceTakeProfit'] ?: '-'}"></td><td th:text="${r['referenceStopLoss'] ?: '-'}"></td>
+                <td class="buy-probability" th:text="${r.probability}"></td>
+                <td class="buy-reason"><strong th:class="${r['buyEligible'] == true ? 'buy-pass' : 'buy-hold'}" th:text="${r['buyEligible'] == true ? '조건 통과' : '매수 보류'}"></strong><span th:text="${r['buyReason']}"></span></td>
+                <td th:text="${r.tpRate}"></td><td th:text="${r.slRate}"></td><td th:text="${r.meanReturn}"></td><td th:text="${r.sample}"></td>
+            </tr></tbody>
+        </table>
+    </div>
+    <div th:if="${#lists.isEmpty(buyCandidates.rows)}" class="buy-empty">
+        <p th:if="${buyCandidates.status == 'STALE'}">최신 예측이 저장되기 전까지 매수 검토를 보류합니다.</p>
+        <p th:if="${buyCandidates.status == 'NO_CANDIDATES'}">기존 필터를 모두 통과한 종목이 없어 현금 대기입니다.</p>
+        <p th:if="${buyCandidates.status == 'UNAVAILABLE'}">조회 가능한 기존 확률 예측이 없습니다. 매수 검토 보류.</p>
+        <a th:if="${buyCandidates.status == 'UNSUPPORTED'}" href="/quant?index=SP500">S&amp;P 500 후보 확인 →</a>
+    </div>
+    <div class="buy-footnote">
+        <p>관심 TOP20은 매수 추천·주문·체결이 아닙니다. 실제 모의운용은 기존 매수 필터와 일 최대 2종목 · 최대 10종목 보유 · 종목당 최대 10% 기준을 유지합니다.</p>
+        <details><summary>과거 통계 근거</summary>
+            <p th:if="${#maps.isEmpty(buyCandidates.evidence)}">연결된 검증 통계가 없습니다.</p>
+            <div th:if="${!#maps.isEmpty(buyCandidates.evidence)}">
+                <p><span th:text="${buyCandidates.evidence.start}"></span> ~ <span th:text="${buyCandidates.evidence.end}"></span> · 편도 비용 <span th:text="${buyCandidates.evidence.fee}"></span> · 기존 두 조건 결합 전략</p>
+                <p>과거 종료 거래의 10%포인트 확률 구간 통계입니다. 개별 종목의 예상 수익률이나 전체 분석 종목의 적중률, 저장 이후 모의운용 성과가 아닙니다. 평균 순수익률은 매수·매도 비용 반영 거래당 단순평균입니다.</p>
+                <p>30건 미만은 소표본입니다. 반복 종목·이미 확인한 기간의 선택 편향이 남아 있으며, 확률이 높다고 실제 익절률이 높음을 보장하지 않습니다. 반올림된 구간 경계 확률은 통계 연결을 보류합니다.</p>
+            </div>
+        </details>
+    </div>
+    <section class="buy-tracking" aria-labelledby="buy-tracking-title">
+        <h2 id="buy-tracking-title">관심 종목 추적 결과</h2>
+        <p class="buy-definition">매수 제외 종목도 포함한 당시 TOP20의 개별 가상 거래입니다. 다음 거래일 시가 진입 · 익절 +15% · 손절 -5% · 진입일 포함 최대 20거래일. 실제 모의운용의 매수·보유 내역이나 현금 포함 계좌 수익률이 아닙니다.</p>
+        <div th:if="${buyCandidates.tracking['available'] == true}" th:with="tracking=${buyCandidates.tracking}">
+            <p class="buy-definition">가격 확인 기준일 <strong th:text="${tracking.asof}"></strong> · 일봉 기반 추적 · 공급자 조정 가격, 배당 미반영</p>
+            <div class="buy-tracking-summary">
+                <span>익절 <strong th:text="${tracking.tp}"></strong></span>
+                <span>손절 <strong th:text="${tracking.sl}"></strong></span>
+                <span>20거래일 청산 <strong th:text="${tracking.time}"></strong></span>
+                <span>추적 중 <strong th:text="${tracking.open}"></strong></span>
+                <span>진입 대기 <strong th:text="${tracking.waiting}"></strong></span>
+                <span>검증 보류 <strong th:text="${tracking.blocked}"></strong></span>
+            </div>
+            <div class="buy-table-scroll" tabindex="0" aria-label="판단일 관심 종목의 개별 가상 추적 결과">
+                <table class="buy-table buy-tracking-table">
+                    <thead><tr><th>당시 순위</th><th>종목</th><th>예측 익절 확률</th><th>당시 필터</th><th>추적 결과</th><th>진입일 / 시가</th><th>청산일 / 가격</th><th>확인 거래일</th><th>순수익률 10bp</th><th>순수익률 20bp</th></tr></thead>
+                    <tbody><tr th:each="r, state : ${tracking.rows}">
+                        <td th:text="${state.count}"></td><th scope="row"><a th:href="@{/stocks/{symbol}(symbol=${r.symbol})}" th:text="${r.symbol}"></a></th>
+                        <td th:text="${r.probabilityText}"></td><td th:text="${r.filterPassed ? '통과' : '제외'}"></td>
+                        <td class="buy-reason"><strong th:text="${r.label}"></strong><span th:if="${r.ambiguous}">양쪽 도달 · 일봉 내 순서 불명, 기존 규칙 적용</span><span th:if="${r.missingDate != ''}" th:text="${r.missingDate + ' 자료 확인 필요'}"></span></td>
+                        <td><span th:text="${r.entryDate}"></span><br><span th:text="${r.entryPriceText}"></span></td>
+                        <td><span th:text="${r.exitDate != '' ? r.exitDate : '-'}"></span><br><span th:text="${r.exitPriceText}"></span></td>
+                        <td th:text="${r.sessions + ' / 20'}"></td><td th:text="${r.net10Text}"></td><td th:text="${r.net20Text}"></td>
+                    </tr></tbody>
+                </table>
+            </div>
+            <p class="buy-definition">순수익률은 종료된 개별 가상 거래에만 표시하며 편도 비용 10bp(0.10%) / 20bp(0.20%)를 각각 반영합니다. 미완료 종목은 0%가 아닌 ‘-’로 표시합니다. 일부 조기 종료 결과만으로 전체 TOP20의 성과·적중률을 판단할 수 없습니다.</p>
+            <details class="buy-footnote"><summary>추적 판정 기준</summary><p>기존 모의운용 규칙과 동일하게 시가 갭을 먼저 판정합니다. 시가가 손절가 아래면 시가 청산, 익절가 위면 익절가 청산을 가정합니다. 이후 장중 양쪽 도달은 손절 우선으로 처리합니다. 20번째 거래일에도 익절·손절이 우선이며 미도달이면 종가 청산합니다. 일봉으로 실제 체결 순서를 확정할 수 없고, 누락·가격 기준 불일치는 검증 보류입니다.</p></details>
+        </div>
+        <p th:unless="${buyCandidates.tracking['available'] == true}" class="buy-empty">검증된 관심 종목 추적 자료가 아직 없습니다. 결과를 임의로 계산하거나 0%로 대체하지 않습니다.</p>
+        <div class="buy-paper-separation"><h3>실제 모의운용 성과</h3><p>기존 필터·자금 배분·보유 제한을 적용한 모의 계좌 기록은 별도입니다. 관심 TOP20 추적은 주문이나 원장에 반영되지 않습니다.</p><a class="buy-ledger-link" href="/paper-trading">모의운용 계좌·거래 원장 보기 →</a></div>
+    </section>
+</section></body></html>

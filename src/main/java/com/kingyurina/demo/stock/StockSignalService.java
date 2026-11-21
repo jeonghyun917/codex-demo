@@ -10,6 +10,8 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -18,23 +20,32 @@ import tools.jackson.databind.ObjectMapper;
 public class StockSignalService {
 
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
-    private static final String SIGNAL_VERSION = "quant-v2";
+    private static final String SIGNAL_VERSION = "q4-fin-20261031";
 
     private final StockCacheService cacheService;
     private final StockDataQualityService dataQualityService;
     private final ObjectMapper objectMapper;
+    private final StockForwardInputEvidence inputEvidence;
 
     public StockSignalService(StockCacheService cacheService, StockDataQualityService dataQualityService,
             ObjectMapper objectMapper) {
+        this(cacheService,dataQualityService,objectMapper,"","./data/quant-forward-inputs");
+    }
+
+    @Autowired
+    public StockSignalService(StockCacheService cacheService, StockDataQualityService dataQualityService,
+            ObjectMapper objectMapper,@Value("${app.quant.forward.run-id:}") String runId,
+            @Value("${app.quant.forward-inputs.directory:./data/quant-forward-inputs}") String inputDirectory) {
         this.cacheService = cacheService;
         this.dataQualityService = dataQualityService;
         this.objectMapper = objectMapper;
+        this.inputEvidence=new StockForwardInputEvidence(objectMapper,inputDirectory,runId);
     }
 
     public StockInfoView.StockSignalView buildStored(String symbol) {
         String normalized = symbol == null ? "" : symbol.trim().toUpperCase(Locale.ROOT);
         StockSignalLatest latest = cacheService.findLatestSignal(normalized);
-        return latest == null ? null : toView(latest);
+        return latest == null || !SIGNAL_VERSION.equals(latest.getSignalVersion()) ? null : toView(latest);
     }
 
     public StockSignalLatest buildLatest(String symbol) {
@@ -52,6 +63,7 @@ public class StockSignalService {
         List<StockRecommendationTrend> recommendations = cacheService.findRecentRecommendations(normalized, 4);
         List<StockEpsSurprise> epsSurprises = cacheService.findRecentEpsSurprises(normalized, 4);
         List<StockCandleDaily> candles = cacheService.findRecentCandles(normalized, 80);
+        quote = StockPricePolicy.select(quote, candles);
 
         return new StockDashboard(normalized, false, cacheService.databaseEnabled(),
                 quote != null, profile != null, metric != null, !news.isEmpty(), !recommendations.isEmpty(),
@@ -60,6 +72,7 @@ public class StockSignalService {
     }
 
     public StockInfoView.StockSignalView build(StockDashboard dashboard) {
+        dashboard = StockPricePolicy.normalize(dashboard);
         StockMetricSnapshot metric = dashboard.metric();
         JsonNode metricNode = readMetricNode(metric);
         SecFinancialContext secFinancial = secFinancialContext(dashboard.symbol());
@@ -73,10 +86,19 @@ public class StockSignalService {
         SignalResult news = newsSignal(dashboard.news());
         SignalResult momentum = momentumSignal(dashboard.quote(), metric, dashboard.candles(), dataQuality);
         SignalResult risk = riskSignal(dashboard.candles(), metric, dashboard.quote(), dataQuality);
-        SignalResult institution = institutionSignal(dashboard.symbol());
+        StockInstitutionFlow institutionFlow=cacheService.findLatestInstitutionFlow(dashboard.symbol());
+        SignalResult institution = institutionSignal(institutionFlow);
 
         List<SignalResult> results = List.of(valuation, quality, growth, stability, earnings, analyst, news,
                 momentum, risk, institution);
+        var evidence=new LinkedHashMap<String,Object>();
+        evidence.put("dashboard",dashboard);evidence.put("quality",dataQuality);
+        evidence.put("annual",secFinancial.annual());evidence.put("previousAnnual",secFinancial.previousAnnual());
+        evidence.put("quarter",secFinancial.quarter());evidence.put("previousQuarter",secFinancial.previousQuarter());
+        evidence.put("institutionFlow",institutionFlow);
+        evidence.put("unrankedFactors",results.stream().map(r->Map.of("name",r.title(),"score",r.score(),
+                "available",r.available(),"detail",r.detail())).toList());
+        inputEvidence.capture(dashboard.symbol(),evidence);
         int score = applyDataQualityGuardrails(integratedScore(results), dataQuality);
         String label = integratedLabel(score);
         String tone = tone(score);
@@ -181,6 +203,10 @@ public class StockSignalService {
         StockQuoteCache quote = dashboard.quote();
         StockMetricSnapshot metric = dashboard.metric();
         values.put("quoteFetchedAt", quote == null || quote.getFetchedAt() == null ? null : quote.getFetchedAt().toString());
+        values.put("priceAsOf", quote == null || quote.getPriceAsOf() == null ? null : quote.getPriceAsOf().toString());
+        values.put("priceSource", quote == null ? null : quote.getPriceSource());
+        values.put("priceKind", quote == null ? null : quote.getPriceKind());
+        values.put("priceBasis", quote == null ? null : quote.getPriceBasis());
         values.put("metricDate", metric == null || metric.getMetricDate() == null ? null : metric.getMetricDate().toString());
         values.put("metricFetchedAt", metric == null || metric.getFetchedAt() == null ? null : metric.getFetchedAt().toString());
         values.put("latestNewsPublishedAt", dashboard.news().stream()
@@ -635,10 +661,9 @@ public class StockSignalService {
         BigDecimal change = currentPrice.subtract(previousClose)
                 .multiply(ONE_HUNDRED)
                 .divide(previousClose, 4, RoundingMode.HALF_UP);
-        BigDecimal high = dataQualityService.clean(dataQuality, "52WeekHigh",
-                metric == null ? null : metric.getWeek52High());
-        BigDecimal low = dataQualityService.clean(dataQuality, "52WeekLow",
-                metric == null ? null : metric.getWeek52Low());
+        // Metric 52-week ranges have no shared adjustment version with the selected price.
+        BigDecimal high = null;
+        BigDecimal low = null;
         BigDecimal position = week52Position(currentPrice, high, low);
         CandleMomentum candleMomentum = candleMomentum(candles);
         int score = clamp(50 + cappedInt(change.multiply(BigDecimal.valueOf(4)), -24, 24)
@@ -675,11 +700,7 @@ public class StockSignalService {
 
         int window = Math.min(sorted.size(), 80);
         List<StockCandleDaily> recent = sorted.subList(0, window);
-        BigDecimal cleanQuote = dataQualityService.clean(dataQuality, "currentPrice",
-                quote == null ? null : quote.getCurrentPrice());
-        BigDecimal latestClose = cleanQuote != null
-                ? cleanQuote
-                : recent.getFirst().getClosePrice();
+        BigDecimal latestClose = recent.getFirst().getClosePrice();
         BigDecimal highInWindow = recent.stream()
                 .map(StockCandleDaily::getHighPrice)
                 .filter(value -> value != null)
@@ -688,10 +709,7 @@ public class StockSignalService {
         BigDecimal drawdown = percentDiff(latestClose, highInWindow);
         BigDecimal absoluteDrawdown = drawdown == null ? null : drawdown.abs();
         BigDecimal annualizedVolatility = annualizedVolatility(recent);
-        BigDecimal week52Position = metric == null ? null
-                : week52Position(latestClose,
-                        dataQualityService.clean(dataQuality, "52WeekHigh", metric.getWeek52High()),
-                        dataQualityService.clean(dataQuality, "52WeekLow", metric.getWeek52Low()));
+        BigDecimal week52Position = null; // Unversioned metric ranges cannot be mixed with candles.
 
         int score = 62;
         if (annualizedVolatility != null) {
@@ -880,8 +898,7 @@ public class StockSignalService {
         return new SecFinancialContext(annual, previousAnnual, quarter, previousQuarter);
     }
 
-    private SignalResult institutionSignal(String symbol) {
-        StockInstitutionFlow flow = cacheService.findLatestInstitutionFlow(symbol);
+    private SignalResult institutionSignal(StockInstitutionFlow flow) {
         if (flow == null) {
             return unavailable("Institution", "13F institution flow data is missing.");
         }
@@ -1316,7 +1333,7 @@ public class StockSignalService {
                     || annual.getRevenue() == null || annual.getRevenue().compareTo(BigDecimal.ZERO) <= 0) {
                 return null;
             }
-            if (annual.getCurrency() != null && !"USD".equalsIgnoreCase(annual.getCurrency())) {
+            if (!FinancialInputPolicy.validPeriod(annual, true) || !"USD".equalsIgnoreCase(annual.getCurrency())) {
                 return null;
             }
             BigDecimal marketCapUsd = profile.getMarketCap().multiply(BigDecimal.valueOf(1_000_000L));
@@ -1342,22 +1359,26 @@ public class StockSignalService {
         }
 
         BigDecimal epsDiluted() {
-            return annual == null ? null : annual.getEpsDiluted();
+            return FinancialInputPolicy.usdQuotedEps(annual);
         }
 
         BigDecimal annualRevenueGrowth() {
+            if (!FinancialInputPolicy.comparable(annual, previousAnnual, true)) return null;
             return growth(value(annual, Field.REVENUE), value(previousAnnual, Field.REVENUE));
         }
 
         BigDecimal annualNetIncomeGrowth() {
+            if (!FinancialInputPolicy.comparable(annual, previousAnnual, true)) return null;
             return growth(value(annual, Field.NET_INCOME), value(previousAnnual, Field.NET_INCOME));
         }
 
         BigDecimal quarterRevenueGrowth() {
+            if (!FinancialInputPolicy.comparable(quarter, previousQuarter, false)) return null;
             return growth(value(quarter, Field.REVENUE), value(previousQuarter, Field.REVENUE));
         }
 
         BigDecimal quarterNetIncomeGrowth() {
+            if (!FinancialInputPolicy.comparable(quarter, previousQuarter, false)) return null;
             return growth(value(quarter, Field.NET_INCOME), value(previousQuarter, Field.NET_INCOME));
         }
 

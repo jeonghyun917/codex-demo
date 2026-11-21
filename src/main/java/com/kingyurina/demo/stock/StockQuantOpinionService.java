@@ -18,14 +18,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class StockQuantOpinionService {
 
-    private static final String EXPECTED_RETURN_V9_MODEL_VERSION = "EXPECTED_RETURN_V9";
-    private static final String EXPECTED_RETURN_V8_MODEL_VERSION = "EXPECTED_RETURN_V8";
-    private static final String EXPECTED_RETURN_V7_MODEL_VERSION = "EXPECTED_RETURN_V7";
-    private static final String EXPECTED_RETURN_V6_MODEL_VERSION = "EXPECTED_RETURN_V6";
-    private static final String EXPECTED_RETURN_V5_MODEL_VERSION = "EXPECTED_RETURN_V5";
-    private static final String EXPECTED_RETURN_V4_MODEL_VERSION = "EXPECTED_RETURN_V4";
-    private static final String EXPECTED_RETURN_V3_MODEL_VERSION = "EXPECTED_RETURN_V3";
-    private static final String EXPECTED_RETURN_V2_MODEL_VERSION = "EXPECTED_RETURN_V2";
+    private static final String EXPECTED_RETURN_V9_MODEL_VERSION = "EXPECTED_RETURN_V9_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V8_MODEL_VERSION = "EXPECTED_RETURN_V8_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V7_MODEL_VERSION = "EXPECTED_RETURN_V7_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V6_MODEL_VERSION = "EXPECTED_RETURN_V6_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V5_MODEL_VERSION = "EXPECTED_RETURN_V5_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V4_MODEL_VERSION = "EXPECTED_RETURN_V4_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V3_MODEL_VERSION = "EXPECTED_RETURN_V3_CORRECTED_20261017";
+    private static final String EXPECTED_RETURN_V2_MODEL_VERSION = "EXPECTED_RETURN_V2_CORRECTED_20261017";
     private static final int PRIMARY_HORIZON_DAYS = 20;
     private static final int STALE_EXPECTED_RETURN_DAYS = 45;
 
@@ -44,6 +44,9 @@ public class StockQuantOpinionService {
             return null;
         }
         StockSignalLatest signal = cacheService.findLatestSignal(normalized);
+        if (signal != null && !"q4-fin-20261031".equals(signal.getSignalVersion())) {
+            signal = null;
+        }
         StockDataQualityLatest dataQuality = cacheService.findLatestDataQuality(normalized);
         ExpectedRows expected = expectedRows(normalized);
         StockExpectedReturnSnapshot primary = primaryExpectedReturn(expected.rows());
@@ -228,7 +231,7 @@ public class StockQuantOpinionService {
         if (!Double.isFinite(upside)) {
             upside = toDouble(primary == null ? null : primary.getUpsideProbabilityPct());
         }
-        rows.add(new StockQuantOpinionView.Metric("Upside probability",
+        rows.add(new StockQuantOpinionView.Metric("Benchmark outperformance probability",
                 metricPercent(upside),
                 "Calibrated probability when available", probabilityTone(upside)));
         rows.add(new StockQuantOpinionView.Metric("Downside risk",
@@ -498,7 +501,7 @@ public class StockQuantOpinionService {
             rows.add("Signal은 강하지만 최신 기대수익 모델은 20D 초과수익을 낮게 봅니다. 좋은 기업이어도 단기 진입은 보수적으로 해석합니다.");
         }
         if (Double.isFinite(upside) && upside >= 52.0d && expectedConfidence > 0 && expectedConfidence < 55) {
-            rows.add("상승 확률은 50%를 넘지만 모델 신뢰도가 높지 않습니다. 방향성보다 순위 참고용으로 보는 편이 안전합니다.");
+            rows.add("비교지수 초과 확률은 50%를 넘지만 모델 신뢰도가 높지 않습니다. 가격 상승 확률이 아니며 순위 참고용입니다.");
         }
         if (Double.isFinite(downsideProbability) && downsideProbability >= 40.0d
                 && Double.isFinite(expectedExcess) && expectedExcess > 0.0d) {
@@ -540,7 +543,7 @@ public class StockQuantOpinionService {
             StockMacroRegimeSnapshot macroRegime) {
         return label + " 의견입니다. 20D 기대 초과수익 "
                 + signedPercent(expectedExcess)
-                + ", 보정 상승확률 " + metricPercent(upside)
+                + ", 비교지수 초과확률 " + metricPercent(upside)
                 + ", 하락확률 " + metricPercent(downsideProbability)
                 + ", Signal " + signalScore
                 + ", 데이터 품질 " + qualityScore
@@ -561,7 +564,7 @@ public class StockQuantOpinionService {
             rows.add("Signal은 강하지만 최신 Expected Return 모델은 단기 초과수익을 낮게 봅니다. 좋은 기업이어도 단기 진입 타이밍은 보수적으로 해석합니다.");
         }
         if (Double.isFinite(upside) && upside >= 52.0d && expectedConfidence > 0 && expectedConfidence < 55) {
-            rows.add("상승 확률은 50%를 넘지만 모델 신뢰도가 높지 않습니다. 방향성보다 순위 참고용으로 보는 게 맞습니다.");
+            rows.add("비교지수 초과 확률은 50%를 넘지만 모델 신뢰도가 높지 않습니다. 가격 상승 확률이 아니며 순위 참고용입니다.");
         }
         if (Double.isFinite(downsideProbability) && downsideProbability >= 40.0d
                 && Double.isFinite(expectedExcess) && expectedExcess > 0.0d) {
@@ -643,7 +646,7 @@ public class StockQuantOpinionService {
             StockMacroRegimeSnapshot macroRegime) {
         return label + " opinion. Expected 20D excess return "
                 + signedPercent(expectedExcess)
-                + ", calibrated upside probability " + metricPercent(upside)
+                + ", calibrated benchmark outperformance probability " + metricPercent(upside)
                 + ", downside probability " + metricPercent(downsideProbability)
                 + ", Signal " + signalScore
                 + ", data quality " + qualityScore

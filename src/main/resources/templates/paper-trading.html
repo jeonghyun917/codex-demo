@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>모의운용 | Quant</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <link rel="stylesheet" th:href="@{/css/paper-trading.css}">
+    <script defer th:src="@{/js/paper-trading.js}"></script>
+</head>
+<body class="market-body"><div class="market-shell">
+    <header class="market-topbar">
+        <a class="market-logo" href="/" aria-label="홈">KY</a>
+        <nav class="market-nav" aria-label="주 메뉴">
+            <a th:each="menu : ${mainMenus}" th:href="${menu.href}" th:text="${menu.label}"
+               th:classappend="${menu.href == '/paper-trading'} ? 'active' : ''"
+               th:attr="aria-current=${menu.href == '/paper-trading' ? 'page' : null}">모의운용</a>
+        </nav>
+    </header>
+    <main class="paper-main">
+        <div class="paper-heading">
+            <div><p class="paper-eyebrow">S&amp;P 500 · PAPER TRADING</p><h1>모의운용 원장</h1></div>
+            <form th:if="${selectedDay != null}" method="get" action="/paper-trading" class="paper-filters">
+                <input th:if="${account != null}" type="hidden" name="fee" th:value="${account.feeKey}">
+                <label for="day">판단일</label><select id="day" name="day" data-submit-select>
+                    <option th:each="d : ${ledger.days}" th:value="${d.date}" th:text="${d.date}" th:selected="${d.date == selectedDay.date}"></option>
+                </select><noscript><button type="submit">조회</button></noscript>
+            </form>
+        </div>
+        <section class="paper-decision" aria-labelledby="decision-title">
+            <div class="paper-section-head"><h2 id="decision-title">오늘의 투자 판단</h2>
+                <span class="paper-status" th:text="${selectedDay == null ? '첫 예측 대기' : selectedDay['decision']}"></span>
+            </div>
+            <p class="paper-notice" th:if="${selectedDay == null}" th:text="${ledger.message}"></p>
+            <div th:if="${selectedDay != null}">
+                <p class="paper-notice">지수 50일선 대비 <strong th:text="${selectedDay['trend']}"></strong>
+                    <span th:if="${selectedDay['candidateCount'] == 0}"> · 조건을 모두 충족한 종목 없음 · 신규 매수 없이 현금 대기</span>
+                    <span th:if="${selectedDay['candidateCount'] > 0}"> · 다음 거래일 시가 기준 모의 진입 검토 · 일 최대 2종목</span>
+                </p>
+                <dl class="paper-summary">
+                    <div><dt>분석 종목</dt><dd th:text="${selectedDay['analysisCount']}"></dd></div>
+                    <div><dt>확률 상위 관심 종목</dt><dd th:text="${selectedDay['interestCount']}"></dd></div>
+                    <div><dt>최종 매수 후보</dt><dd th:text="${selectedDay['candidateCount']}"></dd></div>
+                    <div><dt>변동성 허용 상한</dt><dd th:text="${selectedDay['volatilityCap']}"></dd></div>
+                </dl>
+                <div class="paper-meta"><span>예측 저장 <time th:text="${selectedDay.recordedAt}"></time></span><span>다음 장 개장 <time th:text="${selectedDay.nextOpen}"></time></span></div>
+            </div>
+        </section>
+        <section class="paper-section" aria-labelledby="predictions-title">
+            <div class="paper-section-head"><h2 id="predictions-title">관심 종목 · 매수 제외 사유</h2><span class="paper-caption">확률순</span></div>
+            <p class="paper-caption">목표 선도달 확률: 20거래일 안에 -5% 손절보다 +15% 익절에 먼저 도달할 모델 확률. 예상 수익률이 아닙니다.</p>
+            <div th:if="${selectedDay == null}" class="paper-empty"><h3>저장된 예측이 없습니다</h3><p>소급 생성된 기록 없음</p></div>
+            <div th:if="${selectedDay != null}">
+                <div class="paper-search">
+                    <label for="prediction-scope">대상</label><select id="prediction-scope"><option value="interest">관심 종목 · 상위 20%</option><option value="selected">매수 후보</option><option value="all">전체 분석 종목</option></select>
+                    <label for="prediction-search">종목</label><input id="prediction-search" type="search" placeholder="티커 검색" autocomplete="off">
+                    <span id="prediction-count" class="paper-caption" aria-live="polite"></span>
+                </div>
+                <div class="paper-table-wrap" tabindex="0" aria-label="예측 목록">
+                    <table><thead><tr><th>순위 · 종목</th><th>목표 선도달 확률</th><th>20일 변동성</th><th>63일 고점 대비</th><th>판단 · 제외 사유</th></tr></thead>
+                        <tbody><tr th:each="r : ${selectedDay.predictions}" th:attr="data-symbol=${r.symbol},data-interest=${r['interest']},data-selected=${r.selected}">
+                            <td><span class="paper-rank" th:text="${r['rank']}"></span><strong th:text="${r.symbol}"></strong></td>
+                            <td th:text="${r.probability}"></td><td th:text="${r.volatility}"></td><td th:text="${r['high63']}"></td>
+                            <td class="paper-reason"><span th:class="${r.selected ? 'paper-selected' : 'paper-muted'}" th:text="${r['reason']}"></span></td>
+                        </tr></tbody>
+                    </table>
+                </div><p id="search-empty" hidden class="paper-caption" role="status">해당 조건의 종목이 없습니다.</p>
+                <p class="paper-caption">고점 위치는 참고 지표이며 매수 조건에 추가하지 않았습니다. 매수 후보는 주문·체결을 의미하지 않습니다.</p>
+            </div>
+        </section>
+        <section class="paper-section" aria-labelledby="history-title">
+            <div class="paper-section-head"><h2 id="history-title">과거 검증 근거</h2><span class="paper-label">과거 데이터 재검증</span></div>
+            <div th:if="${ledger['history'] == null || !ledger['history']['available']}" class="paper-empty"><p>연결된 과거 검증 결과가 없습니다.</p></div>
+            <div th:if="${ledger['history'] != null &amp;&amp; ledger['history']['available']}">
+                <p class="paper-caption" th:text="${ledger['history']['notice']}"></p>
+                <div class="paper-table-wrap" tabindex="0" aria-label="과거 검증 결과">
+                    <table><thead><tr><th>구간</th><th>평가 기간</th><th>마지막 판단일</th><th>편도 비용</th><th>현금 포함 수익률</th><th>최대낙폭</th><th>종료 거래</th></tr></thead>
+                        <tbody><tr th:each="h : ${ledger['history']['rows']}"><td th:text="${h.label}"></td><td><span th:text="${h.start}"></span> ~ <span th:text="${h.end}"></span></td><td th:text="${h.lastDecision}"></td><td th:text="${h.fee}"></td><td th:text="${h.returnPct}"></td><td th:text="${h.drawdownPct}"></td><td th:text="${h.trades}"></td></tr></tbody>
+                    </table>
+                </div>
+                <p class="paper-caption">동일한 두 조건 결합 전략 · 잔여 포지션 청산까지 평가 · 누적 수익률, 연율화 아님<br>과거 가격·구성종목의 누락 및 기업행사 한계가 남아 있습니다.</p>
+                <details class="paper-provenance"><summary>검증 자료 출처</summary><p th:text="${ledger['history']['source']}"></p><p th:text="${ledger['history']['sha256']}"></p></details>
+            </div>
+            <div class="paper-bin-section" aria-labelledby="probability-evidence-title">
+                <div class="paper-section-head"><h3 id="probability-evidence-title">확률 구간별 실제 청산 결과</h3>
+                    <div th:if="${ledger['probabilityEvidence'] != null &amp;&amp; ledger['probabilityEvidence']['available']}" class="paper-filters">
+                        <label for="probability-period">검증 구간 · 편도 비용</label>
+                        <select id="probability-period"><option th:each="g : ${ledger['probabilityEvidence']['groups']}" th:value="${g.key}" th:text="${g.label + ' · ' + g.fee}"></option></select>
+                    </div>
+                </div>
+                <p class="paper-caption">두 조건 결합 전략으로 진입 후 청산한 거래만 집계했습니다. 전체 분석 종목의 적중률이나 현재 관심 종목의 기대수익률이 아닙니다.</p>
+                <p th:if="${ledger['probabilityEvidence'] == null || !ledger['probabilityEvidence']['available']}" class="paper-empty">검증된 확률 구간 통계가 없습니다.</p>
+                <div th:if="${ledger['probabilityEvidence'] != null &amp;&amp; ledger['probabilityEvidence']['available']}">
+                    <div th:each="g, state : ${ledger['probabilityEvidence']['groups']}" class="paper-bin-group" th:attr="data-probability-group=${g.key}" th:hidden="${!state.first}">
+                        <p class="paper-caption"><span th:text="${g.start}"></span> ~ <span th:text="${g.end}"></span> 평가 · 마지막 판단일 <span th:text="${g.lastDecision}"></span> · 편도 비용 <span th:text="${g.fee}"></span></p>
+                        <dl class="paper-bin-summary">
+                            <div><dt>전체 종료 거래</dt><dd th:text="${g.count + '건'}"></dd></div>
+                            <div><dt>전체 익절률</dt><dd th:text="${g.tpRate}"></dd></div>
+                            <div><dt>전체 손절률</dt><dd th:text="${g.slRate}"></dd></div>
+                            <div><dt>거래당 평균 순수익률</dt><dd th:text="${g.meanReturn}"></dd></div>
+                        </dl>
+                        <div class="paper-table-wrap paper-bin-table" tabindex="0" aria-label="확률 구간별 청산 통계">
+                            <table><thead><tr><th>예측 확률 구간</th><th>거래 수</th><th>평균 예측 확률</th><th>실제 익절률</th><th>실제 손절률</th><th>기간 청산률</th><th>평균 순수익률</th><th>표본 상태</th></tr></thead>
+                                <tbody><tr th:each="b : ${g.rows}"><td th:text="${b.label}"></td><td th:text="${b.count}"></td><td th:text="${b.meanProbability}"></td><td><span th:text="${b.tpRate}"></span><small th:text="${b.tpCount + '건'}"></small></td><td><span th:text="${b.slRate}"></span><small th:text="${b.slCount + '건'}"></small></td><td><span th:text="${b.timeRate}"></span><small th:text="${b.timeCount + '건'}"></small></td><td th:text="${b.meanReturn}"></td><td class="paper-muted" th:text="${b.sampleNote}"></td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="paper-caption">익절 = +15% 목표 청산 · 손절 = -5% 또는 갭 하락 손절 · 기간 청산 = 최대 20거래일 도달<br>평균 순수익률은 매수·매도 비용을 반영한 거래별 수익률의 단순평균입니다. 현금 포함 계좌 수익률과 다릅니다.</p>
+                    <p class="paper-caption">확률은 10%포인트 구간이며 100%는 마지막 구간에 포함합니다. 0건은 표본 없음, 30건 미만은 소표본으로 표시합니다. 30건 이상도 신뢰도를 보장하지 않으며, 같은 종목의 반복 거래와 이미 확인한 과거 구간의 선택 편향이 남아 있습니다.</p>
+                    <details class="paper-provenance"><summary>확률 통계 검증 자료</summary><p th:text="${ledger['probabilityEvidence']['source']}"></p><p th:text="${ledger['probabilityEvidence']['sha256']}"></p></details>
+                </div>
+            </div>
+        </section>
+        <section class="paper-section" aria-labelledby="account-title">
+            <div class="paper-section-head"><h2 id="account-title">저장 이후 모의운용 성과</h2>
+                <form method="get" action="/paper-trading" class="paper-filters">
+                    <input th:if="${selectedDay != null}" type="hidden" name="day" th:value="${selectedDay.date}">
+                    <label for="fee">편도 비용</label><select id="fee" name="fee" data-submit-select th:disabled="${account == null}">
+                        <option value="0.001" th:selected="${account == null || account.feeKey == '0.001'}">0.10%</option><option value="0.002" th:selected="${account != null &amp;&amp; account.feeKey == '0.002'}">0.20%</option>
+                    </select><noscript><button type="submit">조회</button></noscript>
+                </form>
+            </div>
+            <p class="paper-caption">사전 저장된 예측에 이후 실제 일봉을 적용한 모의 계좌입니다. 과거 백테스트와 별개이며 실제 증권사 체결은 없습니다.</p>
+            <div th:if="${account == null}" class="paper-empty"><h3>평가 기록이 없습니다</h3></div>
+            <div th:if="${account != null}">
+                <p class="paper-caption"><span th:text="${account['start']}"></span> ~ <span th:text="${account.end}"></span> · 최신 계좌 평가 · 저장된 예측 <span th:text="${ledger.capturedDays}"></span>일</p>
+                <p th:if="${account['initialState']}" class="paper-notice">아직 모의 체결이 없습니다. 현금 대기 상태의 0%는 전략 성과를 입증하지 않습니다.</p>
+                <dl class="paper-metrics">
+                    <div><dt>현금 포함 평가자산</dt><dd th:text="${account.equity}"></dd></div><div><dt>평가손익률</dt><dd th:text="${account.markedReturnPct}"></dd></div><div><dt>최대낙폭</dt><dd th:text="${account.drawdownPct}"></dd></div><div><dt>종료 거래</dt><dd th:text="${account.trades}"></dd></div>
+                </dl>
+                <dl class="paper-account"><div><dt>현금</dt><dd th:text="${account.cash}"></dd></div><div><dt>보유 평가금액</dt><dd th:text="${account.holdings}"></dd></div><div><dt>보유 종목</dt><dd th:text="${account.positions}"></dd></div><div><dt>완료 수익률</dt><dd th:text="${account.returnPct}"></dd></div></dl>
+            </div>
+            <h3 class="paper-subtitle">종료 거래 · 예측과 실제 결과</h3>
+            <div th:if="${account == null || #lists.isEmpty(account.rows)}" class="paper-empty"><p>종료된 거래가 없습니다.</p></div>
+            <div th:if="${account != null &amp;&amp; !#lists.isEmpty(account.rows)}" class="paper-table-wrap" tabindex="0" aria-label="종료 거래 목록">
+                <table><thead><tr><th>종목</th><th>판단일</th><th>진입일</th><th>청산일</th><th>예측 확률</th><th>수량</th><th>진입가</th><th>청산가</th><th>청산 사유</th><th>비용 반영 손익</th></tr></thead>
+                    <tbody><tr th:each="t : ${account.rows}"><td th:text="${t.symbol}"></td><td th:text="${t.decision}"></td><td th:text="${t.entry}"></td><td th:text="${t.exit}"></td><td th:text="${t.probability}"></td><td th:text="${t.shares}"></td><td th:text="${t.entryPrice}"></td><td th:text="${t.exitPrice}"></td><td th:text="${t.reason}"></td><td th:text="${t.pnl}"></td></tr></tbody>
+                </table>
+            </div>
+        </section>
+        <section class="paper-section" aria-labelledby="rules-title"><h2 id="rules-title">고정 운용 기준</h2>
+            <dl class="paper-rules"><div><dt>선별</dt><dd>확률 상위 20% + 지수 50일선 위 + 변동성 75백분위 이하</dd></div><div><dt>진입</dt><dd>다음 거래일 시가 · 일 최대 2종목</dd></div><div><dt>청산</dt><dd>익절 +15% · 손절 -5% · 최대 20거래일</dd></div><div><dt>자금</dt><dd>초기 $100,000 · 최대 10종목 · 종목당 최대 10%</dd></div></dl>
+            <p class="paper-caption">연구용 모의운용 · 배당·세금·환율 미포함 · 기업행사 미확정 종목의 기존 제외 유지</p>
+            <div class="paper-meta"><span>원장 시작 <time th:text="${ledger.createdAt}"></time></span><span>조회 데이터 동기화 <time th:text="${ledger.syncedAt}"></time></span></div>
+        </section>
+    </main>
+</div></body></html>

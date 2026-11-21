@@ -35,7 +35,7 @@ public class StockInfoViewService {
         StockMetricSnapshot metric = dashboard.metric();
         JsonNode root = readMetric(metric);
         JsonNode metricNode = root == null ? null : root.get("metric");
-        StockDataQualityLatest dataQuality = dataQualityService.assessAndSave(dashboard);
+        StockDataQualityLatest dataQuality = dataQualityService.assess(dashboard);
 
         List<StockInfoView.SeriesPoint> revenueSeries = quarterlySeries(root, "salesPerShare", "netMargin",
                 profile == null ? null : profile.getShareOutstanding(), "조정 순이익률");

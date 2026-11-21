@@ -172,7 +172,8 @@
     let activeTile = null;
 
     const metricRows = [
-        ["현재가", "price"],
+        ["가격 (USD)", "price"],
+        ["기준일·출처", "priceContext"],
         ["등락률", "change"],
         ["시가총액", "marketCap"],
         ["전일종가", "previousClose"],

@@ -28,4 +28,6 @@ public interface SecFinancialStandardMapper {
     void deleteBySymbol(@Param("symbol") String symbol);
 
     void upsertBatch(@Param("rows") List<SecFinancialStandard> rows);
+
+    void insertNativeBatch(@Param("rows") List<SecFinancialStandard> rows);
 }

@@ -20,7 +20,13 @@ public class SecurityConfig {
                                 pathPattern("/"),
                                 pathPattern("/healthz"),
                                 pathPattern("/quant"),
+                                pathPattern("/paper-trading"),
                                 pathPattern("/dashboard"),
+                                pathPattern("/contact"),
+                                pathPattern("/contact1"),
+                                pathPattern("/contact2"),
+                                pathPattern("/contact3"),
+                                pathPattern("/contact4"),
                                 pathPattern("/atelier"),
                                 pathPattern("/stocks"),
                                 pathPattern("/stocks/**"),
@@ -29,9 +35,13 @@ public class SecurityConfig {
                                 pathPattern("/etfs/**"),
                                 pathPattern("/error"),
                                 pathPattern("/css/**"),
+                                pathPattern("/assets/**"),
                                 pathPattern("/design-concepts/**"),
+                                pathPattern("/fonts/**"),
+                                pathPattern("/img/**"),
                                 pathPattern("/images/**"),
                                 pathPattern("/js/**"),
+                                pathPattern("/vendor/**"),
                                 pathPattern("/favicon.ico")).permitAll()
                         .anyRequest().authenticated()
                 )

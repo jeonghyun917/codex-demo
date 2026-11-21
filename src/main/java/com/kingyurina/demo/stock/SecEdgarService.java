@@ -26,7 +26,7 @@ public class SecEdgarService {
     private static final String COMPANY_FACTS_ENDPOINT = "/api/xbrl/companyfacts";
     private static final int DB_BATCH_SIZE = 200;
     private static final List<String> PERIODIC_FORMS = List.of(
-            "10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A", "40-F", "40-F/A");
+            "10-K", "10-Q", "10-K/A", "10-Q/A", "20-F", "20-F/A", "40-F", "40-F/A", "6-K", "6-K/A");
     private static final Map<String, List<String>> TARGET_CONCEPTS = targetConcepts();
 
     private final SecEdgarProperties properties;
@@ -108,7 +108,9 @@ public class SecEdgarService {
 
             saveFacts(facts, parsedFacts);
             factCount += parsedFacts.size();
-            standardCount += financialStandardService.rebuildFromFacts(symbol, company.getCik(), parsedFacts);
+            // Incoming observations can be partial even when the source refresh succeeds.
+            // Rebuild from the persisted union so earlier coherent statements are not erased.
+            standardCount += financialStandardService.rebuildFromDatabase(symbol);
             success++;
         }
 
@@ -206,8 +208,48 @@ public class SecEdgarService {
                 collectConceptFacts(facts, symbol, cik, taxonomy, concept, unitsNode, fetchedAt);
             }
         }
-        return facts;
+        return canonicalizeInterimPeriods(facts);
     }
+
+    private List<SecCompanyFact> canonicalizeInterimPeriods(List<SecCompanyFact> facts) {
+        Map<InterimPeriodKey, SecFinancialStandardService.NativePeriod> periods = new LinkedHashMap<>();
+        for (SecCompanyFact fact : facts) {
+            if (!SecFinancialStandardService.isForeignInterim(fact)) {
+                continue;
+            }
+            var period = SecFinancialStandardService.nativePeriod(fact);
+            if (period != null) {
+                // A single instant can support both FY and Q4 in memory. Store it once with a stable FY key.
+                periods.merge(interimPeriodKey(fact), period,
+                        (existing, candidate) -> "FY".equals(candidate.period()) ? candidate : existing);
+            }
+        }
+        List<SecCompanyFact> eligible = new ArrayList<>();
+        for (SecCompanyFact fact : facts) {
+            if (!SecFinancialStandardService.isForeignInterim(fact)) {
+                eligible.add(fact);
+                continue;
+            }
+            var period = SecFinancialStandardService.nativePeriod(fact);
+            if (fact.getEndDate() != null && fact.getEndDate().equals(fact.getStartDate())) {
+                period = periods.get(interimPeriodKey(fact));
+            }
+            // Never introduce SQL NULL natural-key columns for new 6-K rows. Original fy/fp remain in rawJson.
+            // Unproved periods (including half/nine-month facts) remain in the source archive only.
+            if (period != null && fact.getFiledAt() != null && !fact.getFiledAt().isBefore(fact.getEndDate())) {
+                fact.setFiscalYear(period.year());
+                fact.setFiscalPeriod(period.period());
+                eligible.add(fact);
+            }
+        }
+        return eligible;
+    }
+
+    private static InterimPeriodKey interimPeriodKey(SecCompanyFact fact) {
+        return new InterimPeriodKey(fact.getAccessionNumber(), fact.getFiledAt(), fact.getEndDate());
+    }
+
+    private record InterimPeriodKey(String accession, LocalDate filedAt, LocalDate endDate) { }
 
     private void collectConceptFacts(List<SecCompanyFact> results,
             String symbol,
@@ -223,8 +265,10 @@ public class SecEdgarService {
                 continue;
             }
 
-            int maxFacts = Math.max(1, properties.maxFactsPerConcept());
-            int start = Math.max(0, values.size() - maxFacts);
+            int maxFacts = properties.maxFactsPerConcept();
+            // SEC arrays contain repeated comparative observations, not one row per period.
+            // Zero retains the complete history; a positive cap is an explicitly lossy opt-in.
+            int start = maxFacts > 0 ? Math.max(0, values.size() - maxFacts) : 0;
             for (int index = start; index < values.size(); index++) {
                 JsonNode item = values.get(index);
                 String accessionNumber = text(item, "accn");
@@ -427,6 +471,18 @@ public class SecEdgarService {
                 "LongTermDebtAndFinanceLeaseObligationsCurrent",
                 "LongTermDebtAndFinanceLeaseObligationsNoncurrent"));
         concepts.put("dei", List.of("EntityCommonStockSharesOutstanding"));
+        concepts.put("ifrs-full", List.of(
+                "Revenue",
+                "RevenueFromContractsWithCustomers",
+                "ProfitLossFromOperatingActivities",
+                "ProfitLossAttributableToOwnersOfParent",
+                "ProfitLoss",
+                "DilutedEarningsLossPerShare",
+                "Assets",
+                "Liabilities",
+                "EquityAttributableToOwnersOfParent",
+                "Equity",
+                "CashFlowsFromUsedInOperatingActivities"));
         return concepts;
     }
 

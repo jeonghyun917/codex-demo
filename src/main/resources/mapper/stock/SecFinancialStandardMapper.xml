@@ -3,6 +3,15 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kingyurina.demo.stock.SecFinancialStandardMapper">
+    <!-- Match FinancialInputPolicy: labels alone are not evidence of duration. -->
+    <sql id="annualDuration">
+          AND COALESCE(period_days, TIMESTAMPDIFF(DAY, start_date, end_date) + 1) BETWEEN 330 AND 380
+          AND (start_date IS NULL OR period_days IS NULL OR period_days = TIMESTAMPDIFF(DAY, start_date, end_date) + 1)
+    </sql>
+    <sql id="quarterDuration">
+          AND COALESCE(period_days, TIMESTAMPDIFF(DAY, start_date, end_date) + 1) BETWEEN 70 AND 110
+          AND (start_date IS NULL OR period_days IS NULL OR period_days = TIMESTAMPDIFF(DAY, start_date, end_date) + 1)
+    </sql>
     <select id="countBySymbol" resultType="int">
         SELECT COUNT(*)
         FROM stock_sec_financial_standard
@@ -29,6 +38,7 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period = 'FY'
+        <include refid="annualDuration"/>
         ORDER BY
             end_date DESC,
             CASE
@@ -45,7 +55,9 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period = 'FY'
+        <include refid="annualDuration"/>
           AND end_date &lt; #{endDate}
+          AND TIMESTAMPDIFF(DAY, end_date, #{endDate}) BETWEEN 330 AND 380
         ORDER BY
             end_date DESC,
             CASE
@@ -62,6 +74,7 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+        <include refid="quarterDuration"/>
         ORDER BY
             end_date DESC,
             CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
@@ -75,7 +88,9 @@
         FROM stock_sec_financial_standard
         WHERE symbol = #{symbol}
           AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
+        <include refid="quarterDuration"/>
           AND end_date &lt; #{endDate}
+          AND TIMESTAMPDIFF(DAY, end_date, #{endDate}) BETWEEN 70 AND 110
         ORDER BY
             end_date DESC,
             CASE WHEN assets IS NOT NULL OR equity IS NOT NULL THEN 0 ELSE 1 END,
@@ -89,7 +104,7 @@
         WHERE symbol = #{symbol}
     </delete>
 
-    <insert id="upsertBatch">
+    <sql id="standardInsertValues">
         INSERT INTO stock_sec_financial_standard (
             symbol,
             cik,
@@ -141,6 +156,16 @@
                 #{row.mappedAt}
             )
         </foreach>
+    </sql>
+
+    <!-- A native partial replay never changes an existing coherent statement or its source evidence. -->
+    <insert id="insertNativeBatch">
+        <include refid="standardInsertValues"/>
+        ON DUPLICATE KEY UPDATE id = id
+    </insert>
+
+    <insert id="upsertBatch">
+        <include refid="standardInsertValues"/>
         ON DUPLICATE KEY UPDATE
             filed_at = VALUES(filed_at),
             start_date = VALUES(start_date),

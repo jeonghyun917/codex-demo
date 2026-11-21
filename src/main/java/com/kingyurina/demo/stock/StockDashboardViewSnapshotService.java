@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 
 import tools.jackson.databind.ObjectMapper;
 
+import com.kingyurina.demo.stock.evaluation.ExpectedReturnEvaluationSummaryService;
+
 @Service
 public class StockDashboardViewSnapshotService {
 
-    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_DATA_SOURCES_V2";
-    private static final Duration DASHBOARD_VIEW_CACHE_TTL = Duration.ofMinutes(10);
+    private static final String DASHBOARD_VIEW_VERSION = "DASHBOARD_QUANT_AI_EVALUATION_V5";
+    private static final Duration DASHBOARD_VIEW_CACHE_TTL = Duration.ofSeconds(30);
+    private static final Duration MATERIALIZED_MAX_AGE = Duration.ofMinutes(5);
 
     private final ObjectProvider<StockBacktestMapper> stockBacktestMapper;
     private final ObjectMapper objectMapper;
@@ -24,6 +27,7 @@ public class StockDashboardViewSnapshotService {
     private final StockMacroRegimeService stockMacroRegimeService;
     private final StockQuantModelHealthService stockQuantModelHealthService;
     private final StockApiDataSourceService stockApiDataSourceService;
+    private final ExpectedReturnEvaluationSummaryService expectedReturnEvaluationSummaryService;
     private final Map<String, CachedDashboardView> dashboardViewCache = new ConcurrentHashMap<>();
 
     public StockDashboardViewSnapshotService(ObjectProvider<StockBacktestMapper> stockBacktestMapper,
@@ -31,13 +35,15 @@ public class StockDashboardViewSnapshotService {
             StockMarketViewService stockMarketViewService,
             StockMacroRegimeService stockMacroRegimeService,
             StockQuantModelHealthService stockQuantModelHealthService,
-            StockApiDataSourceService stockApiDataSourceService) {
+            StockApiDataSourceService stockApiDataSourceService,
+            ExpectedReturnEvaluationSummaryService expectedReturnEvaluationSummaryService) {
         this.stockBacktestMapper = stockBacktestMapper;
         this.objectMapper = objectMapper;
         this.stockMarketViewService = stockMarketViewService;
         this.stockMacroRegimeService = stockMacroRegimeService;
         this.stockQuantModelHealthService = stockQuantModelHealthService;
         this.stockApiDataSourceService = stockApiDataSourceService;
+        this.expectedReturnEvaluationSummaryService = expectedReturnEvaluationSummaryService;
     }
 
     public StockDashboardViewPayload build(String indexCode) {
@@ -53,7 +59,7 @@ public class StockDashboardViewSnapshotService {
             return materialized;
         }
         StockDashboardViewPayload payload = buildUncached(effectiveIndexCode);
-        saveMaterializedDashboardView(mapper, effectiveIndexCode, payload, "ON_DEMAND");
+        // GET paths assemble DB reads only. Persisted publication belongs to the refresh job.
         dashboardViewCache.put(effectiveIndexCode, new CachedDashboardView(payload, Instant.now()));
         return payload;
     }
@@ -84,7 +90,8 @@ public class StockDashboardViewSnapshotService {
                 market,
                 macroRegime,
                 modelHealth,
-                stockApiDataSourceService.build(indexCode, modelHealth));
+                stockApiDataSourceService.build(indexCode, modelHealth),
+                expectedReturnEvaluationSummaryService.build(indexCode));
     }
 
     private StockDashboardViewPayload readMaterializedDashboardView(StockBacktestMapper mapper, String indexCode) {
@@ -94,7 +101,10 @@ public class StockDashboardViewSnapshotService {
         try {
             StockDashboardViewSnapshot snapshot =
                     mapper.findLatestDashboardViewSnapshot(indexCode, DASHBOARD_VIEW_VERSION);
-            if (snapshot == null || snapshot.getPayloadJson() == null || snapshot.getPayloadJson().isBlank()) {
+            if (snapshot == null || snapshot.getPayloadJson() == null || snapshot.getPayloadJson().isBlank()
+                    || snapshot.getGeneratedAt() == null
+                    || snapshot.getGeneratedAt().isAfter(LocalDateTime.now())
+                    || snapshot.getGeneratedAt().isBefore(LocalDateTime.now().minus(MATERIALIZED_MAX_AGE))) {
                 return null;
             }
             StockDashboardViewPayload payload = objectMapper.readValue(snapshot.getPayloadJson(), StockDashboardViewPayload.class);
@@ -115,6 +125,7 @@ public class StockDashboardViewSnapshotService {
                 && payload.modelHealth().alerts() != null
                 && payload.modelHealth().operations() != null
                 && payload.dataSources() != null
+                && payload.expectedReturnEvaluation() != null
                 && hasModelHealthLayer(payload, "Backtest view snapshot");
     }
 

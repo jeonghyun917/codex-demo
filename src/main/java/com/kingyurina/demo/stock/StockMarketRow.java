@@ -6,6 +6,70 @@ import java.time.LocalDateTime;
 
 public class StockMarketRow {
 
+    private LocalDateTime quoteTime;
+    private LocalDate candleDate;
+    private LocalDate previousCandleDate;
+    private String candleSource;
+    private String previousCandleSource;
+    private Integer candleSourceCount;
+    private BigDecimal candleClose;
+    private BigDecimal candlePreviousClose;
+    private BigDecimal candleOpen;
+    private BigDecimal candleHigh;
+    private BigDecimal candleLow;
+
+    public LocalDateTime getQuoteTime() { return quoteTime; }
+    public void setQuoteTime(LocalDateTime value) { quoteTime = value; }
+
+    public LocalDate getCandleDate() { return candleDate; }
+    public void setCandleDate(LocalDate value) { candleDate = value; }
+
+    public LocalDate getPreviousCandleDate() { return previousCandleDate; }
+    public void setPreviousCandleDate(LocalDate value) { previousCandleDate = value; }
+
+    public String getCandleSource() { return candleSource; }
+    public void setCandleSource(String value) { candleSource = value; }
+
+    public String getPreviousCandleSource() { return previousCandleSource; }
+    public void setPreviousCandleSource(String value) { previousCandleSource = value; }
+
+    public Integer getCandleSourceCount() { return candleSourceCount; }
+    public void setCandleSourceCount(Integer value) { candleSourceCount = value; }
+
+    public BigDecimal getCandleClose() { return candleClose; }
+    public void setCandleClose(BigDecimal value) { candleClose = value; }
+
+    public BigDecimal getCandlePreviousClose() { return candlePreviousClose; }
+    public void setCandlePreviousClose(BigDecimal value) { candlePreviousClose = value; }
+
+    public BigDecimal getCandleOpen() { return candleOpen; }
+    public void setCandleOpen(BigDecimal value) { candleOpen = value; }
+
+    public BigDecimal getCandleHigh() { return candleHigh; }
+    public void setCandleHigh(BigDecimal value) { candleHigh = value; }
+
+    public BigDecimal getCandleLow() { return candleLow; }
+    public void setCandleLow(BigDecimal value) { candleLow = value; }
+
+
+    private LocalDateTime priceAsOf;
+    private String priceSource;
+    private String priceKind;
+    private String priceBasis;
+
+    public LocalDateTime getPriceAsOf() { return priceAsOf; }
+    public void setPriceAsOf(LocalDateTime value) { priceAsOf = value; }
+
+    public String getPriceSource() { return priceSource; }
+    public void setPriceSource(String value) { priceSource = value; }
+
+    public String getPriceKind() { return priceKind; }
+    public void setPriceKind(String value) { priceKind = value; }
+
+    public String getPriceBasis() { return priceBasis; }
+    public void setPriceBasis(String value) { priceBasis = value; }
+
+
     private String symbol;
     private String name;
     private String logo;
@@ -16,6 +80,7 @@ public class StockMarketRow {
     private Integer institutionHolderCount;
     private java.time.LocalDate institutionReportQuarter;
     private BigDecimal currentPrice;
+    private BigDecimal threeMonthHigh;
     private BigDecimal previousClose;
     private BigDecimal openPrice;
     private BigDecimal highPrice;
@@ -130,6 +195,14 @@ public class StockMarketRow {
 
     public void setCurrentPrice(BigDecimal currentPrice) {
         this.currentPrice = currentPrice;
+    }
+
+    public BigDecimal getThreeMonthHigh() {
+        return threeMonthHigh;
+    }
+
+    public void setThreeMonthHigh(BigDecimal threeMonthHigh) {
+        this.threeMonthHigh = threeMonthHigh;
     }
 
     public BigDecimal getPreviousClose() {

@@ -24,7 +24,9 @@ import tools.jackson.databind.ObjectMapper;
 public class HistoricalBacktestSeedService {
 
     static final String SNAPSHOT_MODE = "HISTORICAL_RECONSTRUCTED";
-    static final String SIGNAL_VERSION = "quant-v2-hist";
+    // New duration, comparison-unit and filing-availability contract; old experiments remain distinguishable.
+    static final String SIGNAL_VERSION = "q4-hist-fin-20261031";
+    static final String SOURCE_SIGNAL_VERSION = "q4-srcfin-20261105";
 
     private static final int CANDLE_LOOKBACK = 260;
     private static final int MIN_CANDLES = 80;
@@ -34,6 +36,10 @@ public class HistoricalBacktestSeedService {
     private final ObjectProvider<StockSignalSnapshotMapper> snapshotMapper;
     private final StockBacktestService stockBacktestService;
     private final ObjectMapper objectMapper;
+    private StockSourceFinancialService sourceFinancialService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setSourceFinancialService(StockSourceFinancialService service) { this.sourceFinancialService=service; }
 
     public HistoricalBacktestSeedService(ObjectProvider<HistoricalBacktestSeedMapper> seedMapper,
             ObjectProvider<IndexConstituentMapper> indexConstituentMapper,
@@ -128,8 +134,11 @@ public class HistoricalBacktestSeedService {
         SecFinancialStandard previousAnnual = annual == null ? null
                 : mapper.findPreviousAnnualAsOf(symbol, annual.getEndDate(), signalDate);
         SecFinancialStandard quarter = mapper.findLatestQuarterAsOf(symbol, signalDate);
+        if(sourceFinancialService!=null)quarter=sourceFinancialService.resolveQuarter(symbol,signalDate,null,quarter,true);
         SecFinancialStandard previousQuarter = quarter == null ? null
                 : mapper.findPreviousQuarterAsOf(symbol, quarter.getEndDate(), signalDate);
+        if(sourceFinancialService!=null&&quarter!=null)previousQuarter=sourceFinancialService.resolveQuarter(symbol,
+            signalDate,quarter.getEndDate(),previousQuarter,true);
         StockRecommendationTrend recommendation = mapper.findRecommendationAsOf(symbol, signalDate);
         StockInstitutionFlow institutionFlow = mapper.findInstitutionFlowAsOf(symbol, signalDate.minusDays(45));
         HistoricalNewsStats news = mapper.findNewsStatsAsOf(symbol, signalDate.minusDays(30).atStartOfDay(),
@@ -156,7 +165,9 @@ public class HistoricalBacktestSeedService {
         snapshot.setSignalDate(signalDate);
         snapshot.setSnapshotMode(SNAPSHOT_MODE);
         snapshot.setCalculatedAt(LocalDateTime.now());
-        snapshot.setSignalVersion(SIGNAL_VERSION);
+        boolean sourceAware=(quarter!=null&&quarter.getRawJson()!=null&&quarter.getRawJson().contains(StockSourceFinancialService.VERSION))
+            ||(previousQuarter!=null&&previousQuarter.getRawJson()!=null&&previousQuarter.getRawJson().contains(StockSourceFinancialService.VERSION));
+        snapshot.setSignalVersion(sourceAware?SOURCE_SIGNAL_VERSION:SIGNAL_VERSION);
         snapshot.setIntegratedScore(rawScore);
         snapshot.setIntegratedLabel(integratedLabel(rawScore));
         snapshot.setTone(tone(rawScore));
@@ -193,13 +204,19 @@ public class HistoricalBacktestSeedService {
                 momentum, risk, institution)));
         snapshot.setSourceFreshnessJson(writeJson(sourceFreshness(signalDate, candles, annual, quarter,
                 recommendation, institutionFlow, news)));
-        snapshot.setRawJson(writeJson(raw(symbol, signalDate, close, annual, previousAnnual, quarter,
-                previousQuarter, recommendation, institutionFlow, news, dataQualityScore)));
+        var inputs=raw(symbol, signalDate, close, annual, previousAnnual, quarter,
+                previousQuarter, recommendation, institutionFlow, news, dataQualityScore);
+        if(sourceAware){
+            inputs.put("signalVersion",snapshot.getSignalVersion());inputs.put("sourceFinancialPolicyVersion",StockSourceFinancialService.VERSION);
+            inputs.put("selectedQuarter",quarter);inputs.put("selectedPreviousQuarter",previousQuarter);
+            inputs.put("sourceAvailabilityPolicy","Date-only publication strictly before decision; reconstructed sources are not historical acquisition/PIT proof.");
+        }
+        snapshot.setRawJson(writeJson(inputs));
         return snapshot;
     }
 
     private static SignalScore valuationScore(BigDecimal close, SecFinancialStandard annual) {
-        BigDecimal eps = annual == null ? null : annual.getEpsDiluted();
+        BigDecimal eps = FinancialInputPolicy.usdQuotedEps(annual);
         if (close == null || eps == null || eps.compareTo(BigDecimal.ZERO) <= 0) {
             return new SignalScore("Valuation", 50, "중립", "과거 시점 EPS가 없어 Valuation을 중립 처리했습니다.");
         }
@@ -238,6 +255,9 @@ public class HistoricalBacktestSeedService {
     }
 
     private static SignalScore growthScore(SecFinancialStandard annual, SecFinancialStandard previousAnnual) {
+        if (!FinancialInputPolicy.comparable(annual, previousAnnual, true)) {
+            return new SignalScore("Growth", 50, "중립", "비교 가능한 전년 재무의 기간/통화가 확인되지 않았습니다.");
+        }
         BigDecimal revenueGrowth = growthPct(value(annual, SecFinancialStandard::getRevenue),
                 value(previousAnnual, SecFinancialStandard::getRevenue));
         BigDecimal incomeGrowth = growthPct(value(annual, SecFinancialStandard::getNetIncome),
@@ -279,6 +299,9 @@ public class HistoricalBacktestSeedService {
     }
 
     private static SignalScore earningsScore(SecFinancialStandard quarter, SecFinancialStandard previousQuarter) {
+        if (!FinancialInputPolicy.comparable(quarter, previousQuarter, false)) {
+            return new SignalScore("Earnings", 50, "중립", "비교 가능한 인접 분기 재무의 기간/통화가 확인되지 않았습니다.");
+        }
         BigDecimal revenueGrowth = growthPct(value(quarter, SecFinancialStandard::getRevenue),
                 value(previousQuarter, SecFinancialStandard::getRevenue));
         BigDecimal incomeGrowth = growthPct(value(quarter, SecFinancialStandard::getNetIncome),

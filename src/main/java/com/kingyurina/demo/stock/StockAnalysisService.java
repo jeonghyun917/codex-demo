@@ -9,7 +9,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -50,6 +49,20 @@ public class StockAnalysisService {
 
     public StockDashboard dashboard(String requestedSymbol) {
         String symbol = normalizeSymbol(requestedSymbol);
+        List<StockCandleDaily> candles = cacheService.findRecentCandles(symbol, 80);
+        StockQuoteCache quote = StockPricePolicy.select(cacheService.findQuote(symbol), candles);
+        CompanyProfile profile = cacheService.findProfile(symbol);
+        StockMetricSnapshot metric = cacheService.findLatestMetric(symbol);
+        return new StockDashboard(symbol, properties.hasApiKey(), cacheService.databaseEnabled(),
+                true, true, true, true, true, true, true, "Stored data; no collection during page requests.",
+                profile, quote, metric, cacheService.findRecentNews(symbol, 5),
+                cacheService.findRecentRecommendations(symbol, 4), cacheService.findRecentEpsSurprises(symbol, 4),
+                candles, summarize(quote, metric));
+    }
+
+    /** Batch-only collection; web reads must use dashboard(). */
+    public StockDashboard refreshDashboard(String requestedSymbol) {
+        String symbol = normalizeSymbol(requestedSymbol);
         boolean databaseEnabled = cacheService.databaseEnabled();
 
         if (!properties.hasApiKey()) {
@@ -89,6 +102,11 @@ public class StockAnalysisService {
         }
 
         StockQuoteCache quote = parseQuote(symbol, response.body());
+        if (!StockPricePolicy.usableQuote(quote)
+                || quote.getQuoteTime().isBefore(LocalDateTime.now().minusDays(7))
+                || cached != null && cached.getQuoteTime() != null && !quote.getQuoteTime().isAfter(cached.getQuoteTime())) {
+            return new CachedValue<>(cached, true);
+        }
         cacheService.saveQuote(quote);
         return new CachedValue<>(quote, false);
     }
@@ -106,6 +124,7 @@ public class StockAnalysisService {
         }
 
         CompanyProfile profile = parseProfile(symbol, response.body());
+        if (!StringUtils.hasText(profile.getName())) { return new CachedValue<>(cached, true); }
         cacheService.saveProfile(profile);
         return new CachedValue<>(profile, false);
     }
@@ -123,6 +142,10 @@ public class StockAnalysisService {
         }
 
         StockMetricSnapshot metric = parseMetric(symbol, response.body());
+        if (metric.getPeNormalizedAnnual() == null && metric.getPbAnnual() == null && metric.getRoeTtm() == null
+                && metric.getEpsTtm() == null && metric.getWeek52High() == null && metric.getWeek52Low() == null) {
+            return new CachedValue<>(cached, true);
+        }
         cacheService.saveMetric(metric);
         return new CachedValue<>(metric, false);
     }
@@ -146,6 +169,7 @@ public class StockAnalysisService {
         }
 
         List<CompanyNews> news = parseNews(symbol, response.body());
+        if (news.isEmpty()) { return new CachedValue<>(cached, true); }
         cacheService.saveNews(news);
         return new CachedValue<>(news.stream().limit(5).toList(), false);
     }
@@ -168,6 +192,7 @@ public class StockAnalysisService {
         }
 
         List<StockRecommendationTrend> recommendations = parseRecommendations(symbol, response.body());
+        if (recommendations.isEmpty()) { return new CachedValue<>(cached, true); }
         cacheService.saveRecommendations(recommendations);
         return new CachedValue<>(recommendations.stream().limit(4).toList(), false);
     }
@@ -190,6 +215,7 @@ public class StockAnalysisService {
         }
 
         List<StockEpsSurprise> surprises = parseEpsSurprises(symbol, response.body());
+        if (surprises.isEmpty()) { return new CachedValue<>(cached, true); }
         cacheService.saveEpsSurprises(surprises);
         return new CachedValue<>(surprises.stream().limit(4).toList(), false);
     }
@@ -216,11 +242,11 @@ public class StockAnalysisService {
         }
 
         List<StockCandleDaily> candles = parseCandles(symbol, response.body());
-        cacheService.saveCandles(candles);
-        return new CachedValue<>(candles.stream()
-                .sorted((left, right) -> right.getTradeDate().compareTo(left.getTradeDate()))
-                .limit(30)
-                .toList(), false);
+        StockCacheService.CandleSaveResult saved = cacheService.saveCandles(candles);
+        if (saved == null || saved.canonicalRows() == 0 || saved.rejectedRows() > 0) {
+            return new CachedValue<>(cached, true);
+        }
+        return new CachedValue<>(cacheService.findRecentCandles(symbol, 30), false);
     }
 
     private StockQuoteCache parseQuote(String symbol, String json) {
@@ -258,7 +284,7 @@ public class StockAnalysisService {
 
     private StockMetricSnapshot parseMetric(String symbol, String json) {
         JsonNode root = readTree(json);
-        JsonNode metricNode = Optional.ofNullable(root.get("metric")).orElse(root);
+        JsonNode metricNode = root == null ? null : root.get("metric");
         StockMetricSnapshot metric = new StockMetricSnapshot();
         metric.setSymbol(symbol);
         metric.setMetricDate(LocalDate.now());
@@ -403,7 +429,7 @@ public class StockAnalysisService {
         try {
             return objectMapper.readTree(json);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to parse Finnhub JSON.", ex);
+            return null; // An unusable provider payload must not replace the last good cache.
         }
     }
 
@@ -456,7 +482,7 @@ public class StockAnalysisService {
         if (!StringUtils.hasText(text)) {
             return null;
         }
-        return new BigDecimal(text);
+        try { return new BigDecimal(text); } catch (NumberFormatException ex) { return null; }
     }
 
     private static BigDecimal decimalAt(JsonNode node, int index) {

@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 800 800"
+     role="presentation"
+     aria-hidden="true">
+    <metadata>
+        Original repository-authored fallback illustration derived from the
+        procedural ReferencePlanet landmark groups. No reference-site asset
+        was copied or traced.
+    </metadata>
+    <defs>
+        <clipPath id="fallback-core-clip">
+            <path d="M151 382C146 274 225 170 337 139C449 108 584 154 642 255C700 356 671 493 598 585C525 677 391 713 275 668C159 623 91 503 151 382Z"/>
+        </clipPath>
+        <filter id="fallback-soft-shadow" x="-20%" y="-20%" width="140%" height="150%">
+            <feDropShadow dx="0" dy="14" stdDeviation="0" flood-color="#253238" flood-opacity=".24"/>
+        </filter>
+    </defs>
+
+    <g id="fallback-rear-atmosphere"
+       fill="#4aa8a5"
+       opacity=".28">
+        <path d="M16 315C43 270 98 252 146 267C181 278 205 302 208 330C177 350 130 353 92 342C57 333 34 326 16 315Z"/>
+        <path d="M570 160C615 124 686 126 733 155C765 174 781 204 771 228C731 238 679 227 644 209C614 194 589 178 570 160Z"/>
+        <path d="M601 590C648 555 715 554 763 580C790 595 801 617 792 640C755 657 700 651 658 634C632 624 612 608 601 590Z"/>
+        <path d="M79 645C112 616 157 606 198 619C224 627 245 644 250 665C222 683 181 687 145 680C116 674 92 661 79 645Z"
+              fill="#78d7d0"
+              opacity=".72"/>
+        <path d="M246 62C284 38 335 38 371 57C392 68 406 84 406 101C372 112 330 108 298 96C273 87 256 75 246 62Z"
+              fill="#78d7d0"
+              opacity=".58"/>
+    </g>
+
+    <g id="fallback-rear-rings"
+       fill="none"
+       stroke="#338f91"
+       stroke-linecap="round"
+       opacity=".48">
+        <path d="M22 475C74 434 136 421 193 434" stroke-width="15"/>
+        <path d="M627 291C681 265 740 270 783 303" stroke-width="10"/>
+        <path d="M513 692C561 718 617 724 669 706" stroke-width="18"/>
+        <path d="M155 138C187 111 223 99 261 104" stroke="#f2e5c7" stroke-width="8" opacity=".58"/>
+    </g>
+
+    <g id="fallback-rear-rocks"
+       fill="#638f82"
+       stroke="#3d6f6b"
+       stroke-width="5"
+       stroke-linejoin="round"
+       opacity=".72">
+        <path d="M31 205l38-25 41 13 12 38-27 34-48-8-23-27z"/>
+        <path d="M701 98l22-15 27 9 9 27-18 23-32-4-15-21z"/>
+        <path d="M713 487l52-18 29 30-12 51-53 13-35-38z"/>
+        <path d="M271 724l29-16 36 13 8 32-28 26-39-12-17-23z"/>
+        <path d="M525 55l14-18 24 3 11 21-13 20-26 2-13-15z"/>
+        <path d="M96 535l18-12 22 9 4 22-19 16-24-9-7-15z"/>
+    </g>
+
+    <g id="fallback-rear-scraps"
+       fill="#5f9f98"
+       stroke="#3d6f6b"
+       stroke-width="5"
+       stroke-linejoin="round"
+       opacity=".66">
+        <path d="M119 91l88-18 10 26-84 31z"/>
+        <path d="M617 71l89 20-9 28-94-9z"/>
+        <path d="M14 373l116-12 5 24-113 31z"/>
+        <path d="M681 372l104 18-8 25-110-2z"/>
+        <path d="M572 744l105-29 12 27-99 40z"/>
+        <path d="M168 708l62 20-8 23-67-10z"/>
+    </g>
+
+    <g id="fallback-rear-flecks"
+       fill="#f2e5c7"
+       opacity=".56">
+        <path d="M61 133l13-29 16 35z"/>
+        <path d="M229 45l9-24 13 29z"/>
+        <path d="M454 43l18-25 8 34z"/>
+        <path d="M764 245l22-13-8 29z"/>
+        <path d="M740 667l24-15-5 31z"/>
+        <path d="M455 756l12-27 15 31z"/>
+        <path d="M46 615l20-17-1 29z"/>
+        <path d="M338 31l7-18 11 21z"/>
+    </g>
+
+    <g id="fallback-exterior-debris" fill="#7c8580" stroke="#253238" stroke-width="7" stroke-linejoin="round">
+        <path d="M98 238l25-14 19 22-13 30-31-8z"/>
+        <path d="M676 213l28-9 18 24-15 25-31-12z"/>
+        <path d="M82 558l31-19 24 19-8 35-35 4z"/>
+        <path d="M682 590l23-22 30 12 2 34-31 14z"/>
+        <path d="M360 710l21-14 24 17-9 28-31-1z"/>
+        <path d="M214 137l14-26 28 7 7 29-24 17z"/>
+        <g fill="#fff6df" stroke-width="5">
+            <path d="M119 193l9-15 15 12-5 18z"/>
+            <path d="M717 316l12-13 14 14-8 17z"/>
+            <path d="M633 674l11-17 17 10-3 20z"/>
+            <path d="M173 657l14-12 12 16-9 15z"/>
+        </g>
+    </g>
+
+    <g id="fallback-floating-debris"
+       fill="#d65f47"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <path d="M54 394l25-16 23 13-2 29-26 12-22-17z"/>
+        <path d="M706 402l22-17 25 11 3 28-23 17-27-12z"/>
+        <path d="M296 82l17-19 24 8 5 25-20 17-24-9z"/>
+        <path d="M484 710l20-12 19 15-7 24-24 1z"/>
+        <g fill="#e7b54f" stroke-width="4">
+            <circle cx="76" cy="405" r="7"/>
+            <circle cx="731" cy="412" r="7"/>
+            <circle cx="319" cy="88" r="6"/>
+            <circle cx="504" cy="719" r="6"/>
+        </g>
+    </g>
+
+    <g id="fallback-planet-artwork"
+       transform="translate(-60 -104) scale(1.175)">
+        <g id="fallback-backside-houses"
+           fill="#253238"
+           stroke="#253238"
+           stroke-width="6"
+           stroke-linejoin="round">
+        <path d="M134 350l37-32 38 31v59h-75z"/>
+        <path d="M578 346l35-31 39 33v58h-74z"/>
+        <path d="M239 184l28-25 31 26v47h-59z"/>
+        <path d="M507 187l28-25 30 25v48h-58z"/>
+        <g fill="#e7b54f" stroke="none">
+            <path d="M154 359h13v18h-13zM178 359h13v18h-13z"/>
+            <path d="M596 356h13v18h-13zM621 356h13v18h-13z"/>
+            <path d="M255 190h11v15h-11zM275 190h11v15h-11z"/>
+            <path d="M521 192h11v15h-11zM541 192h11v15h-11z"/>
+        </g>
+        </g>
+
+    <g id="fallback-planet-core" filter="url(#fallback-soft-shadow)">
+        <path d="M151 382C146 274 225 170 337 139C449 108 584 154 642 255C700 356 671 493 598 585C525 677 391 713 275 668C159 623 91 503 151 382Z"
+              fill="#a8bf78" stroke="#253238" stroke-width="15" stroke-linejoin="round"/>
+        <path d="M171 474C190 588 281 661 391 668C286 699 173 643 125 547C104 505 105 462 121 421Z"
+              fill="#78965f" opacity=".72"/>
+        <g fill="#7c8580" stroke="#253238" stroke-width="6">
+            <path d="M168 314l24-19 29 10 8 29-23 21-31-8z"/>
+            <path d="M607 325l25-13 27 18-2 31-29 14-24-19z"/>
+            <path d="M194 543l32-11 22 26-12 31-35 2-17-25z"/>
+            <path d="M568 548l29-17 27 22-5 34-34 9-24-25z"/>
+        </g>
+    </g>
+
+    <g id="fallback-water-band" clip-path="url(#fallback-core-clip)">
+        <path d="M105 370C216 340 302 390 399 365C501 339 577 342 686 380L668 471C565 433 494 441 397 466C293 493 211 440 119 465Z"
+              fill="#338f91"/>
+        <path d="M112 356C218 330 305 378 400 353C502 327 590 335 682 367L670 432C570 399 492 410 396 433C292 458 206 410 113 436Z"
+              fill="#78d7d0" stroke="#253238" stroke-width="8"/>
+        <g fill="#fff6df">
+            <path d="M160 384h65l-8 12h-63z"/>
+            <path d="M256 409h48l-7 11h-47z"/>
+            <path d="M337 381h58l-5 12h-61z"/>
+            <path d="M425 405h52l7 11h-57z"/>
+            <path d="M510 375h63l9 12h-68z"/>
+            <path d="M596 403h38l7 10h-43z"/>
+        </g>
+    </g>
+
+    <g id="fallback-water-works"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M242 392v83h47v-83z" fill="#f2e5c7"/>
+        <path d="M232 393h67l-8-20h-51z" fill="#d65f47"/>
+        <path d="M493 377v85h49v-85z" fill="#f2e5c7"/>
+        <path d="M483 379h69l-9-21h-51z" fill="#d65f47"/>
+        <path d="M289 434h52c21 0 20 30 42 30h110"
+              fill="none"
+              stroke="#fff6df"
+              stroke-width="13"
+              stroke-linecap="round"/>
+        <g fill="#338f91">
+            <circle cx="265" cy="434" r="15"/>
+            <circle cx="518" cy="420" r="15"/>
+        </g>
+    </g>
+
+    <g id="fallback-temple" stroke="#253238" stroke-linejoin="round">
+        <path d="M282 243l43-119 47 108 48-137 52 137 38-92 40 120z"
+              fill="#f2e5c7" stroke-width="9"/>
+        <path d="M317 255h170v80H317z" fill="#f2e5c7" stroke-width="10"/>
+        <g fill="#fff6df" stroke-width="6">
+            <path d="M337 270h18v62h-18z"/>
+            <path d="M371 270h18v62h-18z"/>
+            <path d="M405 270h18v62h-18z"/>
+            <path d="M439 270h18v62h-18z"/>
+        </g>
+        <path d="M286 252l114-39 116 39-17 30-99-22-98 22z" fill="#253238" stroke-width="8"/>
+        <path d="M305 225l95-35 97 35-16 28-81-19-80 19z" fill="#d65f47" stroke-width="8"/>
+        <path d="M400 190v-38" fill="none" stroke="#e7b54f" stroke-width="10" stroke-linecap="round"/>
+        <path d="M400 126l15 26-15 16-15-16z" fill="#e7b54f" stroke-width="7"/>
+    </g>
+
+    <g id="fallback-summit-shrine"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M351 172h98l-14 22h-70z" fill="#d65f47"/>
+        <path d="M368 192h64v42h-64z" fill="#fff6df"/>
+        <path d="M357 192l43-28 43 28z" fill="#a94737"/>
+        <path d="M385 205h30v29h-30z" fill="#253238"/>
+        <path d="M400 164v-35" fill="none" stroke="#e7b54f" stroke-linecap="round"/>
+        <circle cx="400" cy="120" r="10" fill="#e7b54f"/>
+    </g>
+
+    <g id="fallback-mountain-village"
+       stroke="#253238"
+       stroke-width="6"
+       stroke-linejoin="round">
+        <g fill="#f2e5c7">
+            <path d="M225 270h53v52h-53z"/>
+            <path d="M252 233h57v56h-57z"/>
+            <path d="M489 238h58v57h-58z"/>
+            <path d="M524 278h55v53h-55z"/>
+        </g>
+        <g fill="#d65f47">
+            <path d="M216 272l35-31 36 31z"/>
+            <path d="M243 235l38-32 38 32z"/>
+            <path d="M480 240l38-33 39 33z"/>
+            <path d="M515 280l36-31 37 31z"/>
+        </g>
+        <g fill="#338f91" stroke-width="4">
+            <path d="M239 286h12v15h-12zM259 286h12v15h-12z"/>
+            <path d="M268 248h12v16h-12zM289 248h12v16h-12z"/>
+            <path d="M499 253h12v16h-12zM522 253h12v16h-12z"/>
+            <path d="M536 294h12v15h-12zM557 294h12v15h-12z"/>
+        </g>
+    </g>
+
+    <g id="fallback-industrial-machinery" stroke="#253238" stroke-linejoin="round">
+        <path d="M160 301h78v177h-78z" fill="#7c8580" stroke-width="9"/>
+        <path d="M115 290h88v77h-88z" fill="#d65f47" stroke-width="10"/>
+        <ellipse cx="115" cy="328" rx="24" ry="39" fill="#a94737" stroke-width="10"/>
+        <path d="M101 417h91v67h-91z" fill="#a94737" stroke-width="10"/>
+        <ellipse cx="101" cy="451" rx="21" ry="34" fill="#d65f47" stroke-width="9"/>
+        <path d="M91 245h91v38H91z" fill="#d65f47" stroke-width="9"/>
+        <path d="M91 264H63v105h38" fill="none" stroke="#a94737" stroke-width="20" stroke-linecap="round"/>
+        <g fill="none" stroke-width="7">
+            <path d="M78 299l129 169"/>
+            <path d="M73 355l139-75"/>
+            <path d="M81 435l125-116"/>
+        </g>
+        <g fill="#e7b54f" stroke-width="6">
+            <circle cx="160" cy="328" r="13"/>
+            <circle cx="146" cy="451" r="12"/>
+        </g>
+    </g>
+
+    <g id="fallback-industrial-yard"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M154 488h149v58H154z" fill="#7c8580"/>
+        <path d="M178 451h38v95h-38zM246 436h35v110h-35z" fill="#a94737"/>
+        <path d="M167 475h126" fill="none" stroke="#fff6df"/>
+        <g fill="#e7b54f">
+            <circle cx="190" cy="524" r="16"/>
+            <circle cx="267" cy="524" r="16"/>
+        </g>
+        <path d="M198 449v-46h70l26 29" fill="none" stroke-linecap="round"/>
+        <path d="M290 427l21 5-13 19z" fill="#d65f47"/>
+    </g>
+
+    <g id="fallback-utility-antenna" stroke="#253238" stroke-linejoin="round">
+        <path d="M565 390h91v103h-91z" fill="#f2e5c7" stroke-width="9"/>
+        <path d="M552 392l58-48 59 48z" fill="#a94737" stroke-width="9"/>
+        <path d="M637 461h66v69h-66z" fill="#f2e5c7" stroke-width="8"/>
+        <path d="M658 212v161" fill="none" stroke-width="10" stroke-linecap="round"/>
+        <path d="M617 248h82" fill="none" stroke-width="9" stroke-linecap="round"/>
+        <path d="M658 242l-35-35M658 242l35-35M658 242l-35 35M658 242l35 35"
+              fill="none" stroke="#fff6df" stroke-width="13" stroke-linecap="round"/>
+        <circle cx="658" cy="242" r="13" fill="#e7b54f" stroke-width="7"/>
+        <path d="M614 316c-27-29-49-11-52 23 23 8 44 0 52-23z"
+              fill="#fff6df" stroke-width="8"/>
+        <path d="M617 249c54 28 76 65 84 103M617 249c-32 31-42 74-32 112"
+              fill="none" stroke-width="6"/>
+    </g>
+
+    <g id="fallback-utility-ridge"
+       stroke="#253238"
+       stroke-width="7"
+       stroke-linejoin="round">
+        <path d="M520 504l39-48 44 46 47-35 45 53"
+              fill="none"
+              stroke="#7c8580"
+              stroke-width="20"
+              stroke-linecap="round"/>
+        <path d="M560 433v116M624 421v128M677 438v101"
+              fill="none"
+              stroke-linecap="round"/>
+        <path d="M540 456h40M604 447h40M657 462h40"
+              fill="none"
+              stroke="#fff6df"
+              stroke-linecap="round"/>
+        <g fill="#e7b54f">
+            <circle cx="560" cy="433" r="9"/>
+            <circle cx="624" cy="421" r="9"/>
+            <circle cx="677" cy="438" r="9"/>
+        </g>
+    </g>
+
+    <g id="fallback-lower-canopy" stroke="#253238" stroke-linejoin="round">
+        <g fill="#253238" stroke-width="5">
+            <path d="M202 555h14v78h-14z"/>
+            <path d="M258 577h14v79h-14z"/>
+            <path d="M316 565h14v102h-14z"/>
+            <path d="M378 579h14v97h-14z"/>
+            <path d="M442 564h14v103h-14z"/>
+            <path d="M505 576h14v78h-14z"/>
+            <path d="M558 550h14v84h-14z"/>
+        </g>
+        <g stroke-width="8">
+            <path d="M168 578c0-37 27-65 62-65s62 28 62 65c0 41-25 71-62 71s-62-30-62-71z" fill="#205f43"/>
+            <path d="M225 604c0-38 28-68 64-68s64 30 64 68c0 42-26 73-64 73s-64-31-64-73z" fill="#39805b"/>
+            <path d="M288 578c0-44 31-78 72-78s72 34 72 78c0 47-29 82-72 82s-72-35-72-82z" fill="#205f43"/>
+            <path d="M365 604c0-45 32-79 73-79s73 34 73 79c0 47-30 82-73 82s-73-35-73-82z" fill="#39805b"/>
+            <path d="M444 576c0-43 31-76 70-76s70 33 70 76c0 45-28 79-70 79s-70-34-70-79z" fill="#205f43"/>
+            <path d="M516 587c0-37 27-66 63-66s63 29 63 66c0 41-26 71-63 71s-63-30-63-71z" fill="#39805b"/>
+        </g>
+        <g fill="#a8bf78" stroke-width="5">
+            <circle cx="260" cy="582" r="14"/>
+            <circle cx="398" cy="565" r="16"/>
+            <circle cx="533" cy="588" r="14"/>
+        </g>
+    </g>
+
+        <g id="fallback-forest-belt"
+           stroke="#253238"
+           stroke-width="6"
+           stroke-linejoin="round">
+        <g fill="#205f43">
+            <path d="M180 610l25-58 25 58z"/>
+            <path d="M236 636l27-66 28 66z"/>
+            <path d="M300 626l28-72 30 72z"/>
+            <path d="M371 647l30-76 31 76z"/>
+            <path d="M449 628l28-73 30 73z"/>
+            <path d="M518 638l27-67 28 67z"/>
+            <path d="M579 612l24-59 26 59z"/>
+        </g>
+        <g fill="#39805b">
+            <circle cx="216" cy="623" r="22"/>
+            <circle cx="335" cy="641" r="23"/>
+            <circle cx="469" cy="642" r="24"/>
+            <circle cx="574" cy="625" r="22"/>
+        </g>
+        <path d="M186 655c105 34 315 35 433-2"
+              fill="none"
+              stroke="#a8bf78"
+              stroke-width="15"
+              stroke-linecap="round"/>
+        </g>
+    </g>
+</svg>

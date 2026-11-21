@@ -16,6 +16,7 @@ public class StockBacktestResult {
     private LocalDate exitTradeDate;
     private BigDecimal exitClose;
     private BigDecimal forwardReturnPct;
+    private BigDecimal benchmarkReturnPct;
     private Integer integratedScore;
     private Integer valuationScore;
     private Integer qualityScore;
@@ -106,6 +107,14 @@ public class StockBacktestResult {
 
     public BigDecimal getForwardReturnPct() {
         return forwardReturnPct;
+    }
+
+    public BigDecimal getBenchmarkReturnPct() {
+        return benchmarkReturnPct;
+    }
+
+    public void setBenchmarkReturnPct(BigDecimal benchmarkReturnPct) {
+        this.benchmarkReturnPct = benchmarkReturnPct;
     }
 
     public void setForwardReturnPct(BigDecimal forwardReturnPct) {

@@ -38,6 +38,9 @@ public class StockMacroVintageBatchRunner implements ApplicationRunner {
     private static final String FRED_OBSERVATIONS_URL =
             "https://api.stlouisfed.org/fred/series/observations";
     private static final ZoneId FRED_REALTIME_ZONE = ZoneId.of("America/Chicago");
+    static final String DEFAULT_SERIES_CODES = "DGS3MO,DGS10,FEDFUNDS,CPIAUCSL,UNRATE,VIXCLS,DTWEXBGS";
+    private static final List<String> DEFAULT_SERIES_CODE_LIST =
+            List.of("DGS3MO", "DGS10", "FEDFUNDS", "CPIAUCSL", "UNRATE", "VIXCLS", "DTWEXBGS");
 
     private final boolean enabled;
     private final boolean exitOnComplete;
@@ -59,7 +62,7 @@ public class StockMacroVintageBatchRunner implements ApplicationRunner {
             @Value("${app.batch.macro-vintage.exit-on-complete:false}") boolean exitOnComplete,
             @Value("${app.batch.macro-vintage.fetch-fred-api:false}") boolean fetchFredApi,
             @Value("${app.batch.macro-vintage.index-code:SP500}") String indexCode,
-            @Value("${app.batch.macro-vintage.series-codes:DGS3MO,FEDFUNDS,CPIAUCSL,UNRATE}") String seriesCodes,
+            @Value("${app.batch.macro-vintage.series-codes:DGS3MO,DGS10,FEDFUNDS,CPIAUCSL,UNRATE,VIXCLS,DTWEXBGS}") String seriesCodes,
             @Value("${app.batch.macro-vintage.api-key:${FRED_API_KEY:}}") String apiKey,
             @Value("${app.batch.macro-vintage.csv-path:}") String csvPath,
             @Value("${app.batch.macro-vintage.years:5}") int years,
@@ -318,13 +321,14 @@ public class StockMacroVintageBatchRunner implements ApplicationRunner {
 
     private static List<String> parseSeriesCodes(String value) {
         if (value == null || value.isBlank()) {
-            return List.of("DGS3MO");
+            return DEFAULT_SERIES_CODE_LIST;
         }
-        return Arrays.stream(value.split(","))
+        List<String> parsed = Arrays.stream(value.split(","))
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .map(item -> item.toUpperCase(Locale.ROOT))
                 .toList();
+        return parsed.isEmpty() ? DEFAULT_SERIES_CODE_LIST : parsed;
     }
 
     private static List<String> parseCsvLine(String line) {

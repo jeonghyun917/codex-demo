@@ -1,5 +1,6 @@
 package com.kingyurina.demo.stock;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record StockMarketView(
@@ -26,7 +27,9 @@ public record StockMarketView(
             String expectedExcessReturn, String calibratedUpsideProbability, String expectedConfidence,
             Integer expectedConfidenceValue, String expectedModelVersion, String expectedSignalDate,
             Integer valuationScore, Integer qualityScore, Integer growthScore, Integer stabilityScore,
-            Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore) {
+            Integer earningsScore, Integer analystScore, Integer newsScore, Integer momentumScore, Integer riskScore,
+            String threeMonthHighRatio, BigDecimal threeMonthHighRatioValue, String threeMonthHighRatioTone,
+            String priceContext, String priceBasis) {
     }
 
     public record SectorRow(String sector, String count, String marketCap, String averageChange) {

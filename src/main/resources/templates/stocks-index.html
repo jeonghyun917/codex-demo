@@ -66,7 +66,7 @@
                         <span>순위</span>
                         <span>종목</span>
                         <span>섹터</span>
-                        <span><button class="sp-sort" type="button" data-sort="price">현재가</button></span>
+                        <span><button class="sp-sort" type="button" data-sort="price">가격 (USD)</button></span>
                         <span><button class="sp-sort" type="button" data-sort="change">등락률</button></span>
                         <span><button class="sp-sort" type="button" data-sort="marketCap">시가총액</button></span>
                         <span><button class="sp-sort" type="button" data-sort="institution">기관증감</button></span>
@@ -91,7 +91,10 @@
                             </span>
                         </strong>
                         <span th:text="${row.sector}">Information Technology</span>
-                        <span th:text="${row.price}">0원</span>
+                        <span th:attr="data-sort-value=${row.price}" th:title="${row.priceBasis}">
+                            <span th:text="${row.price}">$0.00</span>
+                            <small style="display:block;font-size:10px;white-space:normal" th:text="${row.priceContext}">가격 기준일</small>
+                        </span>
                         <span th:class="${row.positive ? 'up' : 'down'}" th:text="${row.change}">0%</span>
                         <span th:text="${row.marketCap}">0 조원</span>
                         <span th:text="${row.institutionFlow}">-</span>
@@ -195,7 +198,8 @@
         if (index == null) {
             return null;
         }
-        return parseNumber(row.children[index]?.textContent);
+        const cell = row.children[index];
+        return parseNumber(cell?.hasAttribute("data-sort-value") ? cell.dataset.sortValue : cell?.textContent);
     };
 
     button?.addEventListener("click", () => {

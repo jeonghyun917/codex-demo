@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#030711">
+    <meta name="description" content="Procedural Intelligence — a living visual system generated in real time.">
+    <title>Procedural Intelligence — King Yurina</title>
+    <link rel="stylesheet" th:href="@{/css/contact-procedural.css}" href="/css/contact-procedural.css">
+</head>
+<body class="procedural-page">
+<main class="procedural-stage" data-procedural-stage>
+    <canvas class="procedural-canvas" data-procedural-canvas aria-hidden="true"></canvas>
+    <div class="procedural-atmosphere" aria-hidden="true"></div>
+    <div class="procedural-grid" aria-hidden="true"></div>
+    <div class="signal-cursor" data-signal-cursor aria-hidden="true">
+        <span></span><i></i>
+    </div>
+
+    <div class="procedural-fallback" aria-hidden="true">
+        <span class="fallback-core"></span>
+        <span class="fallback-orbit fallback-orbit-a"></span>
+        <span class="fallback-orbit fallback-orbit-b"></span>
+        <span class="fallback-orbit fallback-orbit-c"></span>
+    </div>
+
+    <div class="procedural-loader" data-procedural-loader aria-hidden="true">
+        <div class="loader-aperture">
+            <span class="loader-mark"></span>
+            <span class="loader-ring"></span>
+        </div>
+        <div class="loader-status">
+            <span class="loader-copy">GENERATING CORE</span>
+            <span class="loader-track"><i data-core-loader-track></i></span>
+        </div>
+        <span class="loader-value" data-core-loader-value>000</span>
+    </div>
+
+    <div class="corner-frame" aria-hidden="true">
+        <i class="corner-tl"></i><i class="corner-tr"></i>
+        <i class="corner-bl"></i><i class="corner-br"></i>
+    </div>
+
+    <header class="procedural-header">
+        <a class="procedural-brand" href="/" aria-label="King Yurina home">
+            <span class="brand-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>KING YURINA<small>INTELLIGENCE SYSTEMS</small></span>
+        </a>
+        <nav class="procedural-nav" aria-label="Primary navigation">
+            <a href="/">OVERVIEW</a>
+            <a href="/quant">SYSTEM</a>
+            <a href="/atelier">RESEARCH</a>
+            <a href="/contact3" aria-current="page">CONTACT</a>
+        </nav>
+        <div class="system-cluster">
+            <span class="system-copy"><small>NETWORK</small>LIVE</span>
+            <span class="system-indicator" aria-label="System online"><span></span></span>
+        </div>
+    </header>
+
+    <section class="procedural-hero" aria-labelledby="procedural-title">
+        <div class="hero-index" aria-hidden="true"><span>01</span><i></i><span>∞</span></div>
+        <p class="procedural-kicker"><i></i>A LIVING SYSTEM / GENERATED IN REAL TIME<i></i></p>
+        <h1 id="procedural-title">
+            <span data-title="PROCEDURAL">PROCEDURAL</span>
+            <span data-title="INTELLIGENCE">INTELLIGENCE</span>
+        </h1>
+        <p class="procedural-subtitle">A living intelligence shaped by signal, motion and time.</p>
+        <a class="core-entry" href="/quant">
+            <span class="entry-scan" aria-hidden="true"></span>
+            <small>01 / ACCESS</small>
+            <strong>ENTER THE CORE</strong>
+            <i aria-hidden="true"><span></span></i>
+        </a>
+    </section>
+
+    <aside class="procedural-rail rail-left" aria-label="System status">
+        <span class="rail-label">SYSTEM STATUS</span>
+        <strong>OPERATIONAL</strong>
+        <span class="rail-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    </aside>
+    <aside class="procedural-rail rail-right" aria-label="Core stability">
+        <span class="rail-label">CORE STABILITY</span>
+        <strong data-core-stability>98.72%</strong>
+        <span class="rail-frequency" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </aside>
+
+    <div class="signal-coordinates coordinate-left" aria-hidden="true">
+        <span>X <b data-core-x>+0.000</b></span>
+        <span>Y <b data-core-y>+0.000</b></span>
+    </div>
+    <div class="signal-coordinates coordinate-right" aria-hidden="true">
+        <span>FIELD <b data-core-field>72.84</b></span>
+        <span>HZ <b data-core-hz>917.0</b></span>
+    </div>
+
+    <aside class="core-phase" aria-label="Core phase telemetry">
+        <span class="phase-orbit" aria-hidden="true"><i></i></span>
+        <div>
+            <small>ACTIVE PHASE</small>
+            <strong data-core-phase>03 / SYNTHESIS</strong>
+            <span class="phase-spectrum" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+            <b>FLUX <em data-core-flux>0.784</em></b>
+        </div>
+    </aside>
+
+    <footer class="procedural-footer">
+        <div class="footer-signature">
+            <span>PRC-INTL</span>
+            <i aria-hidden="true"></i>
+            <span data-core-cycle>CYCLE 0000</span>
+        </div>
+        <div class="footer-runtime">
+            <span data-core-clock>00:00:00</span>
+            <span>REAL TIME</span>
+            <i aria-hidden="true"></i>
+        </div>
+    </footer>
+
+    <p class="procedural-error" role="status" aria-live="polite" data-procedural-error></p>
+</main>
+
+<script type="module" th:src="@{/js/contact-procedural.js}" src="/js/contact-procedural.js"></script>
+</body>
+</html>

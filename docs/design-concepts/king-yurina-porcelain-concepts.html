@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>King Yurina Porcelain Concepts</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #d9d2c4;
+            color: #10263a;
+            font-family: Inter, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        .frame {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            min-width: 1180px;
+            min-height: 760px;
+            overflow: hidden;
+            margin: 0;
+            background: #f7f1e7;
+            isolation: isolate;
+        }
+        .nav {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 72px;
+            padding: 0 48px;
+            border-bottom: 1px solid rgba(24, 61, 91, 0.12);
+            background: rgba(255,255,255,0.64);
+            backdrop-filter: blur(18px);
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .mark {
+            display: grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(20, 58, 91, 0.18);
+            border-radius: 50%;
+            background: #fff;
+            color: #123b5e;
+        }
+        .links {
+            display: flex;
+            gap: 30px;
+            color: rgba(14, 36, 52, 0.74);
+        }
+        .outline {
+            display: grid;
+            place-items: center;
+            min-width: 144px;
+            height: 44px;
+            border: 1px solid rgba(20, 58, 91, 0.18);
+            background: rgba(255,255,255,0.5);
+        }
+        .hero {
+            position: absolute;
+            z-index: 6;
+            top: 224px;
+            left: 50%;
+            width: 860px;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        .eyebrow {
+            margin: 0 0 22px;
+            color: #174c78;
+            font-size: 13px;
+            font-weight: 950;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        h1 {
+            margin: 0;
+            color: #142737;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 150px;
+            font-weight: 700;
+            line-height: 0.76;
+            letter-spacing: -0.025em;
+        }
+        h1 span { display: block; }
+        .copy {
+            width: 640px;
+            margin: 28px auto 0;
+            color: rgba(16, 38, 58, 0.72);
+            font-size: 18px;
+            font-weight: 600;
+            line-height: 1.55;
+        }
+        .actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 36px;
+        }
+        .actions a {
+            display: grid;
+            place-items: center;
+            width: 118px;
+            height: 54px;
+            border: 1px solid rgba(20,58,91,0.16);
+            background: rgba(255,255,255,0.74);
+            color: #123b5e;
+            font-size: 13px;
+            font-weight: 950;
+            text-transform: uppercase;
+            text-decoration: none;
+            box-shadow: 0 18px 38px rgba(81, 72, 58, 0.08);
+        }
+        .actions a:first-child {
+            background: #123b5e;
+            color: #fff;
+        }
+        .product {
+            position: absolute;
+            z-index: 3;
+            left: 50%;
+            bottom: 120px;
+            width: 1080px;
+            height: 360px;
+            transform: translateX(-50%);
+        }
+        .plate {
+            position: absolute;
+            left: 50%;
+            bottom: 26px;
+            width: 880px;
+            height: 132px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background:
+                radial-gradient(ellipse at center, rgba(255,255,255,0.98) 0 34%, rgba(224, 235, 238, 0.66) 35% 37%, rgba(255,255,255,0.96) 38% 56%, rgba(190, 201, 199, 0.18) 58% 100%),
+                #fff;
+            box-shadow:
+                0 38px 70px rgba(84, 75, 62, 0.2),
+                inset 0 3px 12px rgba(255,255,255,0.95),
+                inset 0 -12px 26px rgba(113,104,92,0.1);
+        }
+        .blue-rim {
+            position: absolute;
+            left: 50%;
+            bottom: 67px;
+            width: 570px;
+            height: 52px;
+            transform: translateX(-50%);
+            border: 3px solid #174c78;
+            border-radius: 50%;
+            opacity: 0.82;
+        }
+        .bowl {
+            position: absolute;
+            left: 390px;
+            bottom: 90px;
+            width: 300px;
+            height: 138px;
+            border-radius: 44% 44% 50% 50% / 38% 38% 62% 62%;
+            background:
+                radial-gradient(ellipse at 50% 14%, #ffffff 0 42%, rgba(219,231,235,0.74) 43% 48%, transparent 49%),
+                linear-gradient(180deg, #fff 0%, #f5f2ed 56%, #ded4c8 100%);
+            box-shadow: 0 30px 56px rgba(73, 64, 52, 0.18), inset 0 6px 20px #fff;
+        }
+        .cup {
+            position: absolute;
+            right: 250px;
+            bottom: 94px;
+            width: 148px;
+            height: 140px;
+            border-radius: 30px 30px 58px 58px;
+            background: linear-gradient(115deg, #fff 0%, #fbfaf6 50%, #d9d3c9 100%);
+            box-shadow: 0 28px 50px rgba(73,64,52,0.16), inset 8px 8px 22px #fff;
+        }
+        .cup::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 16px;
+            right: 16px;
+            height: 24px;
+            border: 3px solid #174c78;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.76);
+        }
+        .cup::after {
+            content: "";
+            position: absolute;
+            top: 40px;
+            right: -42px;
+            width: 54px;
+            height: 54px;
+            border: 12px solid #f6f3ec;
+            border-left: 0;
+            border-radius: 0 50% 50% 0;
+            box-shadow: 8px 12px 20px rgba(73,64,52,0.08);
+        }
+        .glass {
+            position: absolute;
+            left: 230px;
+            bottom: 106px;
+            width: 130px;
+            height: 168px;
+            border: 2px solid rgba(84,126,148,0.2);
+            border-radius: 48% 48% 38% 38%;
+            background: linear-gradient(120deg, rgba(255,255,255,0.3), rgba(174,211,228,0.16));
+            box-shadow: inset 10px 10px 26px rgba(255,255,255,0.56), 0 22px 42px rgba(72,81,86,0.08);
+        }
+        .flatware {
+            position: absolute;
+            bottom: 82px;
+            width: 320px;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, transparent, #dfe2e1 20%, #aeb7ba 50%, #eef1ef 80%, transparent);
+            box-shadow: 0 16px 22px rgba(69,64,58,0.08);
+        }
+        .flatware.left { left: 70px; transform: rotate(-7deg); }
+        .flatware.right { right: 78px; transform: rotate(8deg); }
+        .card {
+            position: absolute;
+            z-index: 4;
+            width: 192px;
+            height: 70px;
+            border: 1px solid rgba(20,58,91,0.12);
+            border-radius: 10px;
+            padding: 15px 18px;
+            background: rgba(255,255,255,0.62);
+            box-shadow: 0 18px 44px rgba(78,70,60,0.08);
+            backdrop-filter: blur(16px);
+            color: rgba(16,38,58,0.82);
+            font-size: 12px;
+            font-weight: 950;
+            text-transform: uppercase;
+        }
+        .card b { display: block; margin-top: 6px; color: #123b5e; font-size: 16px; }
+        .card.one { left: 118px; top: 378px; }
+        .card.two { right: 138px; top: 390px; }
+        .card.three { left: 194px; top: 540px; }
+        .card.four { right: 205px; top: 550px; }
+        .grain {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0.12;
+            background-image: radial-gradient(circle, rgba(20,58,91,0.28) 0 1px, transparent 1.2px);
+            background-size: 72px 72px;
+        }
+        .marble {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background:
+                linear-gradient(118deg, transparent 0 28%, rgba(123,151,159,0.08) 30%, transparent 33%),
+                linear-gradient(22deg, transparent 0 38%, rgba(184,151,113,0.1) 40%, transparent 43%),
+                radial-gradient(circle at 54% 34%, rgba(255,255,255,0.72), transparent 24%);
+            opacity: 0.78;
+        }
+        .c2 {
+            background:
+                radial-gradient(circle at 50% 20%, rgba(255,255,255,0.95), transparent 28%),
+                linear-gradient(135deg, #f8f4ed 0%, #e9ded0 100%);
+        }
+        .c2 .hero { top: 170px; }
+        .c2 h1 { font-size: 132px; }
+        .c2 .product { bottom: 84px; transform: translateX(-50%) scale(1.12); }
+        .c2 .blue-rim { border-color: #0e426d; }
+        .c2 .card { display: none; }
+        .c2 .catalog {
+            position: absolute;
+            z-index: 5;
+            right: 82px;
+            bottom: 100px;
+            display: grid;
+            grid-template-columns: repeat(2, 160px);
+            gap: 14px;
+        }
+        .tile {
+            height: 140px;
+            border: 1px solid rgba(20,58,91,0.1);
+            background: rgba(255,255,255,0.52);
+            box-shadow: 0 16px 34px rgba(70,60,48,0.08);
+            backdrop-filter: blur(12px);
+        }
+        .tile::before {
+            content: "";
+            display: block;
+            width: 96px;
+            height: 34px;
+            margin: 36px auto 16px;
+            border-radius: 50%;
+            border: 2px solid #174c78;
+            background: #fff;
+        }
+        .tile span { display: block; text-align: center; color: #123b5e; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+        .c3 {
+            background:
+                radial-gradient(circle at 34% 40%, rgba(255,255,255,0.92), transparent 28%),
+                linear-gradient(120deg, #f3ece0 0%, #f9f6ef 55%, #d4e1e3 100%);
+        }
+        .c3 .hero {
+            left: 86px;
+            top: 194px;
+            width: 530px;
+            transform: none;
+            text-align: left;
+        }
+        .c3 h1 { font-size: 116px; }
+        .c3 .copy { width: 460px; margin-left: 0; }
+        .c3 .actions { justify-content: flex-start; }
+        .c3 .product {
+            left: auto;
+            right: -84px;
+            bottom: 118px;
+            transform: scale(1.18);
+        }
+        .c3 .plate { width: 960px; }
+        .c3 .bowl { left: 360px; }
+        .c3 .cup { right: 260px; }
+        .c4 {
+            background:
+                radial-gradient(circle at 50% 36%, rgba(255,255,255,0.92), transparent 24%),
+                linear-gradient(180deg, #f8f4eb, #e3d7c7);
+        }
+        .c4 .pattern {
+            position: absolute;
+            inset: 104px 72px 70px;
+            z-index: 2;
+            border: 1px solid rgba(23,76,120,0.14);
+            background:
+                radial-gradient(circle at 18% 22%, transparent 0 42px, rgba(23,76,120,0.13) 43px 45px, transparent 46px),
+                radial-gradient(circle at 76% 68%, transparent 0 64px, rgba(23,76,120,0.12) 65px 68px, transparent 69px),
+                linear-gradient(90deg, rgba(23,76,120,0.08) 1px, transparent 1px),
+                linear-gradient(180deg, rgba(23,76,120,0.08) 1px, transparent 1px);
+            background-size: auto, auto, 120px 120px, 120px 120px;
+            opacity: 0.8;
+        }
+        .c4 .hero { top: 188px; }
+        .c4 .product { bottom: 88px; }
+        .c5 {
+            background:
+                radial-gradient(circle at 54% 36%, rgba(255,255,255,0.9), transparent 24%),
+                linear-gradient(135deg, #e8e1d5 0%, #faf7ef 44%, #d3e0e2 100%);
+        }
+        .c5 .hero {
+            top: 214px;
+            width: 760px;
+        }
+        .c5 h1 { font-size: 128px; }
+        .c5 .product {
+            bottom: 72px;
+            transform: translateX(-50%) scale(1.26);
+        }
+        .c5 .ambient {
+            position: absolute;
+            z-index: 1;
+            left: 50%;
+            top: 140px;
+            width: 760px;
+            height: 760px;
+            transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.78), rgba(255,255,255,0.14) 58%, transparent 72%);
+        }
+    </style>
+</head>
+<body>
+    <section class="frame c1" id="concept-1">
+        <div class="marble"></div><div class="grain"></div>
+        <nav class="nav"><div class="mark">KY</div><div class="links"><span>Quant</span><span>Stocks</span><span>Heatmap</span><span>ETF</span><span>Atelier</span><span>Systems</span><span>Signal</span><span>Contact</span></div><div class="outline">Stock Analysis</div></nav>
+        <div class="card one">Signal<b>79 / 100</b></div><div class="card two">Expected<b>20D Alpha</b></div><div class="card three">Risk<b>Covariance</b></div><div class="card four">Opinion<b>Calibrated</b></div>
+        <main class="hero"><p class="eyebrow">Porcelain-grade quant intelligence</p><h1><span>king</span><span>yurina</span></h1><p class="copy">A quiet market atelier shaped like fine porcelain, where signal, expected return, risk, and portfolio conviction are set with precision.</p><div class="actions"><a>Quant</a><a>Stocks</a><a>Heatmap</a></div></main>
+        <div class="product"><div class="plate"></div><div class="blue-rim"></div><div class="bowl"></div><div class="cup"></div><div class="glass"></div><div class="flatware left"></div><div class="flatware right"></div></div>
+    </section>
+    <section class="frame c2" id="concept-2">
+        <div class="marble"></div><div class="grain"></div>
+        <nav class="nav"><div class="mark">KY</div><div class="links"><span>Quant</span><span>Stocks</span><span>Heatmap</span><span>ETF</span><span>Atelier</span><span>Systems</span><span>Signal</span><span>Contact</span></div><div class="outline">Stock Analysis</div></nav>
+        <main class="hero"><p class="eyebrow">Product-page porcelain intelligence</p><h1><span>king</span><span>yurina</span></h1><p class="copy">Apple-like restraint with fine ceramic depth, designed as a premium product reveal for quant decisions.</p><div class="actions"><a>Quant</a><a>Stocks</a><a>Heatmap</a></div></main>
+        <div class="product"><div class="plate"></div><div class="blue-rim"></div><div class="bowl"></div><div class="cup"></div><div class="glass"></div><div class="flatware left"></div><div class="flatware right"></div></div>
+        <div class="catalog"><div class="tile"><span>Signal</span></div><div class="tile"><span>Expected</span></div><div class="tile"><span>Risk</span></div><div class="tile"><span>Portfolio</span></div></div>
+    </section>
+    <section class="frame c3" id="concept-3">
+        <div class="marble"></div><div class="grain"></div>
+        <nav class="nav"><div class="mark">KY</div><div class="links"><span>Quant</span><span>Stocks</span><span>Heatmap</span><span>ETF</span><span>Atelier</span><span>Systems</span><span>Signal</span><span>Contact</span></div><div class="outline">Stock Analysis</div></nav>
+        <main class="hero"><p class="eyebrow">Noomo motion, ceramic restraint</p><h1><span>king</span><span>yurina</span></h1><p class="copy">A scroll-reactive table setting, clean enough for luxury commerce and precise enough for market research.</p><div class="actions"><a>Quant</a><a>Stocks</a><a>Heatmap</a></div></main>
+        <div class="product"><div class="plate"></div><div class="blue-rim"></div><div class="bowl"></div><div class="cup"></div><div class="glass"></div><div class="flatware left"></div><div class="flatware right"></div></div>
+    </section>
+    <section class="frame c4" id="concept-4">
+        <div class="pattern"></div><div class="marble"></div><div class="grain"></div>
+        <nav class="nav"><div class="mark">KY</div><div class="links"><span>Quant</span><span>Stocks</span><span>Heatmap</span><span>ETF</span><span>Atelier</span><span>Systems</span><span>Signal</span><span>Contact</span></div><div class="outline">Stock Analysis</div></nav>
+        <main class="hero"><p class="eyebrow">Cobalt heritage system</p><h1><span>king</span><span>yurina</span></h1><p class="copy">Classic blue porcelain patterning meets a modern signal engine, with calm rhythm and premium spacing.</p><div class="actions"><a>Quant</a><a>Stocks</a><a>Heatmap</a></div></main>
+        <div class="product"><div class="plate"></div><div class="blue-rim"></div><div class="bowl"></div><div class="cup"></div><div class="glass"></div><div class="flatware left"></div><div class="flatware right"></div></div>
+    </section>
+    <section class="frame c5" id="concept-5">
+        <div class="ambient"></div><div class="marble"></div><div class="grain"></div>
+        <nav class="nav"><div class="mark">KY</div><div class="links"><span>Quant</span><span>Stocks</span><span>Heatmap</span><span>ETF</span><span>Atelier</span><span>Systems</span><span>Signal</span><span>Contact</span></div><div class="outline">Stock Analysis</div></nav>
+        <main class="hero"><p class="eyebrow">Gallery tableware hero</p><h1><span>king</span><span>yurina</span></h1><p class="copy">A gallery-like hero with oversized porcelain presence, soft light, and decision-grade quant controls.</p><div class="actions"><a>Quant</a><a>Stocks</a><a>Heatmap</a></div></main>
+        <div class="product"><div class="plate"></div><div class="blue-rim"></div><div class="bowl"></div><div class="cup"></div><div class="glass"></div><div class="flatware left"></div><div class="flatware right"></div></div>
+    </section>
+    <script>
+        const selectedConcept = new URLSearchParams(window.location.search).get("concept");
+        if (selectedConcept) {
+            document.querySelectorAll(".frame").forEach((frame, index) => {
+                if (String(index + 1) !== selectedConcept) {
+                    frame.remove();
+                }
+            });
+            document.documentElement.style.overflow = "hidden";
+            document.body.style.overflow = "hidden";
+        }
+    </script>
+</body>
+</html>
